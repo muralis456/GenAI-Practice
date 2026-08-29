@@ -1,0 +1,19 @@
+logging:
+  level:
+    root: INFO
+    com.example.agent: DEBUG
+
+spring:
+  ai:
+    ollama:
+      base-url: http://localhost:11434
+      chat:
+        # Faster local model for UI chat
+        model: llama3.2:3b
+
+        # Other local Ollama models already available on this machine:
+        # model: devstral:24b
+        # model: qwen3-coder:30b
+        # model: qwen2.5:3b
+        # model: phi3:mini
+        # model: gemma2:2b

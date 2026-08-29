@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ollama Agent UI</title>
+    <style>
+        :root {
+            --bg-1: #0f172a;
+            --bg-2: #111827;
+            --panel: rgba(15, 23, 42, 0.78);
+            --panel-border: rgba(148, 163, 184, 0.2);
+            --input-bg: rgba(15, 23, 42, 0.5);
+            --primary: #8b5cf6;
+            --primary-2: #3b82f6;
+            --text: #e2e8f0;
+            --muted: #94a3b8;
+            --user-bubble: #2563eb;
+            --bot-bubble: rgba(148, 163, 184, 0.15);
+            --shadow: 0 18px 50px rgba(15, 23, 42, 0.35);
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html, body {
+            height: 100%;
+            margin: 0;
+            font-family: "Segoe UI", Arial, sans-serif;
+            background: linear-gradient(135deg, var(--bg-1), var(--bg-2));
+            color: var(--text);
+        }
+
+        body {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+        }
+
+        .chat-app {
+            width: min(980px, 100%);
+            height: min(88vh, 860px);
+            display: flex;
+            flex-direction: column;
+            background: var(--panel);
+            border: 1px solid var(--panel-border);
+            border-radius: 26px;
+            box-shadow: var(--shadow);
+            backdrop-filter: blur(8px);
+            overflow: hidden;
+        }
+
+        .chat-header {
+            padding: 18px 22px 12px;
+            border-bottom: 1px solid rgba(148, 163, 184, 0.15);
+            background: rgba(15, 23, 42, 0.45);
+        }
+
+        .chat-header h2 {
+            margin: 0;
+            font-size: 1.28rem;
+            font-weight: 700;
+            letter-spacing: 0.02em;
+        }
+
+        .chat-header p {
+            margin: 6px 0 0;
+            color: var(--muted);
+            font-size: 0.92rem;
+        }
+
+        .messages {
+            flex: 1;
+            padding: 20px 22px 14px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            background: rgba(15, 23, 42, 0.15);
+        }
+
+        .message {
+            max-width: 78%;
+            padding: 14px 16px;
+            border-radius: 18px;
+            line-height: 1.55;
+            white-space: pre-wrap;
+            word-break: break-word;
+            font-size: 0.98rem;
+        }
+
+        .message.bot {
+            align-self: flex-start;
+            background: var(--bot-bubble);
+            border: 1px solid rgba(148, 163, 184, 0.12);
+            color: var(--text);
+            border-bottom-left-radius: 6px;
+        }
+
+        .message.user {
+            align-self: flex-end;
+            background: linear-gradient(135deg, var(--primary-2), var(--primary));
+            border-bottom-right-radius: 6px;
+            color: white;
+        }
+
+        .composer-wrap {
+            padding: 18px 20px 22px;
+            border-top: 1px solid rgba(148, 163, 184, 0.15);
+            background: rgba(15, 23, 42, 0.38);
+        }
+
+        .composer-tools {
+            display: flex;
+            gap: 12px;
+            align-items: flex-end;
+            width: 100%;
+        }
+
+        .model-picker {
+            min-width: 180px;
+        }
+
+        select {
+            width: 100%;
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            border-radius: 14px;
+            padding: 14px 16px;
+            background: var(--input-bg);
+            color: var(--text);
+            font-size: 0.95rem;
+            outline: none;
+        }
+
+        form {
+            display: flex;
+            gap: 12px;
+            align-items: flex-end;
+            width: 100%;
+        }
+
+        textarea {
+            flex: 1;
+            width: 100%;
+            min-height: 60px;
+            max-height: 180px;
+            resize: vertical;
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            border-radius: 18px;
+            padding: 16px 18px;
+            font-size: 1rem;
+            color: var(--text);
+            background: var(--input-bg);
+            outline: none;
+            box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.2);
+        }
+
+        textarea::placeholder {
+            color: var(--muted);
+        }
+
+        textarea:focus {
+            border-color: rgba(139, 92, 246, 0.9);
+            box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.18);
+        }
+
+        button {
+            border: none;
+            border-radius: 18px;
+            padding: 16px 22px;
+            font-size: 0.98rem;
+            font-weight: 700;
+            color: white;
+            background: linear-gradient(135deg, var(--primary), var(--primary-2));
+            cursor: pointer;
+            transition: transform 0.15s ease, opacity 0.2s ease;
+            box-shadow: 0 12px 20px rgba(59, 130, 246, 0.28);
+        }
+
+        button:hover {
+            transform: translateY(-1px);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        @media (max-width: 640px) {
+            body {
+                padding: 12px;
+            }
+
+            .chat-app {
+                height: 92vh;
+                border-radius: 18px;
+            }
+
+            .messages {
+                padding: 16px 16px 12px;
+            }
+
+            .message {
+                max-width: 90%;
+            }
+
+            form {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            button {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="chat-app">
+    <div class="chat-header">
+        <h2>Ollama Agent</h2>
+        <p>Smart assistant powered by local Ollama</p>
+    </div>
+
+    <div class="messages" id="responseBox">
+        <div class="message bot">Hello! Ask me anything, and I’ll respond here.</div>
+    </div>
+
+    <div class="composer-wrap">
+        <form id="askForm">
+            <div class="composer-tools">
+                <div class="model-picker">
+                    <label for="modelSelect" style="display:block; color: var(--muted); font-size: 0.75rem; margin-bottom: 6px;">Model</label>
+                    <select id="modelSelect" name="model">
+                        <option value="llama3.2:3b">llama3.2:3b</option>
+                        <option value="devstral:24b">devstral:24b</option>
+                        <option value="qwen3-coder:30b">qwen3-coder:30b</option>
+                    </select>
+                </div>
+                <textarea id="prompt" name="prompt" placeholder="Type your prompt here...">Hello, what can you do?</textarea>
+                <button type="submit">Send</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    const form = document.getElementById('askForm');
+    const promptInput = document.getElementById('prompt');
+    const modelSelect = document.getElementById('modelSelect');
+    const responseBox = document.getElementById('responseBox');
+
+    function appendMessage(text, type, isLoading = false) {
+        const message = document.createElement('div');
+        message.className = 'message ' + type;
+        if (isLoading) {
+            message.classList.add('loading');
+            message.id = 'loadingMessage';
+        }
+        message.textContent = text;
+        responseBox.appendChild(message);
+        responseBox.scrollTop = responseBox.scrollHeight;
+        return message;
+    }
+
+    function clearLoadingMessage() {
+        const loadingMessage = document.getElementById('loadingMessage');
+        if (loadingMessage) {
+            loadingMessage.remove();
+        }
+    }
+
+    form.addEventListener('submit', async function (event) {
+        event.preventDefault();
+        const prompt = promptInput.value.trim();
+        if (!prompt) {
+            appendMessage('Please enter a prompt.', 'bot');
+            return;
+        }
+
+        clearLoadingMessage();
+        appendMessage(prompt, 'user');
+        const loadingMessage = appendMessage('Loading...', 'bot', true);
+
+        try {
+            const formData = new FormData();
+            formData.append('prompt', prompt);
+            formData.append('model', modelSelect.value);
+
+            const response = await fetch('/ask', {
+                method: 'POST',
+                body: formData,
+                cache: 'no-store'
+            });
+
+            const text = await response.text();
+            const content = response.ok ? text : 'Error: ' + text;
+
+            loadingMessage.textContent = content;
+            loadingMessage.id = '';
+            loadingMessage.classList.remove('loading');
+        } catch (error) {
+            loadingMessage.textContent = 'Request failed: ' + error.message;
+            loadingMessage.id = '';
+            loadingMessage.classList.remove('loading');
+        } finally {
+            promptInput.value = '';
+            promptInput.focus();
+            const submitButton = form.querySelector('button[type="submit"]');
+            if (submitButton) {
+                submitButton.disabled = false;
+                submitButton.textContent = 'Send';
+            }
+        }
+    });
+</script>
+</body>
+</html>

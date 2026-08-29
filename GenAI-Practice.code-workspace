@@ -1,0 +1,13 @@
+{
+	"folders": [
+		{
+			"name": "streamlit-demo",
+			"path": "streamlit-demo"
+		},
+		{
+			"name": "hello-streamlit",
+			"path": "hello-streamlit"
+		}
+	],
+	"settings": {}
+}
