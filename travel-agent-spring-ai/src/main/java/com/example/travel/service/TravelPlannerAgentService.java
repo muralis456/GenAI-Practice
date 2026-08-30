@@ -1,5 +1,6 @@
 package com.example.travel.service;
 
+import com.example.travel.config.TravelModelsProperties;
 import com.example.travel.dto.TravelPlanResponse;
 import com.example.travel.dto.TravelRequest;
 import com.example.travel.entity.UserPreference;
@@ -29,6 +30,7 @@ public class TravelPlannerAgentService {
     private final RunnableConfig travelRunnableConfig;
     private final FinalPlannerAgentService finalPlannerAgentService;
     private final UserPreferenceService userPreferenceService;
+    private final TravelModelsProperties travelModels;
     private final int maxRetries;
     private final ConcurrentHashMap<String, TravelState> pendingPlans = new ConcurrentHashMap<>();
 
@@ -36,11 +38,13 @@ public class TravelPlannerAgentService {
                                      RunnableConfig travelRunnableConfig,
                                      FinalPlannerAgentService finalPlannerAgentService,
                                      UserPreferenceService userPreferenceService,
+                                     TravelModelsProperties travelModels,
                                      @Value("${travel.graph.max-retries:2}") int maxRetries) {
         this.travelGraph = travelGraph;
         this.travelRunnableConfig = travelRunnableConfig;
         this.finalPlannerAgentService = finalPlannerAgentService;
         this.userPreferenceService = userPreferenceService;
+        this.travelModels = travelModels;
         this.maxRetries = maxRetries;
     }
 
@@ -52,6 +56,9 @@ public class TravelPlannerAgentService {
 
         Map<String, Object> input = TravelState.fromRequest(request, historyContext);
         input.put(TravelState.MAX_RETRIES, maxRetries);
+        if (TravelState.isBlank((String) input.get(TravelState.SELECTED_MODEL))) {
+            input.put(TravelState.SELECTED_MODEL, configuredModelsLabel());
+        }
         userPreferenceService.find(userId).ifPresent(preference -> applyPreferences(input, preference));
         ensureOrigin(input);
 
@@ -64,7 +71,8 @@ public class TravelPlannerAgentService {
 
     public TravelPlanResponse approve(String userId, String threadId) {
         TravelState state = requirePending(userId, threadId);
-        String plan = finalPlannerAgentService.compose(state);
+        // Final LLM report was already composed after Validator in FinalNode.
+        String plan = TravelState.firstNonBlank(state.finalPlan(), finalPlannerAgentService.compose(state));
         TravelPlanResponse response = toResponse(state, threadId, false);
         response.setFinalPlan(plan);
         response.setStatus("COMPLETE");
@@ -152,7 +160,7 @@ public class TravelPlannerAgentService {
         TravelPlanResponse response = new TravelPlanResponse(
                 state.userId(),
                 TravelState.firstNonBlank(state.destination(), "Destination from current request"),
-                state.selectedModel(),
+                TravelState.firstNonBlank(state.selectedModel(), configuredModelsLabel()),
                 state.finalPlan(),
                 joinFlights(state),
                 joinResearch(state),
@@ -174,6 +182,13 @@ public class TravelPlannerAgentService {
         return response;
     }
 
+    private String configuredModelsLabel() {
+        return "planner=" + travelModels.getPlanner()
+                + "; extract=" + travelModels.getExtraction()
+                + "; itinerary=" + travelModels.getItinerary()
+                + "; final=" + travelModels.getFinale();
+    }
+
     private String joinFlights(TravelState state) {
         if (state.flights().isEmpty()) {
             return "Not requested for this trip.";
@@ -182,10 +197,21 @@ public class TravelPlannerAgentService {
     }
 
     private String joinResearch(TravelState state) {
-        if (state.research().isEmpty()) {
-            return "Not requested for this trip.";
+        StringBuilder sb = new StringBuilder();
+        if (!state.research().isEmpty()) {
+            sb.append(state.research().stream().map(TravelResearch::toDisplay).collect(Collectors.joining("\n")));
         }
-        return state.research().stream().map(TravelResearch::toDisplay).collect(Collectors.joining("\n"));
+        if (!state.attractions().isEmpty()) {
+            if (!sb.isEmpty()) {
+                sb.append("\n\nAttractions\n");
+            } else {
+                sb.append("Attractions\n");
+            }
+            sb.append(state.attractions().stream()
+                    .map(attraction -> attraction.toDisplay())
+                    .collect(Collectors.joining("\n")));
+        }
+        return sb.isEmpty() ? "Not requested for this trip." : sb.toString();
     }
 
     private String joinHotels(TravelState state) {

@@ -69,7 +69,11 @@ public class HotelAgentService {
             fallback.setName("Hotel options in " + destination);
             fallback.setArea(destination);
             fallback.setPriceRange(cheaper ? "budget" : "mid-range");
-            fallback.setNotes(rawContent.length() > 500 ? rawContent.substring(0, 500) + "..." : rawContent);
+            String notes = rawContent;
+            if (JsonSupport.looksLikeJsonObject(notes) || notes.length() > 400) {
+                notes = "See hotel search results for " + destination + " (" + (cheaper ? "budget" : "mid-range") + ").";
+            }
+            fallback.setNotes(notes);
             hotels = List.of(fallback);
         }
         return new ArrayList<>(hotels);

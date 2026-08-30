@@ -12,7 +12,7 @@ public class TravelRequest {
     private String budget;
     private String travelStyle;
     private String preferences;
-    private String selectedModel = "llama3.2:3b";
+    private String selectedModel;
     private String prompt;
 
     public String getUserId() {

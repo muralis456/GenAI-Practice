@@ -673,7 +673,7 @@
                             <textarea id="tripPrompt" name="preferences" placeholder="e.g. From Bengaluru to Japan for 7 days under ₹2 lakh" rows="3">From Bengaluru to Japan for 7 days under ₹2 lakh — family-friendly with good food and local experiences.</textarea>
 
                             <input type="hidden" name="userId" value="aaro_hi_user" />
-                            <input type="hidden" name="selectedModel" value="llama3.2:3b" />
+                            <input type="hidden" name="selectedModel" value="" />
                             <input type="hidden" name="departureCity" value="Bengaluru" />
                             <input type="hidden" name="departureDate" value="" />
                             <input type="hidden" name="returnDate" value="" />
@@ -822,7 +822,7 @@
             data.travelInsights ? 'Research\n' + data.travelInsights : '',
             data.itinerarySummary ? 'Itinerary\n' + data.itinerarySummary : '',
             validation,
-            data.finalPlan ? (data.awaitingApproval ? 'Approval card\n' : 'Final plan\n') + data.finalPlan : ''
+            data.finalPlan ? (data.awaitingApproval ? 'Final report (validated)\n' : 'Final plan\n') + data.finalPlan : ''
         ].filter(Boolean).join('\n\n');
     };
 

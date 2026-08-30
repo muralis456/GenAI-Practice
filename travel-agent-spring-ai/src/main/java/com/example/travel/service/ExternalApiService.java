@@ -2,6 +2,7 @@ package com.example.travel.service;
 
 import com.example.travel.model.FlightOption;
 import com.example.travel.model.SearchHit;
+import com.example.travel.support.FlightSupport;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -119,7 +120,7 @@ public class ExternalApiService {
         // Paid plans can enable travel.aviation.include-flight-date=true.
         boolean useDate = includeFlightDate && date != null && !date.isBlank();
         try {
-            List<FlightOption> result = callAviationStack(departureIata, arrivalIata, useDate ? date : null);
+            List<FlightOption> result = callAviationStack(departureIata, arrivalIata, useDate ? date : null, date);
             if (!useDate) {
                 annotateLiveSchedule(result, date);
             }
@@ -132,7 +133,7 @@ public class ExternalApiService {
                 log.warn("AviationStack rejected flight_date (plan restriction). Retrying without date for {} -> {}",
                         departureIata, arrivalIata);
                 try {
-                    List<FlightOption> live = callAviationStack(departureIata, arrivalIata, null);
+                    List<FlightOption> live = callAviationStack(departureIata, arrivalIata, null, date);
                     annotateLiveSchedule(live, date);
                     return live;
                 } catch (Exception retryException) {
@@ -151,7 +152,8 @@ public class ExternalApiService {
         }
     }
 
-    private List<FlightOption> callAviationStack(String departureIata, String arrivalIata, String flightDateParam) {
+    private List<FlightOption> callAviationStack(String departureIata, String arrivalIata,
+                                                  String flightDateParam, String tripDate) {
         UriComponentsBuilder builder = UriComponentsBuilder.fromUriString(aviationUrl + "/flights")
                 .queryParam("access_key", aviationApiKey)
                 .queryParam("dep_iata", departureIata)
@@ -163,7 +165,7 @@ public class ExternalApiService {
         log.info("Calling AviationStack flights API: from={}, to={}, flight_date={}",
                 departureIata, arrivalIata, flightDateParam == null ? "(omitted for free plan)" : flightDateParam);
         ResponseEntity<String> response = restTemplate.getForEntity(url, String.class);
-        return parseFlights(response.getBody(), departureIata, arrivalIata, flightDateParam);
+        return parseFlights(response.getBody(), departureIata, arrivalIata, tripDate);
     }
 
     private void annotateLiveSchedule(List<FlightOption> flights, String requestedDate) {
@@ -174,16 +176,16 @@ public class ExternalApiService {
             if ("unavailable".equalsIgnoreCase(option.getStatus())) {
                 continue;
             }
-            String note = "live schedule (AviationStack free plan: no flight_date filter)";
+            // Keep notes short for UI — avoid repeating the free-plan disclaimer on every row.
             if (requestedDate != null && !requestedDate.isBlank()) {
-                note += "; tripDate=" + requestedDate;
+                option.setNotes("live · trip " + requestedDate);
+            } else {
+                option.setNotes("live schedule");
             }
-            String existing = option.getNotes() == null ? "" : option.getNotes();
-            option.setNotes(existing.isBlank() ? note : existing + "; " + note);
         }
     }
 
-    private List<FlightOption> parseFlights(String responseBody, String origin, String destination, String date) {
+    private List<FlightOption> parseFlights(String responseBody, String origin, String destination, String tripDate) {
         List<FlightOption> flights = new ArrayList<>();
         try {
             JsonNode root = objectMapper.readTree(responseBody);
@@ -196,13 +198,14 @@ public class ExternalApiService {
             JsonNode data = root.path("data");
             if (!data.isArray() || data.isEmpty()) {
                 flights.add(unavailable("No flight records were returned by AviationStack"
-                        + (date == null ? "." : " for " + date + ".")));
+                        + (tripDate == null ? "." : " for " + tripDate + ".")));
                 return flights;
             }
-            List<FlightOption> dated = new ArrayList<>();
-            int count = Math.min(data.size(), 20);
+            List<FlightOption> parsed = new ArrayList<>();
+            int count = Math.min(data.size(), 40);
             for (int index = 0; index < count; index++) {
                 JsonNode flight = data.get(index);
+                String flightDate = text(flight, "flight_date", "");
                 FlightOption option = new FlightOption(
                         text(flight.path("flight"), "iata"),
                         text(flight.path("airline"), "name"),
@@ -211,16 +214,10 @@ public class ExternalApiService {
                         text(flight.path("departure"), "scheduled"),
                         text(flight.path("arrival"), "scheduled"),
                         text(flight, "flight_status"),
-                        "date=" + text(flight, "flight_date"));
-                flights.add(option);
-                String flightDate = text(flight, "flight_date", "");
-                if (date != null && (date.equals(flightDate) || flightDate.startsWith(date))) {
-                    dated.add(option);
-                }
+                        flightDate.isBlank() ? "" : "date=" + flightDate);
+                parsed.add(option);
             }
-            return dated.isEmpty()
-                    ? new ArrayList<>(flights.subList(0, Math.min(flights.size(), 10)))
-                    : new ArrayList<>(dated.subList(0, Math.min(dated.size(), 10)));
+            return FlightSupport.dedupePreferDate(parsed, tripDate, 5);
         } catch (Exception exception) {
             log.warn("Could not parse AviationStack response", exception);
             flights.add(unavailable("AviationStack returned an unreadable flight response."));

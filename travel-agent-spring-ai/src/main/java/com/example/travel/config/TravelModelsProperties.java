@@ -6,24 +6,12 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public class TravelModelsProperties {
 
     /**
-     * Slot extraction / JSON shaping (fast, cheap). Default Granite if pulled, else Llama.
+     * Configured via {@code travel.models.*} in application.yml only — no code defaults.
      */
-    private String extraction = "llama3.2:3b";
-
-    /**
-     * Planner reasoning. Prefer Qwen when available.
-     */
-    private String planner = "llama3.2:3b";
-
-    /**
-     * Itinerary drafting.
-     */
-    private String itinerary = "llama3.2:3b";
-
-    /**
-     * Final approved narrative. Prefer a stronger model when available.
-     */
-    private String finale = "llama3.2:3b";
+    private String extraction;
+    private String planner;
+    private String itinerary;
+    private String finale;
 
     private double extractionTemperature = 0.1;
     private double plannerTemperature = 0.2;
@@ -95,12 +83,18 @@ public class TravelModelsProperties {
     }
 
     public String model(AgentRole role) {
-        return switch (role) {
+        String configured = switch (role) {
             case PLANNER -> planner;
             case EXTRACT -> extraction;
             case ITINERARY -> itinerary;
             case FINAL -> finale;
         };
+        if (configured == null || configured.isBlank()) {
+            throw new IllegalStateException(
+                    "travel.models." + role.name().toLowerCase()
+                            + " is not set. Configure it in application.yml (no model hardcoding in code).");
+        }
+        return configured.trim();
     }
 
     public double temperature(AgentRole role) {

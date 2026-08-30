@@ -8,7 +8,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -41,7 +40,6 @@ public class FlightAgentService {
         }
 
         log.info("Flight agent searching {} -> {} on {}", originIata, destinationIata, state.departureDate());
-        // Deterministic @Tool-backed call (AviationStack with flight_date).
         List<FlightOption> flights = flightSearchTool.search(originIata, destinationIata, state.departureDate());
         if (flights == null || flights.isEmpty()) {
             return FlightSearchResult.unavailable(originIata, destinationIata, "No flights were returned.");
@@ -49,14 +47,35 @@ public class FlightAgentService {
         return new FlightSearchResult(originIata, destinationIata, flights);
     }
 
-    public record FlightSearchResult(String originIata, String destinationIata, List<FlightOption> flights) {
+    /** Explicit result type (IDE-friendly; avoids flaky nested-record resolution). */
+    public static final class FlightSearchResult {
+        private final String originIata;
+        private final String destinationIata;
+        private final List<FlightOption> flights;
+
+        public FlightSearchResult(String originIata, String destinationIata, List<FlightOption> flights) {
+            this.originIata = originIata == null ? "" : originIata;
+            this.destinationIata = destinationIata == null ? "" : destinationIata;
+            this.flights = flights == null ? List.of() : List.copyOf(flights);
+        }
+
+        public String originIata() {
+            return originIata;
+        }
+
+        public String destinationIata() {
+            return destinationIata;
+        }
+
+        public List<FlightOption> flights() {
+            return flights;
+        }
+
         static FlightSearchResult unavailable(String originIata, String destinationIata, String message) {
             FlightOption option = new FlightOption();
             option.setNotes(message);
             option.setStatus("unavailable");
-            List<FlightOption> flights = new ArrayList<>();
-            flights.add(option);
-            return new FlightSearchResult(originIata, destinationIata, flights);
+            return new FlightSearchResult(originIata, destinationIata, List.of(option));
         }
     }
 }

@@ -1,5 +1,7 @@
 package com.example.travel.model;
 
+import com.example.travel.support.JsonSupport;
+
 import java.io.Serial;
 import java.io.Serializable;
 
@@ -36,9 +38,14 @@ public class TravelResearch implements Serializable {
     }
 
     public String toDisplay() {
-        if (topic == null || topic.isBlank()) {
-            return summary == null ? "" : summary;
+        String safeSummary = summary == null ? "" : summary.trim();
+        if (JsonSupport.looksLikeJsonObject(safeSummary)) {
+            // Never dump raw model JSON into the chat UI.
+            safeSummary = "See attractions and itinerary for details.";
         }
-        return topic + ": " + (summary == null ? "" : summary);
+        if (topic == null || topic.isBlank()) {
+            return safeSummary;
+        }
+        return topic + ": " + safeSummary;
     }
 }

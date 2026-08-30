@@ -65,7 +65,7 @@ public class TravelState extends AgentState {
         Map<String, Channel<?>> schema = new LinkedHashMap<>();
         schema.put(USER_REQUEST, Channels.base(() -> ""));
         schema.put(USER_ID, Channels.base(() -> "anonymous"));
-        schema.put(SELECTED_MODEL, Channels.base(() -> "llama3.2:3b"));
+        schema.put(SELECTED_MODEL, Channels.base(() -> ""));
         schema.put(HISTORY_CONTEXT, Channels.base(() -> ""));
         schema.put(ORIGIN, Channels.base(() -> ""));
         schema.put(DESTINATION, Channels.base(() -> ""));
@@ -110,7 +110,7 @@ public class TravelState extends AgentState {
         Map<String, Object> input = new LinkedHashMap<>();
         input.put(USER_REQUEST, prompt);
         input.put(USER_ID, firstNonBlank(request.getUserId(), "anonymous"));
-        input.put(SELECTED_MODEL, firstNonBlank(request.getSelectedModel(), "llama3.2:3b"));
+        input.put(SELECTED_MODEL, blankToEmpty(request.getSelectedModel()));
         input.put(HISTORY_CONTEXT, historyContext == null ? "" : historyContext);
         input.put(ORIGIN, blankToEmpty(request.getDepartureCity()));
         input.put(DESTINATION, blankToEmpty(request.getDestination()));
@@ -143,7 +143,7 @@ public class TravelState extends AgentState {
     }
 
     public String selectedModel() {
-        return this.<String>value(SELECTED_MODEL).orElse("llama3.2:3b");
+        return this.<String>value(SELECTED_MODEL).orElse("");
     }
 
     public String historyContext() {

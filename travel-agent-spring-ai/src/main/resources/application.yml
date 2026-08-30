@@ -8,11 +8,9 @@ spring:
     ollama:
       base-url: http://localhost:11434
       chat:
-        model: llama3.2:3b
-        options:
-          model: llama3.2:3b
-          temperature: 0.2
-          num-predict: 600
+        model: granite4.2:8b
+        temperature: 0.2
+        num-predict: 800
   datasource:
     url: jdbc:postgresql://localhost:5432/travel_agent
     username: ${DB_USERNAME:postgres}
@@ -42,10 +40,10 @@ travel:
   graph:
     max-retries: 2
   models:
-    extraction: ${TRAVEL_MODEL_FAST:llama3.2:3b}
-    planner: ${TRAVEL_MODEL_PLANNER:llama3.2:3b}
-    itinerary: ${TRAVEL_MODEL_ITINERARY:llama3.2:3b}
-    finale: ${TRAVEL_MODEL_FINAL:llama3.2:3b}
+    extraction: ${TRAVEL_MODEL_FAST:granite4.2:8b}
+    planner: ${TRAVEL_MODEL_PLANNER:granite4.2:8b}
+    itinerary: ${TRAVEL_MODEL_ITINERARY:devstral:24b}
+    finale: ${TRAVEL_MODEL_FINAL:granite4.2:8b}
   tavily:
     api-url: https://api.tavily.com/search
     api-key: ${TAVILY_API_KEY:}

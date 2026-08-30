@@ -1,0 +1,24 @@
+{
+  "java.configuration.updateBuildConfiguration": "automatic",
+  "java.import.maven.enabled": true,
+  "java.compile.nullAnalysis.mode": "disabled",
+  "java.debug.settings.forceBuildBeforeLaunch": false,
+  "java.debug.settings.onBuildFailureProceed": true,
+  "java.jdt.ls.java.home": "C:\\Program Files\\Java\\jdk-26.0.2.1",
+  "java.configuration.runtimes": [
+    {
+      "name": "JavaSE-26",
+      "path": "C:\\Program Files\\Java\\jdk-26.0.2.1",
+      "default": true
+    }
+  ],
+  "java.project.importOnFirstTimeStartup": "automatic",
+  "java.errors.incompleteClasspath.severity": "ignore",
+  "java.autobuild.enabled": true,
+  "maven.terminal.customEnv": [
+    {
+      "environmentVariable": "JAVA_HOME",
+      "value": "C:\\Program Files\\Java\\jdk-26.0.2.1"
+    }
+  ]
+}
