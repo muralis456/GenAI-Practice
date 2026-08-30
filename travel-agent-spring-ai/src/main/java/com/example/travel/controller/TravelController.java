@@ -4,7 +4,7 @@ import com.example.travel.dto.PlanDecisionRequest;
 import com.example.travel.dto.TravelPlanResponse;
 import com.example.travel.dto.TravelRequest;
 import com.example.travel.service.ConversationMemoryService;
-import com.example.travel.service.TravelPlannerAgentService;
+import com.example.travel.agent.TravelPlannerAgentService;
 import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

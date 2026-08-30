@@ -1,4 +1,4 @@
-package com.example.travel.service;
+package com.example.travel.agent;
 
 import com.example.travel.graph.TravelState;
 import com.example.travel.model.AgentDecision;

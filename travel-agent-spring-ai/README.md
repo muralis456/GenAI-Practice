@@ -1,6 +1,6 @@
 # Travel Agent (Spring AI + LangGraph4j)
 
-**Graph-orchestrated multi-agent system** (not a fully autonomous swarm): the graph decides *what runs next*; specialist agents use scoped tools; Airport, Budget, Currency, and the deterministic Validator stay rule-based.
+**Graph-orchestrated multi-agent system** (not a fully autonomous swarm): the graph decides *what runs next*; specialist agents live in `com.example.travel.agent` and use scoped tools; Airport, Budget, Currency, and the deterministic Validator stay rule-based. Infrastructure (memory, preferences, HTTP APIs, `RoutedLlm`) stays in `com.example.travel.service`.
 
 ## Architecture
 

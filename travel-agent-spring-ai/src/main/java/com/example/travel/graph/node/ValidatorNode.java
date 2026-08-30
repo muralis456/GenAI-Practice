@@ -2,8 +2,8 @@ package com.example.travel.graph.node;
 
 import com.example.travel.graph.TravelGraphNodes;
 import com.example.travel.graph.TravelState;
-import com.example.travel.service.SemanticValidatorService;
-import com.example.travel.service.ValidatorAgentService;
+import com.example.travel.agent.SemanticValidatorService;
+import com.example.travel.agent.ValidatorAgentService;
 import org.bsc.langgraph4j.action.NodeAction;
 import org.springframework.stereotype.Component;
 

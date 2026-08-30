@@ -1,4 +1,4 @@
-package com.example.travel.service;
+package com.example.travel.agent;
 
 import com.example.travel.config.TravelModelsProperties;
 import com.example.travel.dto.TravelPlanResponse;
@@ -10,6 +10,7 @@ import com.example.travel.model.FlightOption;
 import com.example.travel.model.HotelOption;
 import com.example.travel.model.Itinerary;
 import com.example.travel.model.TravelResearch;
+import com.example.travel.service.UserPreferenceService;
 import org.bsc.langgraph4j.CompiledGraph;
 import org.bsc.langgraph4j.GraphInput;
 import org.bsc.langgraph4j.RunnableConfig;

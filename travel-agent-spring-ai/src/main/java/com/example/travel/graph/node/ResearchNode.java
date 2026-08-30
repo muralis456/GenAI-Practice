@@ -4,7 +4,7 @@ import com.example.travel.graph.TravelGraphNodes;
 import com.example.travel.graph.TravelState;
 import com.example.travel.graph.model.ResearchExtraction;
 import com.example.travel.model.ProvenanceEvent;
-import com.example.travel.service.TravelResearchAgentService;
+import com.example.travel.agent.TravelResearchAgentService;
 import org.bsc.langgraph4j.action.NodeAction;
 import org.springframework.stereotype.Component;
 

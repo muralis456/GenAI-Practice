@@ -2,7 +2,7 @@ package com.example.travel.eval;
 
 import com.example.travel.graph.TravelState;
 import com.example.travel.model.IntentPlan;
-import com.example.travel.service.ValidatorAgentService;
+import com.example.travel.agent.ValidatorAgentService;
 import com.example.travel.support.IntentClassifier;
 import com.example.travel.support.ToolFailureClassifier;
 import com.example.travel.tool.ToolErrorCode;

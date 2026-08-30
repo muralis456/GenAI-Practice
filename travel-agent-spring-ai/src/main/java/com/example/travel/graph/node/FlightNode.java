@@ -3,7 +3,7 @@ package com.example.travel.graph.node;
 import com.example.travel.graph.TravelGraphNodes;
 import com.example.travel.graph.TravelState;
 import com.example.travel.model.ProvenanceEvent;
-import com.example.travel.service.FlightAgentService;
+import com.example.travel.agent.FlightAgentService;
 import org.bsc.langgraph4j.action.NodeAction;
 import org.springframework.stereotype.Component;
 
