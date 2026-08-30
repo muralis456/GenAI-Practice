@@ -22,7 +22,7 @@ public class IntentNode implements NodeAction<TravelState> {
     public Map<String, Object> apply(TravelState state) {
         Map<String, Object> updates = new LinkedHashMap<>(intentAgentService.classify(state));
         updates.putAll(TravelState.trace(TravelGraphNodes.INTENT, "ok",
-                String.valueOf(updates.get(TravelState.REQUEST_TYPE))));
+                updates.get(TravelState.REQUEST_TYPE) + " conf=" + updates.get(TravelState.INTENT_CONFIDENCE)));
         return updates;
     }
 }

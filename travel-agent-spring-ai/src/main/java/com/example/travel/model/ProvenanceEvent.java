@@ -79,11 +79,17 @@ public class ProvenanceEvent implements Serializable {
     public String toDisplay() {
         StringBuilder sb = new StringBuilder();
         sb.append(field).append(": ").append(source);
-        if (url != null && !url.isBlank()) {
-            sb.append(" (").append(url).append(")");
-        }
         if (note != null && !note.isBlank()) {
             sb.append(" — ").append(note);
+        }
+        if (url != null && !url.isBlank()) {
+            sb.append('\n').append(url);
+        }
+        if (retrievedAt != null && !retrievedAt.isBlank()) {
+            sb.append("\nRetrieved: ").append(retrievedAt);
+        }
+        if (confidence > 0 && url != null && !url.isBlank()) {
+            sb.append("\nTavily score: ").append(String.format("%.2f", confidence));
         }
         return sb.toString();
     }

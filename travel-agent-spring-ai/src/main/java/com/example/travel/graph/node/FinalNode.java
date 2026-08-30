@@ -31,7 +31,8 @@ public class FinalNode implements NodeAction<TravelState> {
                 + (state.validationErrors().isEmpty()
                 ? " (passed)."
                 : " with caveats: " + String.join("; ", state.validationErrors()) + ".")
-                + "\nApprove to confirm, or Modify to re-plan cheaper.";
+                + (state.semanticNotes().isEmpty() ? "" : " Semantic: " + String.join("; ", state.semanticNotes()) + ".")
+                + "\nApprove to confirm, Modify to change the plan, or Reject to cancel.";
 
         Map<String, Object> updates = new LinkedHashMap<>();
         updates.put(TravelState.AWAITING_APPROVAL, Boolean.TRUE);

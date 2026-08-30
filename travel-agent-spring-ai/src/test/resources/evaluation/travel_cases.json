@@ -1,0 +1,46 @@
+[
+  {
+    "prompt": "Find flights from BLR to Paris",
+    "expected": {
+      "needsFlights": true,
+      "needsHotels": false,
+      "needsResearch": false,
+      "needsWeather": false,
+      "needsBudget": false,
+      "needsItinerary": false
+    }
+  },
+  {
+    "prompt": "What are the best places to visit in Paris?",
+    "expected": {
+      "needsFlights": false,
+      "needsHotels": false,
+      "needsResearch": true,
+      "needsWeather": true,
+      "needsBudget": false,
+      "needsItinerary": false
+    }
+  },
+  {
+    "prompt": "Plan a 10-day Japan trip under 2 lakh for a family",
+    "expected": {
+      "needsFlights": true,
+      "needsHotels": true,
+      "needsResearch": true,
+      "needsWeather": true,
+      "needsBudget": true,
+      "needsItinerary": true
+    }
+  },
+  {
+    "prompt": "I already booked my flight. Help me find hotels and things to do in Paris.",
+    "expected": {
+      "needsFlights": false,
+      "needsHotels": true,
+      "needsResearch": true,
+      "needsWeather": true,
+      "needsBudget": false,
+      "needsItinerary": true
+    }
+  }
+]

@@ -42,11 +42,17 @@ spring:
 travel:
   graph:
     max-retries: 2
+    max-llm-calls: 20
+    max-tavily-calls: 8
+    max-iterations: 25
   models:
     extraction: ${TRAVEL_MODEL_FAST:llama3.2:3b}
     planner: ${TRAVEL_MODEL_PLANNER:llama3.2:3b}
     itinerary: ${TRAVEL_MODEL_ITINERARY:llama3.2:3b}
     finale: ${TRAVEL_MODEL_FINAL:llama3.2:3b}
+    fast: ${TRAVEL_MODEL_FAST:llama3.2:3b}
+    balanced: ${TRAVEL_MODEL_BALANCED:}
+    reasoning: ${TRAVEL_MODEL_REASONING:}
   tavily:
     api-url: https://api.tavily.com/search
     api-key: ${TAVILY_API_KEY:}

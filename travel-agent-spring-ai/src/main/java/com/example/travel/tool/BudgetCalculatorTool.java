@@ -39,8 +39,10 @@ public class BudgetCalculatorTool {
         if (style(state).contains("luxury") || "high".equalsIgnoreCase(state.budgetLabel())) {
             hotelLocal = hotelLocal.multiply(BigDecimal.valueOf(1.6));
             activitiesLocal = activitiesLocal.multiply(BigDecimal.valueOf(1.4));
-        } else if (style(state).contains("budget") || "low".equalsIgnoreCase(state.budgetLabel()) || state.retryCount() > 0) {
+        } else if (style(state).contains("budget") || "low".equalsIgnoreCase(state.budgetLabel()) || state.hotelCheaper()) {
             hotelLocal = hotelLocal.multiply(BigDecimal.valueOf(0.75));
+        }
+        if ("cheapest".equalsIgnoreCase(state.flightPreference())) {
             flightLocal = flightLocal.multiply(BigDecimal.valueOf(0.9));
         }
 

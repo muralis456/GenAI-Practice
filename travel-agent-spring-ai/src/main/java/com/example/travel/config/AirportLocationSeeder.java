@@ -24,16 +24,16 @@ public class AirportLocationSeeder implements CommandLineRunner {
     @Override
     @Transactional
     public void run(String... args) {
-        long existingCount = repository.count();
-        if (existingCount > 0) {
-            log.info("Airport directory already initialized with {} locations; skipping seed", existingCount);
-            return;
-        }
-
         List<AirportData> airports = List.of(
                 new AirportData("Mumbai", "India", "Chhatrapati Shivaji Maharaj International Airport", "BOM", "VABB"),
                 new AirportData("Delhi", "India", "Indira Gandhi International Airport", "DEL", "VIDP"),
                 new AirportData("Bengaluru", "India", "Kempegowda International Airport", "BLR", "VOBL"),
+                new AirportData("Goa", "India", "Dabolim Airport", "GOI", "VOGO"),
+                new AirportData("Mopa", "India", "Manohar International Airport", "GOX", "VOGA"),
+                new AirportData("Pune", "India", "Pune Airport", "PNQ", "VAPO"),
+                new AirportData("Kochi", "India", "Cochin International Airport", "COK", "VOCI"),
+                new AirportData("Jaipur", "India", "Jaipur International Airport", "JAI", "VIJP"),
+                new AirportData("Ahmedabad", "India", "Sardar Vallabhbhai Patel International Airport", "AMD", "VAAH"),
                 new AirportData("Chennai", "India", "Chennai International Airport", "MAA", "VOMM"),
                 new AirportData("Hyderabad", "India", "Rajiv Gandhi International Airport", "HYD", "VOHS"),
                 new AirportData("Kolkata", "India", "Netaji Subhas Chandra Bose International Airport", "CCU", "VECC"),
@@ -75,11 +75,20 @@ public class AirportLocationSeeder implements CommandLineRunner {
                 new AirportData("Bali", "Indonesia", "Ngurah Rai International Airport", "DPS", "WADD")
         );
 
-        List<AirportLocation> locations = airports.stream()
-            .map(this::toEntity)
-            .toList();
-        repository.saveAllAndFlush(locations);
-        log.info("Airport directory ready with {} locations", repository.count());
+        int added = 0;
+        for (AirportData data : airports) {
+            if (repository.findByIataCodeIgnoreCase(data.iataCode()).isPresent()) {
+                continue;
+            }
+            repository.save(toEntity(data));
+            added++;
+        }
+        if (added > 0) {
+            repository.flush();
+            log.info("Airport directory added {} location(s); total={}", added, repository.count());
+        } else {
+            log.info("Airport directory already complete with {} locations", repository.count());
+        }
     }
 
     private AirportLocation toEntity(AirportData data) {

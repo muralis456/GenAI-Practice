@@ -35,7 +35,8 @@ public class ValidatorNode implements NodeAction<TravelState> {
         if (!semantic.isEmpty()) {
             detail = detail + " | semantic: " + String.join("; ", semantic);
         }
-        updates.putAll(TravelState.trace(TravelGraphNodes.VALIDATOR, errors.isEmpty() ? "ok" : "warn", detail));
+        updates.putAll(TravelState.trace(TravelGraphNodes.VALIDATOR,
+                errors.isEmpty() && semantic.isEmpty() ? "ok" : "warn", detail));
         return updates;
     }
 }

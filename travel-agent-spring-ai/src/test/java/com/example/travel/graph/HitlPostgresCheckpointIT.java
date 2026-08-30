@@ -107,4 +107,78 @@ class HitlPostgresCheckpointIT {
 
         reloadedSaver.release(config);
     }
+
+    @Test
+    void interruptBeforeHitlRejectGoesToCancel() throws Exception {
+        PGSimpleDataSource ds = new PGSimpleDataSource();
+        ds.setUrl("jdbc:postgresql://localhost:5432/travel_agent");
+        ds.setUser(System.getenv().getOrDefault("DB_USERNAME", "postgres"));
+        ds.setPassword(System.getenv().getOrDefault("DB_PASSWORD", "postgres"));
+
+        ObjectStreamStateSerializer<TravelState> serializer = new ObjectStreamStateSerializer<>(TravelState::new);
+        PostgresSaver saver = PostgresSaver.builder()
+                .datasource(ds)
+                .stateSerializer(serializer)
+                .createTables(true)
+                .build();
+
+        StateGraph<TravelState> graph = new StateGraph<>(TravelState.SCHEMA, serializer)
+                .addNode("draft", node_async(state -> Map.of(
+                        TravelState.FINAL_PLAN, "draft-plan",
+                        TravelState.AWAITING_APPROVAL, Boolean.TRUE)))
+                .addNode(TravelGraphNodes.HITL, node_async(state -> TravelState.trace(
+                        TravelGraphNodes.HITL, "ok", "decision=" + state.hitlDecision())))
+                .addNode(TravelGraphNodes.COMPLETE, node_async(state -> Map.of(
+                        TravelState.AWAITING_APPROVAL, Boolean.FALSE,
+                        TravelState.HITL_DECISION, "approve")))
+                .addNode(TravelGraphNodes.CANCEL, node_async(state -> Map.of(
+                        TravelState.AWAITING_APPROVAL, Boolean.FALSE,
+                        TravelState.HITL_DECISION, "reject",
+                        TravelState.FINAL_PLAN, "rejected")))
+                .addEdge(START, "draft")
+                .addEdge("draft", TravelGraphNodes.HITL)
+                .addConditionalEdges(TravelGraphNodes.HITL,
+                        edge_async(state -> {
+                            String decision = state.hitlDecision() == null ? "" : state.hitlDecision().toLowerCase();
+                            if ("modify".equals(decision)) {
+                                return TravelGraphNodes.ROUTE_MODIFY;
+                            }
+                            if ("reject".equals(decision)) {
+                                return TravelGraphNodes.ROUTE_REJECT;
+                            }
+                            return TravelGraphNodes.ROUTE_APPROVE;
+                        }),
+                        EdgeMappings.builder()
+                                .to(TravelGraphNodes.COMPLETE, TravelGraphNodes.ROUTE_APPROVE)
+                                .to("draft", TravelGraphNodes.ROUTE_MODIFY)
+                                .to(TravelGraphNodes.CANCEL, TravelGraphNodes.ROUTE_REJECT)
+                                .build())
+                .addEdge(TravelGraphNodes.COMPLETE, END)
+                .addEdge(TravelGraphNodes.CANCEL, END);
+
+        CompiledGraph<TravelState> compiled = graph.compile(CompileConfig.builder()
+                .checkpointSaver(saver)
+                .interruptBefore(TravelGraphNodes.HITL)
+                .releaseThread(false)
+                .build());
+
+        String threadId = "hitl-reject-it-" + UUID.randomUUID();
+        RunnableConfig config = RunnableConfig.builder().threadId(threadId).build();
+
+        compiled.invoke(Map.of(
+                TravelState.USER_ID, "it-user",
+                TravelState.DESTINATION, "Tokyo",
+                TravelState.HITL_DECISION, ""), config);
+
+        assertEquals(TravelGraphNodes.HITL, compiled.getState(config).next());
+
+        TravelState rejected = compiled.invoke(GraphInput.resume(Map.of(
+                TravelState.HITL_DECISION, "reject",
+                TravelState.AWAITING_APPROVAL, Boolean.FALSE)), config)
+                .orElseThrow();
+        assertEquals("reject", rejected.hitlDecision());
+        assertEquals("rejected", rejected.finalPlan());
+
+        saver.release(config);
+    }
 }

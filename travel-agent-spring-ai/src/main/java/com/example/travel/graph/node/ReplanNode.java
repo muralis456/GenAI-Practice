@@ -21,7 +21,7 @@ public class ReplanNode implements NodeAction<TravelState> {
     @Override
     public Map<String, Object> apply(TravelState state) {
         Map<String, Object> updates = new LinkedHashMap<>(replanAgentService.decide(state));
-        updates.putAll(TravelState.trace(TravelGraphNodes.REPLAN, "ok",
+        updates.putAll(TravelState.trace(TravelGraphNodes.REPLAN, "retry",
                 String.valueOf(updates.get(TravelState.REPLAN_NOTES))));
         return updates;
     }

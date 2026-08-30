@@ -11,6 +11,7 @@ public class SearchHit implements Serializable {
     private String title;
     private String content;
     private String url;
+    private double score;
 
     public SearchHit() {
     }
@@ -43,5 +44,13 @@ public class SearchHit implements Serializable {
 
     public void setUrl(String url) {
         this.url = url;
+    }
+
+    public double getScore() {
+        return score;
+    }
+
+    public void setScore(double score) {
+        this.score = score;
     }
 }

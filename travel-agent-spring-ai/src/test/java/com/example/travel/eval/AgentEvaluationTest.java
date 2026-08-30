@@ -69,6 +69,69 @@ class AgentEvaluationTest {
     }
 
     @Test
+    void intentSkipsFlightsWhenUserAlreadyBooked() {
+        IntentPlan plan = IntentClassifier.classify(
+                "I already booked my flight. Help me find hotels and things to do in Paris.");
+        assertFalse(plan.isNeedsFlights());
+        assertTrue(plan.isNeedsHotels());
+        assertTrue(plan.isNeedsResearch());
+        assertTrue(plan.getConfidence() >= IntentClassifier.LLM_THRESHOLD);
+    }
+
+    @Test
+    void evaluationDatasetMatchesDeterministicIntent() throws Exception {
+        var mapper = new tools.jackson.databind.ObjectMapper();
+        try (var in = getClass().getResourceAsStream("/evaluation/travel_cases.json")) {
+            var cases = mapper.readTree(in);
+            for (var node : cases) {
+                IntentPlan plan = IntentClassifier.classify(node.get("prompt").asString(""));
+                var expected = node.get("expected");
+                assertEquals(expected.get("needsFlights").asBoolean(), plan.isNeedsFlights(), plan.summary());
+                assertEquals(expected.get("needsHotels").asBoolean(), plan.isNeedsHotels(), plan.summary());
+                assertEquals(expected.get("needsResearch").asBoolean(), plan.isNeedsResearch(), plan.summary());
+                assertEquals(expected.get("needsItinerary").asBoolean(), plan.isNeedsItinerary(), plan.summary());
+            }
+        }
+    }
+
+    @Test
+    void semanticNotesTriggerReplan() {
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put(TravelState.VALIDATION_ERRORS, List.of());
+        data.put(TravelState.SEMANTIC_NOTES, List.of("Itinerary may not be family-friendly"));
+        data.put(TravelState.RETRY_COUNT, 0);
+        data.put(TravelState.MAX_RETRIES, 2);
+        TravelState state = new TravelState(data);
+        assertTrue(state.shouldReplan());
+    }
+
+    @Test
+    void hotelUpgradeDoesNotForceBudgetCostFactor() {
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put(TravelState.COST_FACTOR, java.math.BigDecimal.ONE);
+        data.put(TravelState.TRAVEL_STYLE, "balanced");
+        data.put(TravelState.HOTEL_CHEAPER, Boolean.FALSE);
+        data.put(TravelState.FLIGHT_PREFERENCE, "balanced");
+        data.put(TravelState.RETRY_COUNT, 0);
+        TravelState state = new TravelState(data);
+        com.example.travel.model.ReplanStrategy strategy = new com.example.travel.model.ReplanStrategy();
+        strategy.setActions(List.of("hotel_upgrade"));
+        strategy.setPriority("hotel");
+        Map<String, Object> updates = new com.example.travel.agent.ReplanStrategyExecutor().apply(state, strategy);
+        assertEquals("upscale", updates.get(TravelState.TRAVEL_STYLE));
+        assertEquals(Boolean.FALSE, updates.get(TravelState.HOTEL_CHEAPER));
+        assertEquals(java.math.BigDecimal.ONE, updates.get(TravelState.COST_FACTOR));
+    }
+
+    @Test
+    void modificationHeuristicDoesNotAssumeCheaper() {
+        var upgrade = com.example.travel.agent.ModificationAgentService.heuristic("I want a better hotel");
+        assertEquals(com.example.travel.model.ModificationRequest.HOTEL_UPGRADE, upgrade.getChangeType());
+        var cheaper = com.example.travel.agent.ModificationAgentService.heuristic("Please make it cheaper");
+        assertEquals(com.example.travel.model.ModificationRequest.REDUCE_COST, cheaper.getChangeType());
+    }
+
+    @Test
     void toolFailureClassifierDoesNotRetryForbiddenOrUnprocessable() {
         assertEquals(ToolErrorCode.FORBIDDEN, ToolFailureClassifier.fromHttp(403, "function_access_restricted"));
         assertFalse(ToolFailureClassifier.fromHttp(403, "").isRetryable());
@@ -76,5 +139,58 @@ class AgentEvaluationTest {
         assertFalse(ToolFailureClassifier.fromHttp(422, "").isRetryable());
         assertTrue(ToolFailureClassifier.fromHttp(429, "rate limit").isRetryable());
         assertTrue(ToolFailureClassifier.fromHttp(503, "").isRetryable());
+    }
+
+    @Test
+    void routerSkipsAirportWhenFlightsNotNeeded() {
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put(TravelState.NEEDS_FLIGHTS, Boolean.FALSE);
+        data.put(TravelState.NEEDS_HOTELS, Boolean.TRUE);
+        data.put(TravelState.NEEDS_RESEARCH, Boolean.TRUE);
+        data.put(TravelState.NEEDS_WEATHER, Boolean.TRUE);
+        TravelState state = new TravelState(data);
+        assertEquals("specialists", com.example.travel.graph.SpecialistRouter.afterPlanner(state));
+        assertFalse(com.example.travel.graph.SpecialistRouter.plannedSpecialists(state).contains("flight"));
+    }
+
+    @Test
+    void supervisorRetriesWhenRequiredFlightsUnavailable() {
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put(TravelState.NEEDS_FLIGHTS, Boolean.TRUE);
+        data.put(TravelState.FLIGHTS, List.of());
+        data.put(TravelState.RETRY_COUNT, 0);
+        data.put(TravelState.MAX_RETRIES, 2);
+        TravelState state = new TravelState(data);
+        assertEquals("retry", new com.example.travel.agent.SupervisorAgentService().decide(state));
+    }
+
+    @Test
+    void supervisorSkipBudgetWhenNotNeeded() {
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put(TravelState.NEEDS_BUDGET, Boolean.FALSE);
+        data.put(TravelState.NEEDS_ITINERARY, Boolean.TRUE);
+        TravelState state = new TravelState(data);
+        assertEquals("itinerary", com.example.travel.graph.SpecialistRouter.afterSupervisor(state));
+    }
+
+    @Test
+    void replanAddDestinationDoesNotDuplicate() {
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put(TravelState.DESTINATION, "Paris and Lyon");
+        data.put(TravelState.COST_FACTOR, java.math.BigDecimal.ONE);
+        data.put(TravelState.TRAVEL_STYLE, "balanced");
+        data.put(TravelState.HOTEL_CHEAPER, Boolean.FALSE);
+        data.put(TravelState.FLIGHT_PREFERENCE, "balanced");
+        data.put(TravelState.RETRY_COUNT, 0);
+        com.example.travel.model.ModificationRequest modification = new com.example.travel.model.ModificationRequest();
+        modification.setDestination("Lyon");
+        data.put(TravelState.MODIFICATION, modification);
+        TravelState state = new TravelState(data);
+        com.example.travel.model.ReplanStrategy strategy = new com.example.travel.model.ReplanStrategy();
+        strategy.setActions(List.of("add_destination", "adjust_itinerary"));
+        Map<String, Object> updates = new com.example.travel.agent.ReplanStrategyExecutor().apply(state, strategy);
+        assertEquals(Boolean.TRUE, updates.get(TravelState.NEEDS_ITINERARY));
+        assertEquals(Boolean.TRUE, updates.get(TravelState.NEEDS_RESEARCH));
+        assertFalse(updates.containsKey(TravelState.DESTINATION));
     }
 }

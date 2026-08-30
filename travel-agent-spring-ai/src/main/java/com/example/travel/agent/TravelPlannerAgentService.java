@@ -9,10 +9,16 @@ import com.example.travel.graph.TravelState;
 import com.example.travel.model.FlightOption;
 import com.example.travel.model.HotelOption;
 import com.example.travel.model.Itinerary;
+import com.example.travel.model.ModificationRequest;
 import com.example.travel.model.TravelResearch;
+import com.example.travel.service.AgentExecutionBudget;
+import com.example.travel.service.ConversationMemoryService;
+import com.example.travel.service.GraphProgressHub;
+import com.example.travel.service.ModelRoutingContext;
 import com.example.travel.service.UserPreferenceService;
 import org.bsc.langgraph4j.CompiledGraph;
 import org.bsc.langgraph4j.GraphInput;
+import org.bsc.langgraph4j.NodeOutput;
 import org.bsc.langgraph4j.RunnableConfig;
 import org.bsc.langgraph4j.checkpoint.PostgresSaver;
 import org.bsc.langgraph4j.state.StateSnapshot;
@@ -21,10 +27,12 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ExecutorService;
 import java.util.stream.Collectors;
 
 /**
@@ -42,6 +50,11 @@ public class TravelPlannerAgentService {
     private final FinalPlannerAgentService finalPlannerAgentService;
     private final UserPreferenceService userPreferenceService;
     private final TravelModelsProperties travelModels;
+    private final ModificationAgentService modificationAgentService;
+    private final AgentExecutionBudget executionBudget;
+    private final GraphProgressHub graphProgressHub;
+    private final ExecutorService travelPlanExecutor;
+    private final ConversationMemoryService conversationMemoryService;
     private final int maxRetries;
 
     public TravelPlannerAgentService(CompiledGraph<TravelState> travelGraph,
@@ -50,6 +63,11 @@ public class TravelPlannerAgentService {
                                      FinalPlannerAgentService finalPlannerAgentService,
                                      UserPreferenceService userPreferenceService,
                                      TravelModelsProperties travelModels,
+                                     ModificationAgentService modificationAgentService,
+                                     AgentExecutionBudget executionBudget,
+                                     GraphProgressHub graphProgressHub,
+                                     @org.springframework.beans.factory.annotation.Qualifier("travelPlanExecutor") ExecutorService travelPlanExecutor,
+                                     ConversationMemoryService conversationMemoryService,
                                      @Value("${travel.graph.max-retries:2}") int maxRetries) {
         this.travelGraph = travelGraph;
         this.travelRunnableConfig = travelRunnableConfig;
@@ -57,6 +75,11 @@ public class TravelPlannerAgentService {
         this.finalPlannerAgentService = finalPlannerAgentService;
         this.userPreferenceService = userPreferenceService;
         this.travelModels = travelModels;
+        this.modificationAgentService = modificationAgentService;
+        this.executionBudget = executionBudget;
+        this.graphProgressHub = graphProgressHub;
+        this.travelPlanExecutor = travelPlanExecutor;
+        this.conversationMemoryService = conversationMemoryService;
         this.maxRetries = maxRetries;
     }
 
@@ -67,19 +90,76 @@ public class TravelPlannerAgentService {
 
         Map<String, Object> input = TravelState.fromRequest(request, historyContext);
         input.put(TravelState.MAX_RETRIES, maxRetries);
-        if (TravelState.isBlank((String) input.get(TravelState.SELECTED_MODEL))) {
-            input.put(TravelState.SELECTED_MODEL, configuredModelsLabel());
-        }
+        String policy = ModelRoutingContext.normalize(request.getSelectedModel());
+        input.put(TravelState.SELECTED_MODEL, policy);
+        input.put(TravelState.MODEL_POLICY, policy);
         userPreferenceService.find(userId).ifPresent(preference -> applyPreferences(input, preference));
         ensureOrigin(input);
 
         RunnableConfig config = configFor(threadId);
-        travelGraph.invoke(input, config);
+        ModelRoutingContext.set(policy);
+        executionBudget.begin();
+        try {
+            travelGraph.invoke(input, config);
+        } finally {
+            executionBudget.end();
+            ModelRoutingContext.clear();
+        }
         TravelState state = requireCheckpointState(threadId);
         userPreferenceService.remember(userId, state.originIata(), state.travelStyle(), state.destination());
         boolean pending = isAwaitingHitl(threadId);
         log.info("Graph paused for HITL={} threadId={}", pending, threadId);
         return toResponse(state, threadId, pending);
+    }
+
+    public String startTravelPlan(TravelRequest request, String historyContext) {
+        String userId = TravelState.firstNonBlank(request.getUserId(), "anonymous");
+        String threadId = userId + "-" + UUID.randomUUID();
+        Map<String, Object> input = TravelState.fromRequest(request, historyContext);
+        input.put(TravelState.MAX_RETRIES, maxRetries);
+        String policy = ModelRoutingContext.normalize(request.getSelectedModel());
+        input.put(TravelState.SELECTED_MODEL, policy);
+        input.put(TravelState.MODEL_POLICY, policy);
+        userPreferenceService.find(userId).ifPresent(preference -> applyPreferences(input, preference));
+        ensureOrigin(input);
+        graphProgressHub.open(threadId);
+        travelPlanExecutor.submit(() -> runStreaming(threadId, userId, policy, input));
+        return threadId;
+    }
+
+    private void runStreaming(String threadId, String userId, String policy, Map<String, Object> input) {
+        RunnableConfig config = configFor(threadId);
+        ModelRoutingContext.set(policy);
+        executionBudget.begin();
+        try {
+            graphProgressHub.emit(threadId, "started", Map.of("threadId", threadId, "node", "START"));
+            for (NodeOutput<TravelState> output : travelGraph.stream(input, config)) {
+                Map<String, Object> payload = new LinkedHashMap<>();
+                payload.put("node", output.node());
+                payload.put("end", output.isEND());
+                if (output.state() != null) {
+                    payload.put("pipeline", output.state().pipeline());
+                }
+                graphProgressHub.emit(threadId, "node", payload);
+            }
+            TravelState state = requireCheckpointState(threadId);
+            userPreferenceService.remember(userId, state.originIata(), state.travelStyle(), state.destination());
+            boolean pending = isAwaitingHitl(threadId);
+            TravelPlanResponse plan = toResponse(state, threadId, pending);
+            conversationMemoryService.saveUiMessage(userId, userId, "assistant",
+                    plan.getFinalPlan() != null ? plan.getFinalPlan()
+                            : (plan.getRouteSummary() != null ? plan.getRouteSummary() : "Plan ready"));
+            Map<String, Object> done = new LinkedHashMap<>();
+            done.put("plan", plan);
+            graphProgressHub.emit(threadId, "complete", done);
+        } catch (Exception ex) {
+            log.warn("Streaming plan failed threadId={}", threadId, ex);
+            graphProgressHub.emit(threadId, "failed", Map.of("error",
+                    ex.getMessage() == null ? ex.getClass().getSimpleName() : ex.getMessage()));
+        } finally {
+            executionBudget.end();
+            ModelRoutingContext.clear();
+        }
     }
 
     public TravelPlanResponse approve(String userId, String threadId) {
@@ -91,8 +171,16 @@ public class TravelPlannerAgentService {
         decision.put(TravelState.HITL_DECISION, "approve");
         decision.put(TravelState.AWAITING_APPROVAL, Boolean.FALSE);
 
-        TravelState state = travelGraph.invoke(GraphInput.resume(decision), config)
-                .orElseGet(() -> requireCheckpointState(key));
+        ModelRoutingContext.set(previousPolicy(key));
+        executionBudget.begin();
+        TravelState state;
+        try {
+            state = travelGraph.invoke(GraphInput.resume(decision), config)
+                    .orElseGet(() -> requireCheckpointState(key));
+        } finally {
+            executionBudget.end();
+            ModelRoutingContext.clear();
+        }
         try {
             travelCheckpointSaver.release(config);
         } catch (Exception ex) {
@@ -112,22 +200,101 @@ public class TravelPlannerAgentService {
         TravelState previous = requireCheckpointState(key);
         RunnableConfig config = configFor(key);
 
+        ModificationRequest modification = modificationAgentService.interpret(previous, notes);
+
         Map<String, Object> decision = new LinkedHashMap<>();
         decision.put(TravelState.HITL_DECISION, "modify");
         decision.put(TravelState.AWAITING_APPROVAL, Boolean.TRUE);
-        decision.put(TravelState.REPLAN_NOTES, TravelState.firstNonBlank(notes, "Please make it cheaper"));
-        decision.put(TravelState.TRAVEL_STYLE, "budget");
-        decision.put(TravelState.COST_FACTOR,
-                previous.costFactor().multiply(BigDecimal.valueOf(0.82)));
+        decision.put(TravelState.REPLAN_NOTES, TravelState.firstNonBlank(notes, modification.getNotes()));
+        decision.put(TravelState.MODIFICATION, modification);
+        if (modification.isAddDestination() && !TravelState.isBlank(modification.getDestination())) {
+            decision.put(TravelState.DESTINATION, previous.destination() + " and " + modification.getDestination());
+            decision.put(TravelState.NEEDS_RESEARCH, Boolean.TRUE);
+            decision.put(TravelState.NEEDS_ITINERARY, Boolean.TRUE);
+        }
+        if (modification.isHotelUpgrade()) {
+            decision.put(TravelState.HOTEL_CHEAPER, Boolean.FALSE);
+        }
+        if (modification.isReduceCost()) {
+            decision.put(TravelState.HOTEL_CHEAPER, Boolean.TRUE);
+        }
         if (!TravelState.isBlank(historyContext)) {
             decision.put(TravelState.HISTORY_CONTEXT, historyContext);
         }
 
-        log.info("Resuming graph for MODIFY on same threadId={}", key);
-        travelGraph.invoke(GraphInput.resume(decision), config);
+        log.info("Resuming graph for MODIFY type={} on same threadId={}", modification.getChangeType(), key);
+        ModelRoutingContext.set(previous.modelPolicy());
+        executionBudget.begin();
+        try {
+            travelGraph.invoke(GraphInput.resume(decision), config);
+        } finally {
+            executionBudget.end();
+            ModelRoutingContext.clear();
+        }
         TravelState state = requireCheckpointState(key);
         boolean pending = isAwaitingHitl(key);
         return toResponse(state, key, pending);
+    }
+
+    public TravelPlanResponse reject(String userId, String threadId) {
+        String key = TravelState.firstNonBlank(threadId, userId);
+        requireCheckpointState(key);
+        RunnableConfig config = configFor(key);
+        Map<String, Object> decision = new LinkedHashMap<>();
+        decision.put(TravelState.HITL_DECISION, "reject");
+        decision.put(TravelState.AWAITING_APPROVAL, Boolean.FALSE);
+        ModelRoutingContext.set(previousPolicy(key));
+        executionBudget.begin();
+        TravelState state;
+        try {
+            state = travelGraph.invoke(GraphInput.resume(decision), config)
+                    .orElseGet(() -> requireCheckpointState(key));
+        } finally {
+            executionBudget.end();
+            ModelRoutingContext.clear();
+        }
+        try {
+            travelCheckpointSaver.release(config);
+        } catch (Exception ex) {
+            log.warn("Could not release checkpoint threadId={}", key, ex);
+        }
+        TravelPlanResponse response = toResponse(state, key, false);
+        response.setStatus("REJECTED");
+        response.setAwaitingApproval(false);
+        return response;
+    }
+
+    public Map<String, Object> history(String threadId) {
+        String key = TravelState.firstNonBlank(threadId);
+        StateSnapshot<TravelState> snapshot = travelGraph.getState(configFor(key));
+        TravelState state = snapshot.state();
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("threadId", key);
+        body.put("next", snapshot.next());
+        body.put("pipeline", state.pipeline());
+        body.put("modelPolicy", state.modelPolicy());
+        body.put("intentConfidence", state.intentConfidence());
+        body.put("validationErrors", state.validationErrors());
+        body.put("semanticNotes", state.semanticNotes());
+        try {
+            List<Map<String, Object>> snapshots = new ArrayList<>();
+            for (StateSnapshot<TravelState> item : travelGraph.getStateHistory(configFor(key))) {
+                Map<String, Object> row = new LinkedHashMap<>();
+                row.put("node", item.node());
+                row.put("next", item.next());
+                if (item.state() != null) {
+                    row.put("pipeline", item.state().pipeline());
+                    row.put("supervisorDecision", item.state().supervisorDecision());
+                    row.put("dispatchRoute", item.state().dispatchRoute());
+                }
+                snapshots.add(row);
+            }
+            body.put("snapshots", snapshots);
+        } catch (Exception ex) {
+            log.debug("Could not load state history for threadId={}", key, ex);
+            body.put("snapshots", List.of());
+        }
+        return body;
     }
 
     private TravelState requireCheckpointState(String threadId) {
@@ -143,6 +310,14 @@ public class TravelPlannerAgentService {
         } catch (Exception ex) {
             throw new IllegalStateException("No graph checkpoint for threadId=" + threadId
                     + ". Generate a plan first (checkpoints survive restart via PostgreSQL).", ex);
+        }
+    }
+
+    private String previousPolicy(String threadId) {
+        try {
+            return requireCheckpointState(threadId).modelPolicy();
+        } catch (Exception ignored) {
+            return "BALANCED";
         }
     }
 
@@ -204,7 +379,7 @@ public class TravelPlannerAgentService {
         TravelPlanResponse response = new TravelPlanResponse(
                 state.userId(),
                 TravelState.firstNonBlank(state.destination(), "Destination from current request"),
-                TravelState.firstNonBlank(state.selectedModel(), configuredModelsLabel()),
+                TravelState.firstNonBlank(state.modelPolicy(), configuredModelsLabel()),
                 state.finalPlan(),
                 joinFlights(state),
                 joinResearch(state),

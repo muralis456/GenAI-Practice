@@ -40,7 +40,7 @@ public class FlightNode implements NodeAction<TravelState> {
         updates.putAll(TravelState.trace(TravelGraphNodes.FLIGHT, "ok",
                 result.originIata() + " -> " + result.destinationIata() + " on " + state.departureDate()));
         updates.putAll(TravelState.provenance(new ProvenanceEvent(
-                "flights", "AviationStack", "", 1.0, result.originIata() + "->" + result.destinationIata())));
+                "flights", "AviationStack", "", 0, result.originIata() + "->" + result.destinationIata())));
         return updates;
     }
 }

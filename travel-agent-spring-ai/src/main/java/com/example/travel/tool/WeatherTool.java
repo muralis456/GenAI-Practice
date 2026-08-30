@@ -37,6 +37,7 @@ public class WeatherTool {
     public WeatherForecast forecast(String destination, LocalDate start, LocalDate end) {
         LocalDate from = start == null ? LocalDate.now() : start;
         LocalDate to = end == null ? from.plusDays(5) : end;
+        DateWindow window = clampToOpenMeteo(from, to);
         try {
             String geoUrl = UriComponentsBuilder.fromUriString(geocodeUrl)
                     .queryParam("name", destination)
@@ -54,8 +55,8 @@ public class WeatherTool {
                     .queryParam("latitude", lat)
                     .queryParam("longitude", lon)
                     .queryParam("daily", "precipitation_sum,weathercode")
-                    .queryParam("start_date", from)
-                    .queryParam("end_date", to)
+                    .queryParam("start_date", window.from)
+                    .queryParam("end_date", window.to)
                     .queryParam("timezone", "auto")
                     .build()
                     .toUriString();
@@ -75,9 +76,13 @@ public class WeatherTool {
             String summary = rain
                     ? "Rain likely during the stay (about " + Math.round(total) + " mm total). Prefer indoor backups on wet days."
                     : "Mostly dry conditions expected. Outdoor sightseeing is viable.";
+            if (window.clamped) {
+                summary += " Open-Meteo only covers " + window.from + " to " + window.to
+                        + " (not the full requested trip dates).";
+            }
             return new WeatherForecast(destination, summary, rain);
         } catch (Exception exception) {
-            log.warn("Weather lookup failed for {}", destination, exception);
+            log.warn("Weather lookup failed for {}: {}", destination, exception.getMessage());
             return new WeatherForecast(destination, "Weather lookup failed.", false);
         }
     }
@@ -90,6 +95,34 @@ public class WeatherTool {
         LocalDate start = parseDate(startDate, LocalDate.now());
         LocalDate end = parseDate(endDate, start.plusDays(5));
         return forecast(destination, start, end).toDisplay();
+    }
+
+    private DateWindow clampToOpenMeteo(LocalDate start, LocalDate end) {
+        LocalDate min = LocalDate.now().minusDays(90);
+        LocalDate max = LocalDate.now().plusDays(15);
+        LocalDate from = start.isBefore(min) ? min : start;
+        LocalDate to = end.isAfter(max) ? max : end;
+        if (from.isAfter(max)) {
+            from = max.minusDays(6);
+            to = max;
+        }
+        if (from.isBefore(min)) {
+            from = min;
+        }
+        if (to.isBefore(from)) {
+            to = from.plusDays(5);
+            if (to.isAfter(max)) {
+                to = max;
+            }
+        }
+        if (to.isAfter(max)) {
+            to = max;
+        }
+        boolean clamped = !from.equals(start) || !to.equals(end);
+        return new DateWindow(from, to, clamped);
+    }
+
+    private record DateWindow(LocalDate from, LocalDate to, boolean clamped) {
     }
 
     private LocalDate parseDate(String value, LocalDate fallback) {

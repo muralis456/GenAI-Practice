@@ -16,6 +16,11 @@ public final class TravelGraphNodes {
     public static final String HITL = "hitl";
     public static final String COMPLETE = "complete";
     public static final String INTENT = "intent";
+    public static final String WEATHER = "weather";
+    public static final String CANCEL = "cancel";
+    public static final String ROUTER = "router";
+    public static final String SPECIALISTS = "specialists";
+    public static final String SUPERVISOR = "supervisor";
 
     public static final String ROUTE_VALID = "valid";
     public static final String ROUTE_INVALID = "invalid";
@@ -24,6 +29,9 @@ public final class TravelGraphNodes {
     public static final String ROUTE_SKIP_ITINERARY = "skip_itinerary";
     public static final String ROUTE_APPROVE = "approve";
     public static final String ROUTE_MODIFY = "modify";
+    public static final String ROUTE_REJECT = "reject";
+    public static final String ROUTE_PROCEED = "proceed";
+    public static final String ROUTE_RETRY = "retry";
 
     private TravelGraphNodes() {
     }

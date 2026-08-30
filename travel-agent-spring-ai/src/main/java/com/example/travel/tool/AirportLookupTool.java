@@ -25,6 +25,25 @@ public class AirportLookupTool {
             + "Examples: Bengaluru→BLR, Japan→NRT, Mumbai→BOM. Never invent codes.")
     public String resolveIata(
             @ToolParam(description = "City, country, or airport name/code to resolve") String cityOrCode) {
-        return resolve(cityOrCode).map(AirportLocation::getIataCode).orElse("");
+        String fromDb = resolve(cityOrCode).map(AirportLocation::getIataCode).orElse("");
+        if (!fromDb.isBlank()) {
+            return fromDb;
+        }
+        return fallbackIata(cityOrCode);
+    }
+
+    private static String fallbackIata(String cityOrCode) {
+        if (cityOrCode == null || cityOrCode.isBlank()) {
+            return "";
+        }
+        return switch (cityOrCode.trim().toLowerCase(java.util.Locale.ROOT)) {
+            case "goa", "panaji", "panjim", "dabolim" -> "GOI";
+            case "mopa" -> "GOX";
+            case "pune" -> "PNQ";
+            case "kochi", "cochin" -> "COK";
+            case "jaipur" -> "JAI";
+            case "ahmedabad" -> "AMD";
+            default -> "";
+        };
     }
 }

@@ -26,9 +26,12 @@ public class IntentPlan implements Serializable {
     private boolean needsItinerary = true;
     private String strategy = "parallel_search";
     private String priority = "balanced";
+    private double confidence = 0.5;
 
     public static IntentPlan fullTrip() {
-        return new IntentPlan();
+        IntentPlan plan = new IntentPlan();
+        plan.confidence = 0.85;
+        return plan;
     }
 
     public static IntentPlan flightsOnly() {
@@ -42,6 +45,7 @@ public class IntentPlan implements Serializable {
         plan.needsItinerary = false;
         plan.strategy = "flight_only";
         plan.priority = "flights";
+        plan.confidence = 0.92;
         return plan;
     }
 
@@ -56,6 +60,7 @@ public class IntentPlan implements Serializable {
         plan.needsItinerary = false;
         plan.strategy = "hotel_only";
         plan.priority = "hotels";
+        plan.confidence = 0.9;
         return plan;
     }
 
@@ -70,6 +75,7 @@ public class IntentPlan implements Serializable {
         plan.needsItinerary = false;
         plan.strategy = "research_weather";
         plan.priority = "research";
+        plan.confidence = 0.9;
         return plan;
     }
 
@@ -84,6 +90,7 @@ public class IntentPlan implements Serializable {
         plan.needsItinerary = false;
         plan.strategy = "weather_only";
         plan.priority = "weather";
+        plan.confidence = 0.92;
         return plan;
     }
 
@@ -159,9 +166,18 @@ public class IntentPlan implements Serializable {
         this.priority = priority;
     }
 
+    public double getConfidence() {
+        return confidence;
+    }
+
+    public void setConfidence(double confidence) {
+        this.confidence = confidence;
+    }
+
     public String summary() {
         return requestType + " flights=" + needsFlights + " hotels=" + needsHotels
                 + " research=" + needsResearch + " weather=" + needsWeather
-                + " budget=" + needsBudget + " itinerary=" + needsItinerary;
+                + " budget=" + needsBudget + " itinerary=" + needsItinerary
+                + " confidence=" + confidence;
     }
 }

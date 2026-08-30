@@ -24,4 +24,12 @@ public class HotelSearchTool {
                 + " including location, price range, family suitability, and guest ratings. Style=" + style;
         return tavilySearchTool.search(query);
     }
+
+    public java.util.List<com.example.travel.model.SearchHit> searchHits(String destination, String travelStyle, boolean cheaper) {
+        boolean budget = cheaper;
+        String style = travelStyle == null || travelStyle.isBlank() ? "balanced" : travelStyle;
+        String query = (budget ? "Budget affordable hotels in " : "Best hotels in ") + destination
+                + " including location, price range, family suitability, and guest ratings. Style=" + style;
+        return tavilySearchTool.searchHits(query);
+    }
 }

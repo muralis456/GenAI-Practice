@@ -5,11 +5,12 @@ import com.example.travel.graph.TravelState;
 import com.example.travel.graph.model.ResearchExtraction;
 import com.example.travel.model.TravelAttraction;
 import com.example.travel.model.TravelResearch;
-import com.example.travel.model.WeatherForecast;
+import com.example.travel.model.SearchHit;
+import com.example.travel.service.AgentExecutionBudget;
 import com.example.travel.service.RoutedLlm;
 import com.example.travel.support.JsonSupport;
+import com.example.travel.tool.CurrencyTool;
 import com.example.travel.tool.TavilySearchTool;
-import com.example.travel.tool.WeatherTool;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -25,48 +26,51 @@ public class TravelResearchAgentService {
 
     private final RoutedLlm routedLlm;
     private final TavilySearchTool tavilySearchTool;
-    private final WeatherTool weatherTool;
+    private final CurrencyTool currencyTool;
     private final JsonSupport jsonSupport;
+    private final AgentExecutionBudget executionBudget;
 
     public TravelResearchAgentService(RoutedLlm routedLlm,
                                       TavilySearchTool tavilySearchTool,
-                                      WeatherTool weatherTool,
-                                      JsonSupport jsonSupport) {
+                                      CurrencyTool currencyTool,
+                                      JsonSupport jsonSupport,
+                                      AgentExecutionBudget executionBudget) {
         this.routedLlm = routedLlm;
         this.tavilySearchTool = tavilySearchTool;
-        this.weatherTool = weatherTool;
+        this.currencyTool = currencyTool;
         this.jsonSupport = jsonSupport;
+        this.executionBudget = executionBudget;
     }
 
     public ResearchResult research(TravelState state) {
         String destination = state.destination();
-        boolean budgetMode = state.retryCount() > 0
-                || "budget".equalsIgnoreCase(state.travelStyle());
+        boolean budgetMode = state.hotelCheaper() || "budget".equalsIgnoreCase(state.travelStyle());
         String query = (budgetMode
                 ? "Best budget attractions, food, local tips for "
                 : "Best attractions, food, local tips for ")
                 + destination + " with a " + state.travelStyle() + " travel style.";
         log.info("Research agent searching destination={}", destination);
-        String rawResearch = state.needsResearch() ? tavilySearchTool.search(query) : "";
-        WeatherForecast weather = state.needsWeather()
-                ? weatherTool.forecast(destination, state.departureDate(), state.returnDate())
-                : new WeatherForecast("", "", false);
+        List<SearchHit> hits = state.needsResearch() ? tavilySearchTool.searchHits(query) : List.of();
+        String rawResearch = formatHits(hits);
         String content = rawResearch;
         if (state.needsResearch()) {
             try {
-                content = routedLlm.complete(AgentRole.EXTRACT,
-                    "You are the Travel Research Agent. Prefer the supplied research and weather. "
-                            + "You may call Tavily or weather tools if more detail is needed. "
-                            + "If you call Tavily search, you MUST pass a non-empty query string; never omit query. "
-                            + "Return JSON only with shape "
-                            + "{\"research\":[{\"topic\":\"\",\"summary\":\"\"}],"
-                            + "\"attractions\":[{\"name\":\"\",\"description\":\"\",\"area\":\"\"}]}. "
-                            + "Use plain ASCII in JSON strings. Do not put raw quotation marks inside summary text. "
-                            + "Use weather to prefer indoor ideas when rain is likely.",
-                    "Destination=" + destination + ", style=" + state.travelStyle()
-                            + "\nReplan guidance: " + state.replanGuidance()
-                            + "\nWeather: " + weather.toDisplay() + "\n" + rawResearch,
-                    tavilySearchTool, weatherTool);
+                String system = "You are the Travel Research Agent. Extract attractions and local tips from the research text. "
+                        + "Do not call weather tools; weather is handled by a separate agent. "
+                        + "Return JSON only with shape "
+                        + "{\"research\":[{\"topic\":\"\",\"summary\":\"\"}],"
+                        + "\"attractions\":[{\"name\":\"\",\"description\":\"\",\"area\":\"\"}]}. "
+                        + "Use plain ASCII in JSON strings. Do not put raw quotation marks inside summary text.";
+                String user = "Destination=" + destination + ", style=" + state.travelStyle()
+                        + "\nReplan guidance: " + state.replanGuidance()
+                        + "\nWeather from Weather agent (may be empty if still running): "
+                        + (state.weather() == null ? "n/a" : state.weather().toDisplay())
+                        + "\n" + rawResearch;
+                if (hits.isEmpty() && executionBudget.tavilyAvailable()) {
+                    content = routedLlm.complete(AgentRole.EXTRACT, system, user, tavilySearchTool, currencyTool);
+                } else {
+                    content = routedLlm.complete(AgentRole.EXTRACT, system, user, currencyTool);
+                }
             } catch (Exception exception) {
                 log.warn("Research LLM failed for destination={}", destination, exception);
                 content = rawResearch;
@@ -77,12 +81,29 @@ public class TravelResearchAgentService {
         List<TravelResearch> research = new ArrayList<>(
                 extraction.getResearch() == null ? List.of() : extraction.getResearch());
         research.removeIf(item -> item == null || JsonSupport.looksLikeJsonObject(item.getSummary()));
-        research.add(0, new TravelResearch("Weather", weather.toDisplay()));
         extraction.setResearch(research);
         if (extraction.getAttractions() == null) {
             extraction.setAttractions(List.of());
         }
-        return new ResearchResult(extraction, weather);
+        return new ResearchResult(extraction, hits);
+    }
+
+    private String formatHits(List<SearchHit> hits) {
+        if (hits == null || hits.isEmpty()) {
+            return "";
+        }
+        StringBuilder sb = new StringBuilder();
+        for (SearchHit hit : hits) {
+            sb.append(hit.getTitle() == null ? "" : hit.getTitle()).append('\n');
+            if (hit.getUrl() != null && !hit.getUrl().isBlank()) {
+                sb.append(hit.getUrl()).append('\n');
+            }
+            if (hit.getContent() != null) {
+                sb.append(hit.getContent()).append('\n');
+            }
+            sb.append('\n');
+        }
+        return sb.toString();
     }
 
     private ResearchExtraction parseExtraction(String content, String destination, String rawResearch) {
@@ -170,19 +191,19 @@ public class TravelResearchAgentService {
 
     public static final class ResearchResult {
         private final ResearchExtraction extraction;
-        private final WeatherForecast weather;
+        private final List<SearchHit> hits;
 
-        public ResearchResult(ResearchExtraction extraction, WeatherForecast weather) {
+        public ResearchResult(ResearchExtraction extraction, List<SearchHit> hits) {
             this.extraction = extraction;
-            this.weather = weather;
+            this.hits = hits == null ? List.of() : hits;
         }
 
         public ResearchExtraction extraction() {
             return extraction;
         }
 
-        public WeatherForecast weather() {
-            return weather;
+        public List<SearchHit> hits() {
+            return hits;
         }
     }
 }

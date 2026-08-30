@@ -718,7 +718,11 @@
                             <textarea id="tripPrompt" name="preferences" placeholder="e.g. From Bengaluru to Japan for 7 days under ₹2 lakh" rows="3">From Bengaluru to Japan for 7 days under ₹2 lakh — family-friendly with good food and local experiences.</textarea>
 
                             <input type="hidden" name="userId" value="aaro_hi_user" />
-                            <input type="hidden" name="selectedModel" value="" />
+                            <select name="selectedModel" id="modelPolicy" aria-label="Model policy">
+                                <option value="FAST">FAST</option>
+                                <option value="BALANCED" selected>BALANCED</option>
+                                <option value="REASONING">REASONING</option>
+                            </select>
                             <input type="hidden" name="departureCity" value="Bengaluru" />
                             <input type="hidden" name="departureDate" value="" />
                             <input type="hidden" name="returnDate" value="" />
@@ -1046,12 +1050,22 @@
             const modify = document.createElement('button');
             modify.type = 'button';
             modify.className = 'submit-button ghost-button';
-            modify.textContent = 'Modify / make cheaper';
+            modify.textContent = 'Modify';
+            const reject = document.createElement('button');
+            reject.type = 'button';
+            reject.className = 'submit-button ghost-button';
+            reject.textContent = 'Reject';
             actions.appendChild(approve);
             actions.appendChild(modify);
+            actions.appendChild(reject);
             approve.onclick = () => decide('/api/plan/approve', data.threadId, null, row);
-            modify.onclick = () => decide('/api/plan/modify', data.threadId,
-                'Make it cheaper: lower hotel and flight cost.', row);
+            modify.onclick = () => {
+                const notes = window.prompt('What should we change?', '');
+                if (notes && notes.trim()) {
+                    decide('/api/plan/modify', data.threadId, notes.trim(), row);
+                }
+            };
+            reject.onclick = () => decide('/api/plan/reject', data.threadId, null, row);
         }
         chatThread.appendChild(row);
         scrollChat();
@@ -1074,16 +1088,25 @@
             }
             seen.add(key);
             return true;
-        }).map(step =>
-            (step.status === 'warn' ? '⚠ ' : step.status === 'skip' ? '○ ' : '✓ ') + step.node
+        }).map(step => {
+            const status = (step.status || '').toUpperCase();
+            const icon = status === 'PARTIAL' || status === 'WARN' ? '⚠ '
+                : status === 'SKIPPED' || status === 'SKIP' ? '○ '
+                : status === 'RETRYING' ? '↻ '
+                : status === 'FAILED' ? '✕ '
+                : status === 'WAITING_HUMAN' ? '⏸ '
+                : '✓ ';
+            return icon + step.node
             + (step.durationMs ? ' (' + (step.durationMs / 1000).toFixed(1) + 's)' : '')
             + (step.model ? ' [' + step.model + ']' : '')
             + (step.toolCalls ? ' tools=' + step.toolCalls : '')
-            + (step.detail ? ' — ' + step.detail : '')
-        ).join('\n');
+            + (step.inputTokens ? ' tok=' + step.inputTokens + '/' + (step.outputTokens || 0) : '')
+            + (step.detail ? ' — ' + step.detail : '');
+        }).join('\n');
         const sources = (data.sources || []).length
             ? 'Sources\n' + data.sources.join('\n')
             : '';
+        const history = data.executionHistory ? 'Execution history\n' + data.executionHistory : '';
 
         if (data.finalPlan) {
             return [
@@ -1091,6 +1114,7 @@
                 data.routeSummary ? 'Route\n' + data.routeSummary : '',
                 'Pipeline\n' + (pipeline || 'n/a'),
                 sources,
+                history,
                 (data.awaitingApproval ? 'Final report (validated)\n' : 'Final plan\n') + data.finalPlan
             ].filter(Boolean).join('\n\n');
         }
@@ -1136,16 +1160,64 @@
         loadingState.classList.add('visible');
 
         try {
-            const res = await fetch('/api/plan', {
+            const startRes = await fetch('/api/plan/start', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             });
-            const body = await res.text();
-            if (!res.ok) {
-                throw new Error(body || 'Request failed');
+            const startedBody = await startRes.text();
+            if (!startRes.ok) {
+                throw new Error(startedBody || 'Request failed');
             }
-            appendAssistantMessage(JSON.parse(body));
+            const started = JSON.parse(startedBody);
+            const threadId = started.threadId;
+            const statusSpan = loadingState.querySelectorAll('span')[1];
+            await new Promise((resolve, reject) => {
+                let finished = false;
+                const es = new EventSource('/api/plan/' + encodeURIComponent(threadId) + '/events');
+                es.addEventListener('node', (evt) => {
+                    try {
+                        const data = JSON.parse(evt.data);
+                        if (statusSpan && data.node) {
+                            statusSpan.textContent = 'Running ' + data.node + '…';
+                        }
+                    } catch (ignored) {}
+                });
+                es.addEventListener('complete', async (evt) => {
+                    finished = true;
+                    es.close();
+                    try {
+                        const data = JSON.parse(evt.data);
+                        const plan = data.plan || data;
+                        try {
+                            const hist = await fetch('/api/plan/' + encodeURIComponent(threadId) + '/history').then(r => r.json());
+                            plan.executionHistory = (hist.snapshots || []).map(s =>
+                                (s.node || '?') + ' → ' + (s.next || 'end')).join('\n');
+                        } catch (ignored) {}
+                        appendAssistantMessage(plan);
+                        resolve();
+                    } catch (error) {
+                        reject(error);
+                    }
+                });
+                es.addEventListener('failed', (evt) => {
+                    finished = true;
+                    es.close();
+                    try {
+                        const data = JSON.parse(evt.data);
+                        reject(new Error(data.error || 'Plan failed'));
+                    } catch (error) {
+                        reject(error);
+                    }
+                });
+                es.onerror = () => {
+                    if (finished) {
+                        return;
+                    }
+                    es.close();
+                    reject(new Error('Lost connection to the agent stream'));
+                };
+            });
         } catch (error) {
             appendAssistantMessage({
                 status: 'ERROR',
@@ -1184,6 +1256,8 @@
             }
             if (notes) {
                 appendUserMessage(notes);
+            } else if (url.includes('reject')) {
+                appendUserMessage('Rejected this plan.');
             } else {
                 appendUserMessage('Approved this plan.');
             }

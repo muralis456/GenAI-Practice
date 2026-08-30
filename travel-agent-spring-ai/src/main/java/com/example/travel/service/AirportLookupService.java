@@ -52,6 +52,8 @@ public class AirportLookupService {
 
     private String normalizeCity(String city) {
         return switch (city.toLowerCase(Locale.ROOT)) {
+            case "goa", "panaji", "panjim", "vasco", "vasco da gama" -> "Goa";
+            case "kyoto" -> "Osaka";
             case "bangalore" -> "Bengaluru";
             case "bombay" -> "Mumbai";
             case "calcutta" -> "Kolkata";

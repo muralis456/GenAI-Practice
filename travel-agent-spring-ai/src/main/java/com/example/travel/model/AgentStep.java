@@ -17,6 +17,8 @@ public class AgentStep implements Serializable {
     private String error;
     private int retryCount;
     private int attempt;
+    private int inputTokens;
+    private int outputTokens;
 
     public AgentStep() {
     }
@@ -27,9 +29,24 @@ public class AgentStep implements Serializable {
 
     public AgentStep(String node, String status, String detail, long durationMs) {
         this.node = node;
-        this.status = status;
+        this.status = normalizeStatus(status);
         this.detail = detail;
         this.durationMs = durationMs;
+    }
+
+    public static String normalizeStatus(String status) {
+        if (status == null || status.isBlank()) {
+            return "SUCCESS";
+        }
+        return switch (status.toLowerCase()) {
+            case "ok", "success" -> "SUCCESS";
+            case "warn", "warning", "partial" -> "PARTIAL";
+            case "skip", "skipped" -> "SKIPPED";
+            case "fail", "failed", "error" -> "FAILED";
+            case "retry", "retrying" -> "RETRYING";
+            case "waiting", "waiting_human", "hitl" -> "WAITING_HUMAN";
+            default -> status.toUpperCase();
+        };
     }
 
     public String getNode() {
@@ -102,5 +119,21 @@ public class AgentStep implements Serializable {
 
     public void setAttempt(int attempt) {
         this.attempt = attempt;
+    }
+
+    public int getInputTokens() {
+        return inputTokens;
+    }
+
+    public void setInputTokens(int inputTokens) {
+        this.inputTokens = inputTokens;
+    }
+
+    public int getOutputTokens() {
+        return outputTokens;
+    }
+
+    public void setOutputTokens(int outputTokens) {
+        this.outputTokens = outputTokens;
     }
 }

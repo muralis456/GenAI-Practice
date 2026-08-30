@@ -33,6 +33,7 @@ public class ExternalApiService {
 
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
+    private final AgentExecutionBudget executionBudget;
 
     @Value("${travel.tavily.api-url:}")
     private String tavilyUrl;
@@ -53,15 +54,19 @@ public class ExternalApiService {
     @Value("${travel.aviation.include-flight-date:false}")
     private boolean includeFlightDate;
 
-    public ExternalApiService(RestTemplate restTemplate, ObjectMapper objectMapper) {
+    public ExternalApiService(RestTemplate restTemplate, ObjectMapper objectMapper, AgentExecutionBudget executionBudget) {
         this.restTemplate = restTemplate;
         this.objectMapper = objectMapper;
+        this.executionBudget = executionBudget;
     }
 
     public String searchTravelInfo(String query) {
         if (query == null || query.isBlank()) {
             log.warn("Tavily search skipped: query was null/blank (often from a tool call with missing args)");
             return "Tavily search skipped: query must be a non-empty string.";
+        }
+        if (!executionBudget.tryConsumeTavily()) {
+            return "Tavily search skipped: Tavily call budget exhausted for this graph run.";
         }
         if (tavilyApiKey == null || tavilyApiKey.isBlank()) {
             log.warn("Tavily API key is missing");
@@ -95,6 +100,11 @@ public class ExternalApiService {
     public List<SearchHit> searchTravelHits(String query) {
         String body = searchTravelInfo(query);
         List<SearchHit> hits = new ArrayList<>();
+        if (body == null || body.isBlank() || !body.strip().startsWith("{")) {
+            log.debug("Tavily hits skipped: response was not JSON ({})",
+                    body == null ? "null" : body.substring(0, Math.min(80, body.length())));
+            return hits;
+        }
         try {
             JsonNode root = objectMapper.readTree(body);
             JsonNode results = root.path("results");
@@ -105,7 +115,8 @@ public class ExternalApiService {
                 SearchHit hit = new SearchHit(
                         text(result, "title"),
                         text(result, "content"),
-                        text(result, "url"));
+                        text(result, "url", ""));
+                hit.setScore(result.path("score").asDouble(0));
                 hits.add(hit);
             }
         } catch (Exception exception) {

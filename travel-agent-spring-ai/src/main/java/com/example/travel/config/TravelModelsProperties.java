@@ -12,6 +12,9 @@ public class TravelModelsProperties {
     private String planner;
     private String itinerary;
     private String finale;
+    private String fast;
+    private String balanced;
+    private String reasoning;
 
     private double extractionTemperature = 0.1;
     private double plannerTemperature = 0.2;
@@ -48,6 +51,30 @@ public class TravelModelsProperties {
 
     public void setFinale(String finale) {
         this.finale = finale;
+    }
+
+    public String getFast() {
+        return fast;
+    }
+
+    public void setFast(String fast) {
+        this.fast = fast;
+    }
+
+    public String getBalanced() {
+        return balanced;
+    }
+
+    public void setBalanced(String balanced) {
+        this.balanced = balanced;
+    }
+
+    public String getReasoning() {
+        return reasoning;
+    }
+
+    public void setReasoning(String reasoning) {
+        this.reasoning = reasoning;
     }
 
     public double getExtractionTemperature() {
@@ -95,6 +122,34 @@ public class TravelModelsProperties {
                             + " is not set. Configure it in application.yml (no model hardcoding in code).");
         }
         return configured.trim();
+    }
+
+    /**
+     * User policy FAST/BALANCED/REASONING, or a concrete Ollama model id, overlays role defaults.
+     */
+    public String resolve(AgentRole role, String policy) {
+        if (policy == null || policy.isBlank() || "BALANCED".equalsIgnoreCase(policy)) {
+            return firstNonBlank(model(role), balanced);
+        }
+        if ("FAST".equalsIgnoreCase(policy)) {
+            return firstNonBlank(fast, extraction, model(role));
+        }
+        if ("REASONING".equalsIgnoreCase(policy)) {
+            return firstNonBlank(reasoning, finale, model(role));
+        }
+        return policy.trim();
+    }
+
+    private static String firstNonBlank(String... values) {
+        if (values == null) {
+            return "";
+        }
+        for (String value : values) {
+            if (value != null && !value.isBlank()) {
+                return value.trim();
+            }
+        }
+        return "";
     }
 
     public double temperature(AgentRole role) {

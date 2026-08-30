@@ -7,6 +7,7 @@ import com.example.travel.model.BudgetSummary;
 import com.example.travel.model.FlightOption;
 import com.example.travel.model.HotelOption;
 import com.example.travel.model.Itinerary;
+import com.example.travel.model.ModificationRequest;
 import com.example.travel.model.ProvenanceEvent;
 import com.example.travel.model.ReplanStrategy;
 import com.example.travel.model.TravelAttraction;
@@ -59,7 +60,7 @@ public class TravelState extends AgentState {
     public static final String WEATHER = "weather";
     public static final String PIPELINE = "pipeline";
     public static final String AWAITING_APPROVAL = "awaitingApproval";
-    /** Human decision written on resume: approve | modify */
+    /** Human decision written on resume: approve | modify | reject */
     public static final String HITL_DECISION = "hitlDecision";
     public static final String PREFERRED_AIRPORT = "preferredAirport";
     public static final String CURRENCY = "currency";
@@ -76,6 +77,13 @@ public class TravelState extends AgentState {
     public static final String REPLAN_STRATEGY = "replanStrategy";
     public static final String SEMANTIC_NOTES = "semanticNotes";
     public static final String PROVENANCE = "provenance";
+    public static final String HOTEL_CHEAPER = "hotelCheaper";
+    public static final String FLIGHT_PREFERENCE = "flightPreference";
+    public static final String MODEL_POLICY = "modelPolicy";
+    public static final String INTENT_CONFIDENCE = "intentConfidence";
+    public static final String MODIFICATION = "modification";
+    public static final String DISPATCH_ROUTE = "dispatchRoute";
+    public static final String SUPERVISOR_DECISION = "supervisorDecision";
 
     public static final Map<String, Channel<?>> SCHEMA;
 
@@ -126,6 +134,13 @@ public class TravelState extends AgentState {
         schema.put(REPLAN_STRATEGY, Channels.base(ReplanStrategy::new));
         schema.put(SEMANTIC_NOTES, Channels.base(() -> new ArrayList<String>()));
         schema.put(PROVENANCE, Channels.appender(() -> new ArrayList<ProvenanceEvent>()));
+        schema.put(HOTEL_CHEAPER, Channels.base(() -> Boolean.FALSE));
+        schema.put(FLIGHT_PREFERENCE, Channels.base(() -> "balanced"));
+        schema.put(MODEL_POLICY, Channels.base(() -> "BALANCED"));
+        schema.put(INTENT_CONFIDENCE, Channels.base(() -> 1.0d));
+        schema.put(MODIFICATION, Channels.base(ModificationRequest::new));
+        schema.put(DISPATCH_ROUTE, Channels.base(() -> ""));
+        schema.put(SUPERVISOR_DECISION, Channels.base(() -> ""));
         SCHEMA = Collections.unmodifiableMap(schema);
     }
 
@@ -156,6 +171,9 @@ public class TravelState extends AgentState {
         input.put(RETRY_COUNT, 0);
         input.put(MAX_RETRIES, 2);
         input.put(COST_FACTOR, BigDecimal.ONE);
+        input.put(HOTEL_CHEAPER, Boolean.FALSE);
+        input.put(FLIGHT_PREFERENCE, "balanced");
+        input.put(MODEL_POLICY, com.example.travel.service.ModelRoutingContext.normalize(request.getSelectedModel()));
         input.put(VALIDATION_ERRORS, new ArrayList<String>());
         input.put(PIPELINE, new ArrayList<AgentStep>());
         input.put(AWAITING_APPROVAL, Boolean.TRUE);
@@ -385,8 +403,42 @@ public class TravelState extends AgentState {
         return budgetSummary() != null && !budgetSummary().isWithinBudget();
     }
 
+    public boolean hotelCheaper() {
+        return Boolean.TRUE.equals(this.<Boolean>value(HOTEL_CHEAPER).orElse(Boolean.FALSE));
+    }
+
+    public String flightPreference() {
+        return this.<String>value(FLIGHT_PREFERENCE).orElse("balanced");
+    }
+
+    public String modelPolicy() {
+        return this.<String>value(MODEL_POLICY).orElse("BALANCED");
+    }
+
+    public double intentConfidence() {
+        Object value = this.value(INTENT_CONFIDENCE).orElse(1.0d);
+        if (value instanceof Number number) {
+            return number.doubleValue();
+        }
+        return 1.0d;
+    }
+
+    public ModificationRequest modification() {
+        return this.<ModificationRequest>value(MODIFICATION).orElseGet(ModificationRequest::new);
+    }
+
+    public String supervisorDecision() {
+        return this.<String>value(SUPERVISOR_DECISION).orElse("");
+    }
+
+    public String dispatchRoute() {
+        return this.<String>value(DISPATCH_ROUTE).orElse("");
+    }
+
     public boolean shouldReplan() {
-        return !validationErrors().isEmpty() && retryCount() < maxRetries();
+        boolean deterministicFailure = !validationErrors().isEmpty();
+        boolean semanticFailure = !semanticNotes().isEmpty();
+        return (deterministicFailure || semanticFailure) && retryCount() < maxRetries();
     }
 
     public boolean shouldReplanForBudget() {
@@ -453,7 +505,7 @@ public class TravelState extends AgentState {
     }
 
     public static Map<String, Object> trace(String node, String status, String detail) {
-        return Map.of(PIPELINE, List.of(new AgentStep(node, status, detail)));
+        return Map.of(PIPELINE, List.of(new AgentStep(node, AgentStep.normalizeStatus(status), detail)));
     }
 
     public static Map<String, Object> provenance(ProvenanceEvent event) {
