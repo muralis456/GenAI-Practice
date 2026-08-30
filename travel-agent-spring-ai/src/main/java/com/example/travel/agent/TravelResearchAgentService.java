@@ -160,7 +160,7 @@ public class TravelResearchAgentService {
         if (node == null || node.get(field) == null || node.get(field).isNull()) {
             return "";
         }
-        return node.get(field).asText("").trim();
+        return node.get(field).asString("").trim();
     }
 
     private static String trim(String value, int max) {
