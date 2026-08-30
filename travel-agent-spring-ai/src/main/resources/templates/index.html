@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AI Travel Planner</title>
+    <style>
+        :root {
+            --bg-1: #020b18;
+            --bg-2: #0a182d;
+            --panel: rgba(18, 32, 52, 0.9);
+            --panel-soft: rgba(255, 255, 255, 0.04);
+            --border: rgba(255, 255, 255, 0.08);
+            --primary: #2b8cff;
+            --primary-2: #0e4ec4;
+            --text: #edf5ff;
+            --muted: #b3c7df;
+            --chip: rgba(53, 125, 255, 0.16);
+            --pill: rgba(77, 142, 255, 0.16);
+            --shadow: rgba(4, 9, 19, 0.45);
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html, body {
+            margin: 0;
+            min-height: 100%;
+            font-family: Arial, Helvetica, sans-serif;
+            background: radial-gradient(circle at top, rgba(52, 116, 196, 0.18), transparent 35%),
+                        linear-gradient(120deg, var(--bg-1), var(--bg-2));
+            color: var(--text);
+        }
+
+        body {
+            min-height: 100vh;
+        }
+
+        .layout {
+            display: flex;
+            min-height: 100vh;
+        }
+
+        .sidebar {
+            width: 290px;
+            padding: 22px 18px 18px;
+            background: rgba(9, 17, 31, 0.75);
+            border-right: 1px solid var(--border);
+            backdrop-filter: blur(6px);
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 18px;
+            font-weight: 700;
+            margin: 6px 4px 26px;
+            color: #edf4ff;
+        }
+
+        .brand-mark {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #3ec1ff, #1d6fff);
+            box-shadow: 0 0 12px rgba(45, 130, 255, 0.7);
+            position: relative;
+        }
+
+        .brand-mark::after {
+            content: "";
+            position: absolute;
+            inset: 4px 4px auto auto;
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.9);
+        }
+
+        .sidebar-card {
+            background: rgba(255,255,255,0.02);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 14px 12px;
+            margin-bottom: 18px;
+        }
+
+        .sidebar-label {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 13px;
+            color: var(--muted);
+            margin-bottom: 10px;
+        }
+
+        .user-field {
+            width: 100%;
+            background: rgba(255,255,255,0.92);
+            border: 1px solid rgba(255,255,255,0.7);
+            border-radius: 8px;
+            padding: 12px 14px;
+            font-size: 15px;
+            color: #1f2d3d;
+        }
+
+        .sidebar-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-top: 8px;
+        }
+
+        .sidebar-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            width: 100%;
+            background: rgba(255,255,255,0.02);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 11px 12px;
+            color: var(--text);
+            font-size: 14px;
+        }
+
+        .tiny-icon {
+            display: inline-flex;
+            width: 18px;
+            height: 18px;
+            align-items: center;
+            justify-content: center;
+            border-radius: 6px;
+            font-size: 11px;
+            background: rgba(255,255,255,0.08);
+        }
+
+        .main {
+            flex: 1;
+            padding: 22px 28px 34px;
+        }
+
+        .content {
+            max-width: 1180px;
+            margin: 0 auto;
+        }
+
+        .hero {
+            margin-top: 6px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: rgba(91, 164, 255, 0.12);
+            border: 1px solid rgba(123, 180, 255, 0.25);
+            border-radius: 999px;
+            padding: 7px 14px;
+            font-size: 12px;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: #dfeeff;
+            margin-bottom: 16px;
+        }
+
+        .title {
+            font-size: clamp(2.3rem, 4vw, 4.2rem);
+            line-height: 1.05;
+            font-weight: 800;
+            margin: 0;
+            letter-spacing: -0.05em;
+        }
+
+        .subtitle {
+            max-width: 760px;
+            margin: 18px auto 0;
+            font-size: 20px;
+            line-height: 1.5;
+            color: var(--muted);
+        }
+
+        .hero-visual {
+            width: 100%;
+            max-width: 960px;
+            height: 146px;
+            margin: 20px auto 18px;
+            border-radius: 20px;
+            background:
+                linear-gradient(180deg, rgba(4, 12, 21, 0.18), rgba(7, 18, 30, 0.12)),
+                linear-gradient(135deg, rgba(150, 196, 255, 0.32), rgba(72, 118, 190, 0.1)),
+                url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 420"><rect width="1200" height="420" fill="transparent"/><path d="M0 300 C160 250, 260 260, 430 220 S760 170, 1200 270 L1200 420 L0 420 Z" fill="rgba(255,255,255,0.08)"/><path d="M0 320 C180 280, 300 260, 500 240 S830 210, 1200 290" fill="none" stroke="rgba(255,255,255,0.14)" stroke-width="2"/></svg>') center/cover no-repeat;
+            border: 1px solid rgba(255,255,255,0.05);
+            box-shadow: inset 0 0 22px rgba(255,255,255,0.04);
+        }
+
+        .city-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(160px, 1fr));
+            gap: 14px;
+            margin: 16px auto 18px;
+            max-width: 960px;
+        }
+
+        .city-card {
+            height: 104px;
+            border-radius: 14px;
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+            padding: 12px 10px;
+            font-weight: 700;
+            font-size: 18px;
+            letter-spacing: 0.02em;
+            color: #eef6ff;
+            border: 1px solid rgba(255,255,255,0.07);
+            box-shadow: 0 10px 24px rgba(0,0,0,0.15);
+            text-shadow: 0 2px 12px rgba(0,0,0,0.35);
+        }
+
+        .tokyo { background: linear-gradient(135deg, rgba(17,179,255,0.22), rgba(4,39,70,0.18)), url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 250"><rect width="400" height="250" fill="%230d1e32"/><path d="M0 180 L120 120 L190 170 L260 110 L400 180 L400 250 L0 250 Z" fill="%234b8bb8" opacity="0.5"/><circle cx="260" cy="90" r="35" fill="%23f4d58d" opacity="0.9"/><rect x="80" y="120" width="180" height="50" fill="%23fdf9ea" opacity="0.2"/></svg>') center/cover no-repeat; }
+        .paris { background: linear-gradient(135deg, rgba(224,133,87,0.18), rgba(13,41,71,0.2)), url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 250"><rect width="400" height="250" fill="%230d1e32"/><path d="M0 170 L140 120 L200 170 L260 110 L400 170 L400 250 L0 250 Z" fill="%23d37b61" opacity="0.5"/><path d="M180 62 L210 155 L150 155 Z" fill="%23f6d0a8" opacity="0.8"/><rect x="100" y="155" width="190" height="35" fill="%23f4e7d6" opacity="0.25"/></svg>') center/cover no-repeat; }
+        .bangkok { background: linear-gradient(135deg, rgba(255,167,87,0.18), rgba(13,41,71,0.2)), url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 250"><rect width="400" height="250" fill="%230d1e32"/><path d="M0 180 L120 100 L220 150 L400 120 L400 250 L0 250 Z" fill="%23e6ae5b" opacity="0.45"/><rect x="70" y="90" width="270" height="80" fill="%23a5d7ef" opacity="0.12"/><path d="M160 120 L190 90 L220 120" fill="none" stroke="%23f7d493" stroke-width="10" opacity="0.8"/></svg>') center/cover no-repeat; }
+        .dubai { background: linear-gradient(135deg, rgba(86,143,255,0.18), rgba(13,41,71,0.2)), url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 250"><rect width="400" height="250" fill="%230d1e32"/><path d="M0 180 Q150 120 400 150 L400 250 L0 250 Z" fill="%2390c4ff" opacity="0.3"/><path d="M110 120 H290 V160 H110 Z" fill="%23e9f0ff" opacity="0.10"/><path d="M80 210 H320" stroke="%23f5efda" stroke-width="8" opacity="0.28"/></svg>') center/cover no-repeat; }
+
+        .prompt-box {
+            max-width: 1000px;
+            margin: 20px auto 0;
+            background: rgba(15, 24, 39, 0.76);
+            border: 1px solid rgba(140, 182, 255, 0.25);
+            border-radius: 18px;
+            box-shadow: 0 18px 36px rgba(0,0,0,0.22);
+            overflow: hidden;
+        }
+
+        .prompt-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 16px 22px 8px;
+            color: #dfeeff;
+            font-size: 13px;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            font-weight: 700;
+        }
+
+        .prompt-header .tag {
+            display: inline-flex;
+            width: 18px;
+            height: 18px;
+            border-radius: 6px;
+            background: rgba(90, 150, 255, 0.18);
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            border: 1px solid rgba(123, 180, 255, 0.2);
+        }
+
+        .prompt-body {
+            padding: 8px 18px 20px;
+        }
+
+        .trip-suggestions {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(180px, 1fr));
+            gap: 14px;
+            margin: 10px 0 16px;
+        }
+
+        .suggestion {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 90px;
+            border-radius: 12px;
+            padding: 14px 16px;
+            background: linear-gradient(135deg, rgba(41, 118, 215, 0.72), rgba(28, 83, 175, 0.82));
+            color: #f4f9ff;
+            font-weight: 700;
+            font-size: 18px;
+            text-align: center;
+            border: 1px solid rgba(255,255,255,0.12);
+            box-shadow: inset 0 0 18px rgba(255,255,255,0.06);
+        }
+
+        textarea,
+        input,
+        select,
+        button {
+            font: inherit;
+        }
+
+        textarea {
+            width: 100%;
+            min-height: 116px;
+            resize: vertical;
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.09);
+            border-radius: 14px;
+            padding: 18px 18px 16px;
+            color: var(--text);
+            font-size: 17px;
+            line-height: 1.55;
+            outline: none;
+            box-shadow: inset 0 0 18px rgba(0,0,0,0.08);
+        }
+
+        textarea:focus {
+            border-color: rgba(126, 182, 255, 0.55);
+            box-shadow: 0 0 0 3px rgba(71, 145, 255, 0.15), inset 0 0 18px rgba(0,0,0,0.06);
+        }
+
+        textarea::placeholder {
+            color: rgba(220, 233, 255, 0.6);
+        }
+
+        .submit-button {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            width: 100%;
+            margin-top: 14px;
+            border: none;
+            border-radius: 12px;
+            padding: 18px 20px;
+            background: linear-gradient(135deg, var(--primary), var(--primary-2));
+            color: #f9fbff;
+            font-size: 18px;
+            font-weight: 700;
+            cursor: pointer;
+            box-shadow: 0 10px 24px rgba(32, 91, 255, 0.38);
+            transition: transform 0.15s ease, filter 0.15s ease;
+        }
+
+        .submit-button:hover {
+            filter: brightness(1.05);
+            transform: translateY(-1px);
+        }
+
+        .submit-button:disabled {
+            opacity: 0.75;
+            cursor: wait;
+            transform: none;
+        }
+
+        .response {
+            margin-top: 24px;
+            background: rgba(9, 17, 31, 0.8);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 14px;
+            padding: 18px 20px;
+            color: var(--text);
+            white-space: pre-wrap;
+            line-height: 1.65;
+            display: none;
+        }
+
+        .loading-shell {
+            display: none;
+            align-items: center;
+            gap: 12px;
+            min-height: 60px;
+            color: #dfeeff;
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .loading-shell.visible {
+            display: flex;
+        }
+
+        .spinner {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-top-color: #83b5ff;
+            animation: spin 0.9s linear infinite;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .hidden-fields {
+            display: none;
+        }
+
+        @media (max-width: 980px) {
+            .layout {
+                flex-direction: column;
+            }
+
+            .sidebar {
+                width: 100%;
+                border-right: none;
+                border-bottom: 1px solid var(--border);
+            }
+
+            .trip-suggestions,
+            .city-grid {
+                grid-template-columns: repeat(2, minmax(150px, 1fr));
+            }
+        }
+
+        @media (max-width: 560px) {
+            .main {
+                padding: 18px 16px 30px;
+            }
+
+            .trip-suggestions,
+            .city-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="layout">
+    <aside class="sidebar">
+        <div class="brand">
+            <span class="brand-mark"></span>
+            <span>AI Travel Planner</span>
+        </div>
+
+        <div class="sidebar-card">
+            <div class="sidebar-label">
+                <span>User ID</span>
+                <span>◎</span>
+            </div>
+            <input class="user-field" type="text" id="userId" value="aaro_hi_user" />
+        </div>
+
+        <div class="sidebar-card">
+            <div class="sidebar-label"><span>Powered by</span></div>
+            <div class="sidebar-list">
+                <div class="sidebar-item"><span class="tiny-icon">◌</span> LangGraph</div>
+                <div class="sidebar-item"><span class="tiny-icon">◉</span> Groq · Llama 3.3 70B</div>
+                <div class="sidebar-item"><span class="tiny-icon">◍</span> PostgreSQL</div>
+                <div class="sidebar-item"><span class="tiny-icon">◈</span> Tavily Search</div>
+                <div class="sidebar-item"><span class="tiny-icon">✦</span> AviationStack</div>
+            </div>
+        </div>
+
+        <div class="sidebar-card">
+            <div class="sidebar-label"><span>Agent Pipeline</span></div>
+            <div class="sidebar-list">
+                <div class="sidebar-item"><span class="tiny-icon">✦</span> Flight Agent</div>
+                <div class="sidebar-item"><span class="tiny-icon">◌</span> Hotel Agent</div>
+                <div class="sidebar-item"><span class="tiny-icon">✧</span> Itinerary Agent</div>
+                <div class="sidebar-item"><span class="tiny-icon">✦</span> Final Agent</div>
+            </div>
+        </div>
+    </aside>
+
+    <main class="main">
+        <div class="content">
+            <div class="hero">
+                <div class="badge">Multi-agent AI system</div>
+                <h1 class="title">AI Travel Booking System</h1>
+                <div class="subtitle">
+                    Four specialized agents work together — searching flights, hotels, building an itinerary, and delivering your perfect trip plan.
+                </div>
+                <div class="hero-visual"></div>
+            </div>
+
+            <div class="city-grid">
+                <div class="city-card tokyo">Tokyo</div>
+                <div class="city-card paris">Paris</div>
+                <div class="city-card bangkok">Bangkok</div>
+                <div class="city-card dubai">Dubai</div>
+            </div>
+
+            <form id="travelForm">
+                <div class="prompt-box">
+                    <div class="prompt-header">
+                        <span class="tag">✦</span>
+                        <span>Describe your trip</span>
+                    </div>
+
+                    <div class="prompt-body">
+                        <div class="trip-suggestions">
+                            <div class="suggestion">7-day Japan<br>under ₹2L</div>
+                            <div class="suggestion">Paris trip for 5<br>days</div>
+                            <div class="suggestion">Dubai<br>weekend trip</div>
+                            <div class="suggestion">Bali<br>backpacking<br>10 days</div>
+                        </div>
+
+                        <textarea id="tripPrompt" name="preferences" placeholder="e.g. 7-day Japan trip including flights, hotels and sightseeing under ₹2L">Need a family-friendly trip with good food, local experiences, and moderate budget.</textarea>
+
+                        <input type="hidden" name="userId" value="aaro_hi_user" />
+                        <input type="hidden" name="selectedModel" value="llama3.2:3b" />
+                        <input type="hidden" name="departureCity" value="LHR" />
+                        <input type="hidden" name="destination" value="DXB" />
+                        <input type="hidden" name="departureDate" value="" />
+                        <input type="hidden" name="returnDate" value="" />
+                        <input type="hidden" name="budget" value="₹2L" />
+                        <input type="hidden" name="travelStyle" value="balanced" />
+
+                        <button type="submit" id="submitButton" class="submit-button">✈ Generate My Travel Plan</button>
+                        <div id="loadingState" class="loading-shell" aria-live="polite">
+                            <span class="spinner"></span>
+                            <span>Planning your trip with the AI agents...</span>
+                        </div>
+                    </div>
+                </div>
+            </form>
+
+            <div id="response" class="response"></div>
+        </div>
+    </main>
+</div>
+
+<script>
+    const form = document.getElementById('travelForm');
+    const responseBox = document.getElementById('response');
+    const userIdField = document.getElementById('userId');
+    const promptInput = document.getElementById('tripPrompt');
+    const submitButton = document.getElementById('submitButton');
+    const loadingState = document.getElementById('loadingState');
+
+    const syncUserId = () => {
+        const hiddenUserId = form.querySelector('input[name="userId"]');
+        hiddenUserId.value = userIdField.value.trim() || 'aaro_hi_user';
+    };
+
+    userIdField.addEventListener('input', syncUserId);
+
+    form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        syncUserId();
+
+        const formData = new FormData(form);
+        const payload = Object.fromEntries(formData.entries());
+        payload.preferences = promptInput.value.trim() || payload.preferences;
+
+        submitButton.disabled = true;
+        loadingState.classList.add('visible');
+        responseBox.style.display = 'block';
+        responseBox.textContent = '';
+
+        try {
+            const res = await fetch('/api/plan', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            const text = await res.text();
+            if (!res.ok) {
+                throw new Error(text || 'Request failed');
+            }
+
+            const data = JSON.parse(text);
+            responseBox.textContent = data.finalPlan || 'No plan generated.';
+        } catch (error) {
+            responseBox.textContent = 'Error: ' + error.message;
+        } finally {
+            submitButton.disabled = false;
+            loadingState.classList.remove('visible');
+        }
+    });
+</script>
+</body>
+</html>
