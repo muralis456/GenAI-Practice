@@ -1,0 +1,12 @@
+{
+	"folders": [
+		{
+			"name": "langchain-gemini",
+			"path": "../../langchain-gemini"
+		},
+		{
+			"path": "."
+		}
+	],
+	"settings": {}
+}
