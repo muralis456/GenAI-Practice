@@ -9,4 +9,5 @@ import java.util.List;
 public interface ConversationMemoryRepository extends JpaRepository<ConversationMemory, Long> {
     List<ConversationMemory> findByUserIdAndSessionIdOrderByCreatedAtDesc(String userId, String sessionId, Pageable pageable);
     List<ConversationMemory> findByUserIdOrderByCreatedAtDesc(String userId, Pageable pageable);
+    long countByUserId(String userId);
 }

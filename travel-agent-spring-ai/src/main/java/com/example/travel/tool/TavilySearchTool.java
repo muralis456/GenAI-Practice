@@ -17,8 +17,8 @@ public class TavilySearchTool {
         this.externalApiService = externalApiService;
     }
 
-    @Tool(description = "Web search via Tavily for destination research, attractions, food, and local tips.")
-    public String search(@ToolParam(description = "Search query") String query) {
+    @Tool(description = "Web search via Tavily for destination research, attractions, food, and local tips. Always pass a concrete non-empty query string.")
+    public String search(@ToolParam(description = "Required non-empty search query, e.g. 'best food in Tokyo'") String query) {
         return externalApiService.searchTravelInfo(query);
     }
 

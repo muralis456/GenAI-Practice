@@ -8,9 +8,9 @@ spring:
     ollama:
       base-url: http://localhost:11434
       chat:
-        model: granite4.2:8b
+        model: llama3.2:3b
         temperature: 0.2
-        num-predict: 800
+        num-predict: 600
   datasource:
     url: jdbc:postgresql://localhost:5432/travel_agent
     username: ${DB_USERNAME:postgres}
@@ -33,17 +33,20 @@ spring:
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
+        # Keep the JDBC connection for the whole Spring transaction.
+        # RELEASE_AFTER_STATEMENT returns the connection to Hikari mid-tx;
+        # the pool rolls it back → sequence advances but rows never persist.
         connection:
-          handling_mode: DELAYED_ACQUISITION_AND_RELEASE_AFTER_STATEMENT
+          handling_mode: DELAYED_ACQUISITION_AND_RELEASE_AFTER_TRANSACTION
 
 travel:
   graph:
     max-retries: 2
   models:
-    extraction: ${TRAVEL_MODEL_FAST:granite4.2:8b}
-    planner: ${TRAVEL_MODEL_PLANNER:granite4.2:8b}
-    itinerary: ${TRAVEL_MODEL_ITINERARY:devstral:24b}
-    finale: ${TRAVEL_MODEL_FINAL:granite4.2:8b}
+    extraction: ${TRAVEL_MODEL_FAST:llama3.2:3b}
+    planner: ${TRAVEL_MODEL_PLANNER:llama3.2:3b}
+    itinerary: ${TRAVEL_MODEL_ITINERARY:llama3.2:3b}
+    finale: ${TRAVEL_MODEL_FINAL:llama3.2:3b}
   tavily:
     api-url: https://api.tavily.com/search
     api-key: ${TAVILY_API_KEY:}

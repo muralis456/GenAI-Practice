@@ -53,6 +53,7 @@ public class TravelResearchAgentService {
             content = routedLlm.complete(AgentRole.EXTRACT,
                     "You are the Travel Research Agent. Prefer the supplied research and weather. "
                             + "You may call Tavily or weather tools if more detail is needed. "
+                            + "If you call Tavily search, you MUST pass a non-empty query string; never omit query. "
                             + "Return JSON only with shape "
                             + "{\"research\":[{\"topic\":\"\",\"summary\":\"\"}],"
                             + "\"attractions\":[{\"name\":\"\",\"description\":\"\",\"area\":\"\"}]}. "

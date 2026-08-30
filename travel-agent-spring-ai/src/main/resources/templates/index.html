@@ -528,6 +528,44 @@
             background: rgba(43, 140, 255, 0.12);
         }
 
+        .chat-history-list {
+            max-height: 220px;
+            overflow-y: auto;
+        }
+
+        .chat-history-empty {
+            color: var(--muted);
+            font-size: 13px;
+            padding: 6px 4px;
+        }
+
+        .chat-history-item {
+            display: block;
+            width: 100%;
+            text-align: left;
+            background: transparent;
+            border: 1px solid transparent;
+            border-radius: 10px;
+            color: #dfeeff;
+            padding: 10px 10px;
+            cursor: pointer;
+            font-size: 13px;
+            line-height: 1.35;
+        }
+
+        .chat-history-item:hover,
+        .chat-history-item.active {
+            background: rgba(43, 140, 255, 0.12);
+            border-color: rgba(123, 180, 255, 0.25);
+        }
+
+        .chat-history-item .meta {
+            display: block;
+            margin-top: 4px;
+            color: var(--muted);
+            font-size: 11px;
+        }
+
         .city-card {
             cursor: pointer;
         }
@@ -617,6 +655,13 @@
         </div>
 
         <div class="sidebar-card">
+            <div class="sidebar-label"><span>Chat history</span></div>
+            <div id="chatHistoryList" class="sidebar-list chat-history-list">
+                <div class="chat-history-empty">No saved chats yet</div>
+            </div>
+        </div>
+
+        <div class="sidebar-card">
             <div class="sidebar-label"><span>Powered by</span></div>
             <div class="sidebar-list">
                 <div class="sidebar-item"><span class="tiny-icon">◌</span> LangGraph4j</div>
@@ -700,14 +745,20 @@
     const layout = document.querySelector('.layout');
     const form = document.getElementById('travelForm');
     const chatThread = document.getElementById('chatThread');
+    const chatHistoryList = document.getElementById('chatHistoryList');
     const userIdField = document.getElementById('userId');
     const promptInput = document.getElementById('tripPrompt');
     const submitButton = document.getElementById('submitButton');
     const loadingState = document.getElementById('loadingState');
     const newChatBtn = document.getElementById('newChatBtn');
 
+    const storageKey = () => 'travel-chats:' + (userIdField.value.trim() || 'aaro_hi_user');
+    let currentChatId = null;
+
     const syncUserId = () => {
         form.querySelector('input[name="userId"]').value = userIdField.value.trim() || 'aaro_hi_user';
+        renderHistoryList();
+        loadServerHistoryIntoStore();
     };
 
     userIdField.addEventListener('input', syncUserId);
@@ -719,7 +770,165 @@
         });
     });
 
-    newChatBtn.addEventListener('click', () => {
+    const loadStore = () => {
+        try {
+            return JSON.parse(localStorage.getItem(storageKey()) || '{"chats":[]}');
+        } catch (e) {
+            return { chats: [] };
+        }
+    };
+
+    const saveStore = (store) => {
+        try {
+            // Keep only last 20 chats; store text only to avoid quota errors.
+            store.chats = (store.chats || []).slice(0, 20).map(chat => ({
+                id: chat.id,
+                title: chat.title,
+                updatedAt: chat.updatedAt,
+                messages: (chat.messages || []).map(m => ({
+                    role: m.role,
+                    text: m.text,
+                    planData: m.planData ? {
+                        status: m.planData.status,
+                        routeSummary: m.planData.routeSummary,
+                        finalPlan: m.planData.finalPlan,
+                        awaitingApproval: m.planData.awaitingApproval,
+                        threadId: m.planData.threadId,
+                        pipeline: m.planData.pipeline
+                    } : null
+                }))
+            }));
+            localStorage.setItem(storageKey(), JSON.stringify(store));
+        } catch (e) {
+            console.warn('Could not save chat history locally', e);
+            try {
+                // Fallback: drop planData payloads
+                store.chats = (store.chats || []).map(chat => ({
+                    ...chat,
+                    messages: (chat.messages || []).map(m => ({ role: m.role, text: m.text, planData: null }))
+                }));
+                localStorage.setItem(storageKey(), JSON.stringify(store));
+            } catch (ignored) {
+                // ignore
+            }
+        }
+    };
+
+    const ensureCurrentChat = (titleHint) => {
+        const store = loadStore();
+        let chat = store.chats.find(c => c.id === currentChatId);
+        if (!chat) {
+            currentChatId = 'chat-' + Date.now();
+            chat = {
+                id: currentChatId,
+                title: (titleHint || 'New trip').slice(0, 60),
+                updatedAt: Date.now(),
+                messages: []
+            };
+            store.chats.unshift(chat);
+            saveStore(store);
+        }
+        return chat;
+    };
+
+    const persistMessage = (role, text, planData) => {
+        try {
+            const store = loadStore();
+            let chat = store.chats.find(c => c.id === currentChatId);
+            if (!chat) {
+                ensureCurrentChat(text);
+                return persistMessage(role, text, planData);
+            }
+            chat.messages.push({ role, text, planData: planData || null });
+            chat.updatedAt = Date.now();
+            if (role === 'user' && chat.messages.filter(m => m.role === 'user').length === 1) {
+                chat.title = text.slice(0, 60);
+            }
+            saveStore(store);
+            renderHistoryList();
+        } catch (e) {
+            console.warn('persistMessage failed', e);
+        }
+    };
+
+    const loadServerHistoryIntoStore = async () => {
+        const userId = userIdField.value.trim() || 'aaro_hi_user';
+        try {
+            const res = await fetch('/api/chat/history?userId=' + encodeURIComponent(userId) + '&limit=40');
+            if (!res.ok) {
+                return;
+            }
+            const items = await res.json();
+            if (!Array.isArray(items) || !items.length) {
+                return;
+            }
+            const store = loadStore();
+            const serverId = 'server-' + userId;
+            const messages = items.map(item => ({
+                role: item.role === 'assistant' ? 'assistant' : 'user',
+                text: item.content || '',
+                planData: item.role === 'assistant' ? {
+                    status: '',
+                    finalPlan: item.content || '',
+                    awaitingApproval: false,
+                    pipeline: []
+                } : null
+            }));
+            const existing = store.chats.find(c => c.id === serverId);
+            const title = (items.find(i => i.role === 'user') || items[0] || {}).content || 'Previous chats';
+            const chat = {
+                id: serverId,
+                title: String(title).slice(0, 60),
+                updatedAt: Date.now(),
+                messages
+            };
+            if (existing) {
+                store.chats = store.chats.map(c => c.id === serverId ? chat : c);
+            } else {
+                store.chats.unshift(chat);
+            }
+            saveStore(store);
+            renderHistoryList();
+            // If main thread is empty, auto-open server history so something is visible.
+            if (!chatThread.querySelector('.chat-msg')) {
+                openChat(serverId);
+            }
+        } catch (e) {
+            console.warn('Could not load server chat history', e);
+        }
+    };
+
+    const renderHistoryList = () => {
+        const store = loadStore();
+        chatHistoryList.innerHTML = '';
+        if (!store.chats.length) {
+            const empty = document.createElement('div');
+            empty.className = 'chat-history-empty';
+            empty.textContent = 'No chats in this browser yet. Send a plan here — Edge history is separate from Chrome.';
+            chatHistoryList.appendChild(empty);
+            return;
+        }
+        store.chats
+            .slice()
+            .sort((a, b) => b.updatedAt - a.updatedAt)
+            .forEach(chat => {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'chat-history-item' + (chat.id === currentChatId ? ' active' : '');
+                const when = new Date(chat.updatedAt).toLocaleString();
+                const title = document.createElement('span');
+                title.textContent = chat.title || 'Untitled chat';
+                const meta = document.createElement('span');
+                meta.className = 'meta';
+                meta.textContent = when + ' · ' + (chat.messages || []).length + ' msgs';
+                btn.appendChild(title);
+                btn.appendChild(meta);
+                btn.onclick = () => openChat(chat.id);
+                chatHistoryList.appendChild(btn);
+            });
+    };
+
+    const clearThreadDom = () => {
         chatThread.querySelectorAll('.chat-msg').forEach(node => node.remove());
         layout.classList.remove('has-chat');
         if (!chatThread.querySelector('.chat-empty')) {
@@ -728,6 +937,37 @@
             empty.textContent = 'Your trip plans will appear here and stay as you chat.';
             chatThread.appendChild(empty);
         }
+    };
+
+    const openChat = (chatId) => {
+        const store = loadStore();
+        const chat = store.chats.find(c => c.id === chatId);
+        if (!chat) {
+            return;
+        }
+        currentChatId = chatId;
+        clearThreadDom();
+        (chat.messages || []).forEach(msg => {
+            if (msg.role === 'user') {
+                renderUserMessage(msg.text, false);
+            } else {
+                renderAssistantMessage(msg.planData || {
+                    status: '',
+                    finalPlan: msg.text,
+                    awaitingApproval: false,
+                    pipeline: []
+                }, false);
+            }
+        });
+        renderHistoryList();
+        scrollChat();
+    };
+
+    newChatBtn.addEventListener('click', () => {
+        // Keep previous chat in history; start a fresh thread.
+        currentChatId = null;
+        clearThreadDom();
+        renderHistoryList();
         promptInput.value = '';
         promptInput.focus();
     });
@@ -744,7 +984,7 @@
         chatThread.scrollTop = chatThread.scrollHeight;
     };
 
-    const appendUserMessage = (text) => {
+    const renderUserMessage = (text, persist) => {
         markChatActive();
         const row = document.createElement('div');
         row.className = 'chat-msg user';
@@ -754,9 +994,13 @@
         row.querySelector('.chat-body').textContent = text;
         chatThread.appendChild(row);
         scrollChat();
+        if (persist) {
+            ensureCurrentChat(text);
+            persistMessage('user', text, null);
+        }
     };
 
-    const appendAssistantMessage = (data) => {
+    const renderAssistantMessage = (data, persist) => {
         markChatActive();
         const row = document.createElement('div');
         row.className = 'chat-msg assistant';
@@ -767,9 +1011,10 @@
             '<div class="chat-body"></div>' +
             '<div class="chat-actions"></div>' +
             '</div>';
-        row.querySelector('.chat-body').textContent = formatPlan(data);
+        const bodyText = formatPlan(data);
+        row.querySelector('.chat-body').textContent = bodyText;
         const actions = row.querySelector('.chat-actions');
-        if (data.awaitingApproval) {
+        if (data.awaitingApproval && data.threadId) {
             const approve = document.createElement('button');
             approve.type = 'button';
             approve.className = 'submit-button';
@@ -786,8 +1031,15 @@
         }
         chatThread.appendChild(row);
         scrollChat();
+        if (persist) {
+            ensureCurrentChat(data.routeSummary || 'Trip plan');
+            persistMessage('assistant', bodyText, data);
+        }
         return row;
     };
+
+    const appendUserMessage = (text) => renderUserMessage(text, true);
+    const appendAssistantMessage = (data) => renderAssistantMessage(data, true);
 
     const formatPlan = (data) => {
         const seen = new Set();
@@ -803,11 +1055,20 @@
             + (step.durationMs ? ' (' + (step.durationMs / 1000).toFixed(1) + 's)' : '')
             + (step.detail ? ' — ' + step.detail : '')
         ).join('\n');
+
+        if (data.finalPlan) {
+            return [
+                data.status || '',
+                data.routeSummary ? 'Route\n' + data.routeSummary : '',
+                'Pipeline\n' + (pipeline || 'n/a'),
+                (data.awaitingApproval ? 'Final report (validated)\n' : 'Final plan\n') + data.finalPlan
+            ].filter(Boolean).join('\n\n');
+        }
+
         const budget = data.budgetSummary && data.budgetSummary.lineItems
             ? data.budgetSummary.lineItems.map(item => item.category + ': ₹' + item.amountInr).join('\n')
                 + '\nTotal: ₹' + data.budgetSummary.estimatedCost
                 + (data.budgetSummary.remaining != null ? '\nRemaining: ₹' + data.budgetSummary.remaining : '')
-                + (data.budgetSummary.assessment ? '\n' + data.budgetSummary.assessment : '')
             : '';
         const validation = (data.validationErrors || []).length
             ? 'Validation notes:\n' + data.validationErrors.join('\n')
@@ -821,8 +1082,7 @@
             data.hotelInsights ? 'Hotels\n' + data.hotelInsights : '',
             data.travelInsights ? 'Research\n' + data.travelInsights : '',
             data.itinerarySummary ? 'Itinerary\n' + data.itinerarySummary : '',
-            validation,
-            data.finalPlan ? (data.awaitingApproval ? 'Final report (validated)\n' : 'Final plan\n') + data.finalPlan : ''
+            validation
         ].filter(Boolean).join('\n\n');
     };
 
@@ -917,6 +1177,13 @@
             form.requestSubmit();
         }
     });
+
+    renderHistoryList();
+    const storeOnLoad = loadStore();
+    if (storeOnLoad.chats.length) {
+        openChat(storeOnLoad.chats.slice().sort((a, b) => b.updatedAt - a.updatedAt)[0].id);
+    }
+    loadServerHistoryIntoStore();
 </script>
 </body>
 </html>

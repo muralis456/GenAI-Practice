@@ -58,18 +58,23 @@ public class ExternalApiService {
     }
 
     public String searchTravelInfo(String query) {
+        if (query == null || query.isBlank()) {
+            log.warn("Tavily search skipped: query was null/blank (often from a tool call with missing args)");
+            return "Tavily search skipped: query must be a non-empty string.";
+        }
         if (tavilyApiKey == null || tavilyApiKey.isBlank()) {
             log.warn("Tavily API key is missing");
             return "Tavily API key is missing. Please set TAVILY_API_KEY environment variable.";
         }
 
-        log.debug("Searching travel info via Tavily for query={}", query);
+        String cleanQuery = query.trim();
+        log.debug("Searching travel info via Tavily for query={}", cleanQuery);
         HttpHeaders headers = new HttpHeaders();
         headers.set("Content-Type", "application/json");
         headers.set("Authorization", "Bearer " + tavilyApiKey);
 
         Map<String, Object> body = new HashMap<>();
-        body.put("query", query);
+        body.put("query", cleanQuery);
         body.put("search_depth", "basic");
         body.put("max_results", 5);
 
@@ -77,11 +82,11 @@ public class ExternalApiService {
         try {
             return withRetry("Tavily", () -> {
                 ResponseEntity<String> response = restTemplate.exchange(tavilyUrl, HttpMethod.POST, request, String.class);
-                log.info("Tavily search completed for query={}", query);
+                log.info("Tavily search completed for query={}", cleanQuery);
                 return response.getBody();
             });
         } catch (Exception exception) {
-            log.warn("Tavily search failed for query={}", query, exception);
+            log.warn("Tavily search failed for query={}", cleanQuery, exception);
             return "Tavily search failed: " + exception.getMessage();
         }
     }

@@ -5,8 +5,9 @@ import com.example.travel.repository.ConversationMemoryRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.List;
@@ -18,6 +19,8 @@ public class ConversationMemoryService {
     private static final Logger log = LoggerFactory.getLogger(ConversationMemoryService.class);
     private static final int MAX_HISTORY = 6;
     private static final int MAX_CONTENT = 400;
+    private static final int UI_HISTORY_LIMIT = 50;
+    private static final int UI_CONTENT_MAX = 12000;
 
     private final ConversationMemoryRepository repository;
 
@@ -25,22 +28,60 @@ public class ConversationMemoryService {
         this.repository = repository;
     }
 
-    @Transactional
+    /**
+     * Commits immediately (REQUIRES_NEW) so a search is stored even if the long
+     * travel graph later fails or the HTTP client times out.
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void saveMessage(String userId, String sessionId, String role, String content) {
         ConversationMemory memory = new ConversationMemory();
         memory.setUserId(userId);
         memory.setSessionId(sessionId);
         memory.setRole(role);
-        memory.setContent(truncate(content));
+        memory.setContent(truncate(content, MAX_CONTENT));
         memory.setCreatedAt(Instant.now());
-        repository.save(memory);
-        log.debug("Saved conversation memory for userId={}, sessionId={}, role={}", userId, sessionId, role);
+        ConversationMemory saved = repository.saveAndFlush(memory);
+        log.info("Saved conversation memory id={} userId={} role={} chars={}",
+                saved.getId(), userId, role, memory.getContent().length());
     }
 
-    /**
-     * Loads recent turns and returns a detached string so the JDBC connection is
-     * released before long-running LLM/orchestration work.
-     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void saveUiMessage(String userId, String sessionId, String role, String content) {
+        ConversationMemory memory = new ConversationMemory();
+        memory.setUserId(userId);
+        memory.setSessionId(sessionId);
+        memory.setRole(role);
+        memory.setContent(truncate(content, UI_CONTENT_MAX));
+        memory.setCreatedAt(Instant.now());
+        ConversationMemory saved = repository.saveAndFlush(memory);
+        log.info("Saved UI conversation memory id={} userId={} role={} chars={}",
+                saved.getId(), userId, role, memory.getContent().length());
+    }
+
+    @Transactional(readOnly = true)
+    public long countForUser(String userId) {
+        return repository.countByUserId(userId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<HistoryItem> getHistoryForUi(String userId, int limit) {
+        int size = Math.min(Math.max(limit, 1), UI_HISTORY_LIMIT);
+        PageRequest pageable = PageRequest.of(0, size);
+        List<ConversationMemory> memories = repository.findByUserIdOrderByCreatedAtDesc(userId, pageable);
+        log.info("Loaded {} history row(s) for userId={}", memories.size(), userId);
+        return memories.stream()
+                .sorted((a, b) -> a.getCreatedAt().compareTo(b.getCreatedAt()))
+                .map(m -> new HistoryItem(
+                        m.getId(),
+                        m.getRole(),
+                        m.getContent(),
+                        m.getCreatedAt() == null ? null : m.getCreatedAt().toString()))
+                .collect(Collectors.toList());
+    }
+
+    public record HistoryItem(Long id, String role, String content, String createdAt) {
+    }
+
     @Transactional(readOnly = true)
     public String buildHistoryContext(String userId, String sessionId) {
         List<ConversationMemory> history = loadRecentHistory(userId, sessionId);
@@ -49,7 +90,7 @@ public class ConversationMemoryService {
         }
         StringBuilder sb = new StringBuilder("Short-term conversation (last turns only):\n");
         for (ConversationMemory memory : history) {
-            sb.append(memory.getRole()).append(": ").append(truncate(memory.getContent())).append("\n");
+            sb.append(memory.getRole()).append(": ").append(truncate(memory.getContent(), MAX_CONTENT)).append("\n");
         }
         return sb.toString();
     }
@@ -76,14 +117,14 @@ public class ConversationMemoryService {
                 .collect(Collectors.toList());
     }
 
-    private String truncate(String content) {
+    private String truncate(String content, int max) {
         if (content == null) {
             return "";
         }
         String trimmed = content.trim();
-        if (trimmed.length() <= MAX_CONTENT) {
+        if (trimmed.length() <= max) {
             return trimmed;
         }
-        return trimmed.substring(0, MAX_CONTENT) + "...";
+        return trimmed.substring(0, max) + "...";
     }
 }
