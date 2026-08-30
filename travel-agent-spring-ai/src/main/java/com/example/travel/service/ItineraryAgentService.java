@@ -6,6 +6,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
+
 @Service
 public class ItineraryAgentService {
 
@@ -20,8 +22,9 @@ public class ItineraryAgentService {
     public String buildItinerary(TravelRequest request, String selectedModel, String flightInsights, String travelInsights) {
         log.debug("Building itinerary for destination={}, model={}", request.getDestination(), selectedModel);
         String destination = request.getDestination();
-        String departureDate = request.getDepartureDate() != null ? request.getDepartureDate() : "2026-09-15";
-        String returnDate = request.getReturnDate() != null ? request.getReturnDate() : "2026-09-20";
+        LocalDate today = LocalDate.now();
+        String departureDate = request.getDepartureDate() != null ? request.getDepartureDate() : today.toString();
+        String returnDate = request.getReturnDate() != null ? request.getReturnDate() : today.plusDays(5).toString();
 
         String itinerary = chatClient.prompt()
                 .system("You are the Itinerary Agent. Build a practical, day-by-day travel plan with sequence, activities, and pacing.")

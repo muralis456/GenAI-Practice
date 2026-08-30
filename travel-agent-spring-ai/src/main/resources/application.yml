@@ -16,21 +16,33 @@ spring:
     username: ${DB_USERNAME:postgres}
     password: ${DB_PASSWORD:postgres}
     driver-class-name: org.postgresql.Driver
+    hikari:
+      pool-name: TravelAgentHikariPool
+      maximum-pool-size: 10
+      minimum-idle: 2
+      connection-timeout: 30000
+      validation-timeout: 5000
+      keepalive-time: 120000
+      max-lifetime: 1800000
+      leak-detection-threshold: 60000
   jpa:
+    open-in-view: false
     hibernate:
       ddl-auto: update
     show-sql: false
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
+        connection:
+          handling_mode: DELAYED_ACQUISITION_AND_RELEASE_AFTER_STATEMENT
 
 travel:
   tavily:
     api-url: https://api.tavily.com/search
-    api-key: ${TAVILY_API_KEY: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}
+    api-key: ${TAVILY_API_KEY:}
   aviation:
     api-url: https://api.aviationstack.com/v1
-    api-key: ${AVIATIONSTACK_API_KEY:eba3c6a8c055297e535ff7f9385b4e7c}
+    api-key: ${AVIATIONSTACK_API_KEY:}
 
 logging:
   level:

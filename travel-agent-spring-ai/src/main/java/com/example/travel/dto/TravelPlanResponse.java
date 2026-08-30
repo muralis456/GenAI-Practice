@@ -8,19 +8,21 @@ public class TravelPlanResponse {
     private String finalPlan;
     private String flightInsights;
     private String travelInsights;
+    private String hotelInsights;
     private String itinerarySummary;
 
     public TravelPlanResponse() {
     }
 
     public TravelPlanResponse(String userId, String destination, String model, String finalPlan,
-                             String flightInsights, String travelInsights, String itinerarySummary) {
+                             String flightInsights, String travelInsights, String hotelInsights, String itinerarySummary) {
         this.userId = userId;
         this.destination = destination;
         this.model = model;
         this.finalPlan = finalPlan;
         this.flightInsights = flightInsights;
         this.travelInsights = travelInsights;
+        this.hotelInsights = hotelInsights;
         this.itinerarySummary = itinerarySummary;
     }
 
@@ -74,6 +76,14 @@ public class TravelPlanResponse {
 
     public String getItinerarySummary() {
         return itinerarySummary;
+    }
+
+    public String getHotelInsights() {
+        return hotelInsights;
+    }
+
+    public void setHotelInsights(String hotelInsights) {
+        this.hotelInsights = hotelInsights;
     }
 
     public void setItinerarySummary(String itinerarySummary) {

@@ -3,3 +3,6 @@ target/
 *.iml
 .DS_Store
 .env
+application.properties
+logs/
+.vscode/

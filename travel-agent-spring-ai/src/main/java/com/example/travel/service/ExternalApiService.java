@@ -10,7 +10,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
-import tools.jackson.databind.ObjectMapper;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -21,7 +20,6 @@ public class ExternalApiService {
     private static final Logger log = LoggerFactory.getLogger(ExternalApiService.class);
 
     private final RestTemplate restTemplate;
-    private final ObjectMapper objectMapper;
 
     @Value("${travel.tavily.api-url:}")
     private String tavilyUrl;
@@ -35,9 +33,8 @@ public class ExternalApiService {
     @Value("${travel.aviation.api-key:}")
     private String aviationApiKey;
 
-    public ExternalApiService(RestTemplate restTemplate, ObjectMapper objectMapper) {
+    public ExternalApiService(RestTemplate restTemplate) {
         this.restTemplate = restTemplate;
-        this.objectMapper = objectMapper;
     }
 
     public String searchTravelInfo(String query) {
@@ -78,4 +75,5 @@ public class ExternalApiService {
         log.info("Flight options fetched for departureCity={}, destination={}", departureCity, destination);
         return response.getBody();
     }
+
 }

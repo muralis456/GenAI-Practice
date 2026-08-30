@@ -489,19 +489,13 @@
                     </div>
 
                     <div class="prompt-body">
-                        <div class="trip-suggestions">
-                            <div class="suggestion">7-day Japan<br>under ₹2L</div>
-                            <div class="suggestion">Paris trip for 5<br>days</div>
-                            <div class="suggestion">Dubai<br>weekend trip</div>
-                            <div class="suggestion">Bali<br>backpacking<br>10 days</div>
-                        </div>
-
                         <textarea id="tripPrompt" name="preferences" placeholder="e.g. 7-day Japan trip including flights, hotels and sightseeing under ₹2L">Need a family-friendly trip with good food, local experiences, and moderate budget.</textarea>
 
                         <input type="hidden" name="userId" value="aaro_hi_user" />
                         <input type="hidden" name="selectedModel" value="llama3.2:3b" />
-                        <input type="hidden" name="departureCity" value="LHR" />
-                        <input type="hidden" name="destination" value="DXB" />
+                        <input type="hidden" name="departureCity" value="" />
+                        <label for="destination">Destination (optional)</label>
+                        <input id="destination" name="destination" placeholder="AI will extract it from your request" />
                         <input type="hidden" name="departureDate" value="" />
                         <input type="hidden" name="returnDate" value="" />
                         <input type="hidden" name="budget" value="₹2L" />
@@ -526,6 +520,7 @@
     const responseBox = document.getElementById('response');
     const userIdField = document.getElementById('userId');
     const promptInput = document.getElementById('tripPrompt');
+    const destinationInput = document.getElementById('destination');
     const submitButton = document.getElementById('submitButton');
     const loadingState = document.getElementById('loadingState');
 
