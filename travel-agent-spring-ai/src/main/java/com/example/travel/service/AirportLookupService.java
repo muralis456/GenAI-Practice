@@ -29,7 +29,7 @@ public class AirportLookupService {
         }
 
         String[] parts = value.split(",");
-        String city = parts[0].trim().replaceFirst("(?i)\\s+city$", "");
+        String city = normalizeCity(parts[0].trim().replaceFirst("(?i)\\s+city$", ""));
         Optional<AirportLocation> match = repository.findFirstByCityIgnoreCase(city);
         if (match.isPresent()) {
             return match;
@@ -38,6 +38,18 @@ public class AirportLookupService {
             return repository.findFirstByCountryIgnoreCase(parts[1].trim());
         }
 
-        return repository.findFirstByCityIgnoreCase(value.toLowerCase(Locale.ROOT));
+        return repository.findFirstByCityIgnoreCase(normalizeCity(value));
+    }
+
+    private String normalizeCity(String city) {
+        return switch (city.toLowerCase(Locale.ROOT)) {
+            case "bangalore" -> "Bengaluru";
+            case "bombay" -> "Mumbai";
+            case "calcutta" -> "Kolkata";
+            case "madras" -> "Chennai";
+            case "new delhi" -> "Delhi";
+            case "sao paulo", "são paulo" -> "Sao Paulo";
+            default -> city;
+        };
     }
 }

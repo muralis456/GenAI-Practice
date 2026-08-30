@@ -46,12 +46,13 @@ public class TravelPlannerAgentService {
         request.setTravelStyle(travelStyle);
         request.setBudget(budget);
 
-        travelAgentTools.startRequest();
+        travelAgentTools.startRequest(promptText);
         try {
             String finalPlan = chatClient.prompt()
                     .system("You are the main travel orchestrator. Use the registered travel tools when they are relevant to the user's request. "
                             + "Choose only the minimum required tools. Use searchHotels for hotel requests, searchFlights for flight requests, "
                             + "researchDestination for destination information, and buildItinerary for schedules or trip plans. "
+                            + "First extract the destination city or country from the CURRENT REQUEST. Never call a tool with an empty destination. "
                             + "After receiving tool results, produce the final answer for the user. Never use a destination or route from conversation history when it conflicts with the current request. For flight requests, preserve the exact FROM and TO direction and do not invent missing locations. Never output bracketed placeholders such as [Insert flight number]; use 'Unavailable' when data is missing.")
                     .user("CURRENT REQUEST: " + promptText + "\nDestination field (may be stale): " + request.getDestination()
                             + "\nDeparture city: " + departureCity + "\nDeparture date: " + departureDate

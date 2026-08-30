@@ -38,7 +38,7 @@ public class FlightAgentService {
         }
         String departureCity = airportLookupService.findAirport(departureCityName)
             .map(AirportLocation::getIataCode)
-            .orElse(departureCityName);
+            .orElse(null);
         String destination = request.getDestination();
         String destinationAirportCode = airportLookupService.findAirport(airportCode)
                 .map(AirportLocation::getIataCode)
@@ -64,7 +64,8 @@ public class FlightAgentService {
         String flightInsights = chatClient.prompt()
             .system("You are the Flight Agent. Summarize only facts present in the supplied AviationStack response. "
                 + "Never invent flight numbers, airlines, times, durations, prices, or dates. Never output placeholders such as [Insert flight number]. "
-                + "When a field is missing, write 'Unavailable'. If the response contains an API error or no flight data, clearly say that flight availability is unavailable.")
+                + "When a field is missing, write 'Unavailable'. If the response contains an API error or no flight data, clearly say that flight availability is unavailable. "
+                + "Do not create alternative flights or prices that are not listed in the data.")
             .user("Route FROM " + departureCity + " TO " + destination + ", departureDate=" + departureDate + ", returnDate=" + returnDate + ", Model=" + selectedModel +
                 ". Analyze this AviationStack response and return verified flight details only:\n" + rawFlightData)
                 .call()

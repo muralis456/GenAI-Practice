@@ -494,8 +494,6 @@
                         <input type="hidden" name="userId" value="aaro_hi_user" />
                         <input type="hidden" name="selectedModel" value="llama3.2:3b" />
                         <input type="hidden" name="departureCity" value="" />
-                        <label for="destination">Destination (optional)</label>
-                        <input id="destination" name="destination" placeholder="AI will extract it from your request" />
                         <input type="hidden" name="departureDate" value="" />
                         <input type="hidden" name="returnDate" value="" />
                         <input type="hidden" name="budget" value="₹2L" />
@@ -520,7 +518,6 @@
     const responseBox = document.getElementById('response');
     const userIdField = document.getElementById('userId');
     const promptInput = document.getElementById('tripPrompt');
-    const destinationInput = document.getElementById('destination');
     const submitButton = document.getElementById('submitButton');
     const loadingState = document.getElementById('loadingState');
 
