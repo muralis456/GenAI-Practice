@@ -23,6 +23,7 @@ public class TravelPlanResponse {
     private BudgetSummary budgetSummary;
     private List<AgentStep> pipeline = new ArrayList<>();
     private List<String> validationErrors = new ArrayList<>();
+    private List<String> sources = new ArrayList<>();
 
     public TravelPlanResponse() {
     }
@@ -158,5 +159,13 @@ public class TravelPlanResponse {
 
     public void setValidationErrors(List<String> validationErrors) {
         this.validationErrors = validationErrors;
+    }
+
+    public List<String> getSources() {
+        return sources;
+    }
+
+    public void setSources(List<String> sources) {
+        this.sources = sources == null ? new ArrayList<>() : sources;
     }
 }

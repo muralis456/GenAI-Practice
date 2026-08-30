@@ -20,6 +20,9 @@ public class AirportResolverNode implements NodeAction<TravelState> {
 
     @Override
     public Map<String, Object> apply(TravelState state) {
+        if (!state.needsFlights()) {
+            return TravelState.trace(TravelGraphNodes.AIRPORT, "skip", "flights not requested");
+        }
         String originQuery = TravelState.firstNonBlank(state.origin(), state.preferredAirport(), "Bengaluru");
         String destinationQuery = TravelState.firstNonBlank(state.destination());
         String originIata = airportLookupTool.resolveIata(originQuery);

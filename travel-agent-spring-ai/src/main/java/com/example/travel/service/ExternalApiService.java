@@ -3,6 +3,7 @@ package com.example.travel.service;
 import com.example.travel.model.FlightOption;
 import com.example.travel.model.SearchHit;
 import com.example.travel.support.FlightSupport;
+import com.example.travel.support.ToolFailureClassifier;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -235,9 +236,17 @@ public class ExternalApiService {
         for (int attempt = 1; attempt <= 2; attempt++) {
             try {
                 return action.get();
-            } catch (ResourceAccessException | HttpStatusCodeException exception) {
+            } catch (HttpStatusCodeException exception) {
                 last = exception;
-                log.warn("{} attempt {} failed: {}", label, attempt, exception.getMessage());
+                var code = ToolFailureClassifier.fromHttp(exception.getStatusCode().value(),
+                        exception.getResponseBodyAsString());
+                log.warn("{} attempt {} failed code={}: {}", label, attempt, code, exception.getMessage());
+                if (!code.isRetryable()) {
+                    throw exception;
+                }
+            } catch (ResourceAccessException exception) {
+                last = exception;
+                log.warn("{} attempt {} timed out: {}", label, attempt, exception.getMessage());
             }
         }
         if (last instanceof RuntimeException runtime) {

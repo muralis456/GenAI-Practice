@@ -4,23 +4,32 @@ import com.example.travel.config.TravelModelsProperties;
 import com.example.travel.dto.TravelPlanResponse;
 import com.example.travel.dto.TravelRequest;
 import com.example.travel.entity.UserPreference;
+import com.example.travel.graph.TravelGraphNodes;
 import com.example.travel.graph.TravelState;
 import com.example.travel.model.FlightOption;
 import com.example.travel.model.HotelOption;
 import com.example.travel.model.Itinerary;
 import com.example.travel.model.TravelResearch;
 import org.bsc.langgraph4j.CompiledGraph;
+import org.bsc.langgraph4j.GraphInput;
 import org.bsc.langgraph4j.RunnableConfig;
+import org.bsc.langgraph4j.checkpoint.PostgresSaver;
+import org.bsc.langgraph4j.state.StateSnapshot;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
+/**
+ * Drives the LangGraph travel workflow. HITL approve/modify resume the same
+ * {@code threadId} from PostgreSQL checkpoints — no in-memory pending map.
+ */
 @Service
 public class TravelPlannerAgentService {
 
@@ -28,20 +37,22 @@ public class TravelPlannerAgentService {
 
     private final CompiledGraph<TravelState> travelGraph;
     private final RunnableConfig travelRunnableConfig;
+    private final PostgresSaver travelCheckpointSaver;
     private final FinalPlannerAgentService finalPlannerAgentService;
     private final UserPreferenceService userPreferenceService;
     private final TravelModelsProperties travelModels;
     private final int maxRetries;
-    private final ConcurrentHashMap<String, TravelState> pendingPlans = new ConcurrentHashMap<>();
 
     public TravelPlannerAgentService(CompiledGraph<TravelState> travelGraph,
                                      RunnableConfig travelRunnableConfig,
+                                     PostgresSaver travelCheckpointSaver,
                                      FinalPlannerAgentService finalPlannerAgentService,
                                      UserPreferenceService userPreferenceService,
                                      TravelModelsProperties travelModels,
                                      @Value("${travel.graph.max-retries:2}") int maxRetries) {
         this.travelGraph = travelGraph;
         this.travelRunnableConfig = travelRunnableConfig;
+        this.travelCheckpointSaver = travelCheckpointSaver;
         this.finalPlannerAgentService = finalPlannerAgentService;
         this.userPreferenceService = userPreferenceService;
         this.travelModels = travelModels;
@@ -50,7 +61,6 @@ public class TravelPlannerAgentService {
 
     public TravelPlanResponse createTravelPlan(TravelRequest request, String historyContext) {
         String userId = TravelState.firstNonBlank(request.getUserId(), "anonymous");
-        // Unique thread per request so MemorySaver does not append a previous pipeline.
         String threadId = userId + "-" + UUID.randomUUID();
         log.info("Starting LangGraph travel orchestration for userId={}, threadId={}", userId, threadId);
 
@@ -62,51 +72,94 @@ public class TravelPlannerAgentService {
         userPreferenceService.find(userId).ifPresent(preference -> applyPreferences(input, preference));
         ensureOrigin(input);
 
-        TravelState state = travelGraph.invoke(input, configFor(threadId))
-                .orElseThrow(() -> new IllegalStateException("Travel graph produced no final state"));
-        pendingPlans.put(threadId, state);
+        RunnableConfig config = configFor(threadId);
+        travelGraph.invoke(input, config);
+        TravelState state = requireCheckpointState(threadId);
         userPreferenceService.remember(userId, state.originIata(), state.travelStyle(), state.destination());
-        return toResponse(state, threadId, true);
+        boolean pending = isAwaitingHitl(threadId);
+        log.info("Graph paused for HITL={} threadId={}", pending, threadId);
+        return toResponse(state, threadId, pending);
     }
 
     public TravelPlanResponse approve(String userId, String threadId) {
-        TravelState state = requirePending(userId, threadId);
-        // Final LLM report was already composed after Validator in FinalNode.
+        String key = TravelState.firstNonBlank(threadId, userId);
+        requireCheckpointState(key);
+        RunnableConfig config = configFor(key);
+
+        Map<String, Object> decision = new LinkedHashMap<>();
+        decision.put(TravelState.HITL_DECISION, "approve");
+        decision.put(TravelState.AWAITING_APPROVAL, Boolean.FALSE);
+
+        TravelState state = travelGraph.invoke(GraphInput.resume(decision), config)
+                .orElseGet(() -> requireCheckpointState(key));
+        try {
+            travelCheckpointSaver.release(config);
+        } catch (Exception ex) {
+            log.warn("Could not release checkpoint threadId={}", key, ex);
+        }
+
         String plan = TravelState.firstNonBlank(state.finalPlan(), finalPlannerAgentService.compose(state));
-        TravelPlanResponse response = toResponse(state, threadId, false);
+        TravelPlanResponse response = toResponse(state, key, false);
         response.setFinalPlan(plan);
         response.setStatus("COMPLETE");
         response.setAwaitingApproval(false);
-        pendingPlans.remove(threadId);
         return response;
     }
 
     public TravelPlanResponse modify(String userId, String threadId, String notes, String historyContext) {
-        TravelState previous = requirePending(userId, threadId);
-        TravelRequest request = new TravelRequest();
-        request.setUserId(userId);
-        request.setDestination(previous.destination());
-        request.setDepartureCity(previous.origin());
-        request.setDepartureDate(previous.departureDate().toString());
-        request.setReturnDate(previous.returnDate().toString());
-        request.setAdults(previous.travelers());
-        request.setBudget(previous.budget() == null ? previous.budgetLabel() : previous.budget().toPlainString());
-        request.setTravelStyle("budget");
-        request.setPrompt(previous.userRequest() + " Modify: " + notes);
-        request.setSelectedModel(previous.selectedModel());
-        Map<String, Object> input = TravelState.fromRequest(request, historyContext);
-        input.put(TravelState.MAX_RETRIES, maxRetries);
-        input.put(TravelState.REPLAN_NOTES, notes);
-        input.put(TravelState.COST_FACTOR, previous.costFactor().multiply(java.math.BigDecimal.valueOf(0.82)));
-        input.put(TravelState.ORIGIN_IATA, previous.originIata());
-        input.put(TravelState.DESTINATION_IATA, previous.destinationIata());
-        ensureOrigin(input);
-        String nextThreadId = userId + "-" + UUID.randomUUID();
-        TravelState state = travelGraph.invoke(input, configFor(nextThreadId))
-                .orElseThrow(() -> new IllegalStateException("Travel graph produced no final state"));
-        pendingPlans.remove(threadId);
-        pendingPlans.put(nextThreadId, state);
-        return toResponse(state, nextThreadId, true);
+        String key = TravelState.firstNonBlank(threadId, userId);
+        TravelState previous = requireCheckpointState(key);
+        RunnableConfig config = configFor(key);
+
+        Map<String, Object> decision = new LinkedHashMap<>();
+        decision.put(TravelState.HITL_DECISION, "modify");
+        decision.put(TravelState.AWAITING_APPROVAL, Boolean.TRUE);
+        decision.put(TravelState.REPLAN_NOTES, TravelState.firstNonBlank(notes, "Please make it cheaper"));
+        decision.put(TravelState.TRAVEL_STYLE, "budget");
+        decision.put(TravelState.COST_FACTOR,
+                previous.costFactor().multiply(BigDecimal.valueOf(0.82)));
+        if (!TravelState.isBlank(historyContext)) {
+            decision.put(TravelState.HISTORY_CONTEXT, historyContext);
+        }
+
+        log.info("Resuming graph for MODIFY on same threadId={}", key);
+        travelGraph.invoke(GraphInput.resume(decision), config);
+        TravelState state = requireCheckpointState(key);
+        boolean pending = isAwaitingHitl(key);
+        return toResponse(state, key, pending);
+    }
+
+    private TravelState requireCheckpointState(String threadId) {
+        try {
+            StateSnapshot<TravelState> snapshot = travelGraph.getState(configFor(threadId));
+            if (snapshot == null || snapshot.state() == null) {
+                throw new IllegalStateException("No graph checkpoint for threadId=" + threadId
+                        + ". Generate a plan first (or the thread expired).");
+            }
+            return snapshot.state();
+        } catch (IllegalStateException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            throw new IllegalStateException("No graph checkpoint for threadId=" + threadId
+                    + ". Generate a plan first (checkpoints survive restart via PostgreSQL).", ex);
+        }
+    }
+
+    private boolean isAwaitingHitl(String threadId) {
+        try {
+            StateSnapshot<TravelState> snapshot = travelGraph.getState(configFor(threadId));
+            if (snapshot == null) {
+                return false;
+            }
+            String next = snapshot.next();
+            return TravelGraphNodes.HITL.equals(next)
+                    || Boolean.TRUE.equals(snapshot.state().awaitingApproval())
+                    && !TravelGraphNodes.COMPLETE.equals(next)
+                    && !org.bsc.langgraph4j.StateGraph.END.equals(next);
+        } catch (Exception ex) {
+            log.debug("Could not read HITL status for threadId={}", threadId, ex);
+            return false;
+        }
     }
 
     private void ensureOrigin(Map<String, Object> input) {
@@ -118,7 +171,6 @@ public class TravelPlannerAgentService {
             input.put(TravelState.ORIGIN, preferred);
             return;
         }
-        // Sensible India-origin default when the prompt omits "from <city>".
         input.put(TravelState.ORIGIN, "Bengaluru");
         input.put(TravelState.PREFERRED_AIRPORT, "BLR");
     }
@@ -139,15 +191,6 @@ public class TravelPlannerAgentService {
                 + ", style=" + preference.getTravelStyle() + ", currency=" + preference.getCurrency()
                 + ", lastDestination=" + preference.getLastDestination()
                 + "\n" + history);
-    }
-
-    private TravelState requirePending(String userId, String threadId) {
-        String key = TravelState.firstNonBlank(threadId, userId);
-        TravelState state = pendingPlans.get(key);
-        if (state == null) {
-            throw new IllegalStateException("No pending plan found for approval. Generate a plan first.");
-        }
-        return state;
     }
 
     private RunnableConfig configFor(String threadId) {
@@ -179,6 +222,7 @@ public class TravelPlannerAgentService {
         response.setBudgetSummary(state.budgetSummary());
         response.setPipeline(state.pipeline());
         response.setValidationErrors(state.validationErrors());
+        response.setSources(state.provenance().stream().map(event -> event.toDisplay()).toList());
         return response;
     }
 
@@ -190,6 +234,9 @@ public class TravelPlannerAgentService {
     }
 
     private String joinFlights(TravelState state) {
+        if (!state.needsFlights()) {
+            return "Not requested for this query.";
+        }
         if (state.flights().isEmpty()) {
             return "Not requested for this trip.";
         }
@@ -215,6 +262,9 @@ public class TravelPlannerAgentService {
     }
 
     private String joinHotels(TravelState state) {
+        if (!state.needsHotels()) {
+            return "Not requested for this query.";
+        }
         if (state.hotels().isEmpty()) {
             return "Not requested for this trip.";
         }
@@ -222,6 +272,9 @@ public class TravelPlannerAgentService {
     }
 
     private String joinItinerary(TravelState state) {
+        if (!state.needsItinerary()) {
+            return "Not requested for this query.";
+        }
         Itinerary itinerary = state.itinerary();
         if (itinerary == null || itinerary.isEmpty()) {
             return "Not requested for this trip.";

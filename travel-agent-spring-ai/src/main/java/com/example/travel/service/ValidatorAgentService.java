@@ -28,7 +28,8 @@ public class ValidatorAgentService {
 
         boolean flightsUnavailable = state.flights().isEmpty() || state.flights().stream()
                 .allMatch(flight -> "unavailable".equalsIgnoreCase(flight.getStatus()));
-        if (!flightsUnavailable && !TravelState.isBlank(state.originIata()) && !TravelState.isBlank(state.destinationIata())) {
+        if (state.needsFlights() && !flightsUnavailable && !TravelState.isBlank(state.originIata())
+                && !TravelState.isBlank(state.destinationIata())) {
             boolean routeMatch = state.flights().stream().anyMatch(flight ->
                     matchesAirport(flight, state.originIata(), state.destinationIata()));
             if (!routeMatch) {
@@ -45,9 +46,10 @@ public class ValidatorAgentService {
 
         long nights = state.nights();
         Itinerary itinerary = state.itinerary();
-        if (itinerary == null || itinerary.isEmpty()) {
-            errors.add("Itinerary is empty.");
-        } else if (itinerary.getDays() != null && !itinerary.getDays().isEmpty()) {
+        if (state.needsItinerary()) {
+            if (itinerary == null || itinerary.isEmpty()) {
+                errors.add("Itinerary is empty.");
+            } else if (itinerary.getDays() != null && !itinerary.getDays().isEmpty()) {
             int dayCount = itinerary.getDays().size();
             long expectedDays = nights + 1;
             if (Math.abs(dayCount - nights) > 2 && Math.abs(dayCount - expectedDays) > 2) {
@@ -63,6 +65,7 @@ public class ValidatorAgentService {
                         "fly back", "leave", "airport", "outbound", "last day")) {
                     errors.add("Last day should cover departure.");
                 }
+            }
             }
         }
         log.info("Validator found {} issue(s); retryCount={}", errors.size(), state.retryCount());

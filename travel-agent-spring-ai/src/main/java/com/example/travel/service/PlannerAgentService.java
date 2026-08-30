@@ -109,6 +109,11 @@ public class PlannerAgentService {
         updates.put(TravelState.BUDGET_LABEL, budgetLabel);
         updates.put(TravelState.BUDGET, budget);
         updates.put(TravelState.TRAVEL_STYLE, travelStyle);
+        updates.put(TravelState.LAST_DECISION, new com.example.travel.model.AgentDecision(
+                "planner",
+                state.requestType(),
+                "slots origin=" + origin + " dest=" + destination + " strategy=" + state.planStrategy(),
+                0.9));
         return updates;
     }
 

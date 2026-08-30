@@ -50,21 +50,27 @@ public class FinalPlannerAgentService {
         }
 
         sb.append("\n**Flights**\n");
-        boolean flightsUnavailable = state.flights().isEmpty()
-                || state.flights().stream().allMatch(f -> "unavailable".equalsIgnoreCase(f.getStatus()));
-        if (flightsUnavailable) {
-            sb.append("No reliable flight options were returned for this route/date.\n");
+        if (!state.needsFlights()) {
+            sb.append("Not requested for this query.\n");
         } else {
-            for (FlightOption flight : state.flights()) {
-                if ("unavailable".equalsIgnoreCase(nullToEmpty(flight.getStatus()))) {
-                    continue;
+            boolean flightsUnavailable = state.flights().isEmpty()
+                    || state.flights().stream().allMatch(f -> "unavailable".equalsIgnoreCase(f.getStatus()));
+            if (flightsUnavailable) {
+                sb.append("No reliable flight options were returned for this route/date.\n");
+            } else {
+                for (FlightOption flight : state.flights()) {
+                    if ("unavailable".equalsIgnoreCase(nullToEmpty(flight.getStatus()))) {
+                        continue;
+                    }
+                    sb.append("- ").append(flight.toDisplay()).append('\n');
                 }
-                sb.append("- ").append(flight.toDisplay()).append('\n');
             }
         }
 
         sb.append("\n**Hotels**\n");
-        if (state.hotels().isEmpty()) {
+        if (!state.needsHotels()) {
+            sb.append("Not requested for this query.\n");
+        } else if (state.hotels().isEmpty()) {
             sb.append("No hotel options extracted.\n");
         } else {
             for (HotelOption hotel : state.hotels()) {
@@ -73,7 +79,9 @@ public class FinalPlannerAgentService {
         }
 
         sb.append("\n**Day-by-day itinerary**\n");
-        if (state.itinerary() != null && state.itinerary().getDays() != null) {
+        if (!state.needsItinerary()) {
+            sb.append("Not requested for this query.\n");
+        } else if (state.itinerary() != null && state.itinerary().getDays() != null) {
             for (ItineraryDay day : state.itinerary().getDays()) {
                 sb.append("Day ").append(day.getDay());
                 if (!TravelState.isBlank(day.getTitle())) {
@@ -87,26 +95,42 @@ public class FinalPlannerAgentService {
         }
 
         sb.append("\n**Budget**\n");
-        BudgetSummary budget = state.budgetSummary();
-        if (budget != null) {
-            for (BudgetLineItem item : budget.getLineItems()) {
-                sb.append("- ").append(item.getCategory()).append(": ₹").append(item.getAmountInr()).append('\n');
-            }
-            if (budget.getEstimatedCost() != null) {
-                sb.append("Total estimated: ₹").append(budget.getEstimatedCost()).append('\n');
-            }
-            if (budget.getRemaining() != null) {
-                sb.append("Remaining vs ceiling: ₹").append(budget.getRemaining()).append('\n');
-            }
-            if (!TravelState.isBlank(budget.getAssessment())) {
-                sb.append(budget.getAssessment()).append('\n');
-            }
+        if (!state.needsBudget()) {
+            sb.append("Not requested for this query.\n");
         } else {
-            sb.append(state.budgetLabel()).append('\n');
+            BudgetSummary budget = state.budgetSummary();
+            if (budget != null) {
+                for (BudgetLineItem item : budget.getLineItems()) {
+                    sb.append("- ").append(item.getCategory()).append(": ₹").append(item.getAmountInr()).append('\n');
+                }
+                if (budget.getEstimatedCost() != null) {
+                    sb.append("Total estimated: ₹").append(budget.getEstimatedCost()).append('\n');
+                }
+                if (budget.getRemaining() != null) {
+                    sb.append("Remaining vs ceiling: ₹").append(budget.getRemaining()).append('\n');
+                }
+                if (!TravelState.isBlank(budget.getAssessment())) {
+                    sb.append(budget.getAssessment()).append('\n');
+                }
+            } else {
+                sb.append(state.budgetLabel()).append('\n');
+            }
         }
 
-        if (state.weather() != null) {
+        if (state.weather() != null && state.needsWeather()) {
             sb.append("\n**Weather**\n").append(state.weather().toDisplay()).append('\n');
+        }
+        if (!state.semanticNotes().isEmpty()) {
+            sb.append("\n**Semantic review**\n");
+            for (String note : state.semanticNotes()) {
+                sb.append("- ").append(note).append('\n');
+            }
+        }
+        if (!state.provenance().isEmpty()) {
+            sb.append("\n**Sources**\n");
+            for (var event : state.provenance()) {
+                sb.append("- ").append(event.toDisplay()).append('\n');
+            }
         }
         return sb.toString().trim();
     }

@@ -20,6 +20,12 @@ public class ItineraryNode implements NodeAction<TravelState> {
 
     @Override
     public Map<String, Object> apply(TravelState state) {
+        if (!state.needsItinerary()) {
+            Map<String, Object> skip = new LinkedHashMap<>();
+            skip.put(TravelState.ITINERARY, new com.example.travel.model.Itinerary());
+            skip.putAll(TravelState.trace(TravelGraphNodes.ITINERARY, "skip", "not requested"));
+            return skip;
+        }
         Map<String, Object> updates = new LinkedHashMap<>();
         updates.put(TravelState.ITINERARY, itineraryAgentService.build(state));
         updates.putAll(TravelState.trace(TravelGraphNodes.ITINERARY, "ok", state.nights() + " night itinerary"));

@@ -12,6 +12,11 @@ public class AgentStep implements Serializable {
     private String status;
     private String detail;
     private long durationMs;
+    private String model;
+    private String toolCalls;
+    private String error;
+    private int retryCount;
+    private int attempt;
 
     public AgentStep() {
     }
@@ -57,5 +62,45 @@ public class AgentStep implements Serializable {
 
     public void setDurationMs(long durationMs) {
         this.durationMs = durationMs;
+    }
+
+    public String getModel() {
+        return model;
+    }
+
+    public void setModel(String model) {
+        this.model = model;
+    }
+
+    public String getToolCalls() {
+        return toolCalls;
+    }
+
+    public void setToolCalls(String toolCalls) {
+        this.toolCalls = toolCalls;
+    }
+
+    public String getError() {
+        return error;
+    }
+
+    public void setError(String error) {
+        this.error = error;
+    }
+
+    public int getRetryCount() {
+        return retryCount;
+    }
+
+    public void setRetryCount(int retryCount) {
+        this.retryCount = retryCount;
+    }
+
+    public int getAttempt() {
+        return attempt;
+    }
+
+    public void setAttempt(int attempt) {
+        this.attempt = attempt;
     }
 }

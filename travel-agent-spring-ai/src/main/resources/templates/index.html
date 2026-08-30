@@ -754,9 +754,14 @@
 
     const storageKey = () => 'travel-chats:' + (userIdField.value.trim() || 'aaro_hi_user');
     let currentChatId = null;
+    let startedFreshChat = false;
+
+    const syncUserIdField = () => {
+        form.querySelector('input[name="userId"]').value = userIdField.value.trim() || 'aaro_hi_user';
+    };
 
     const syncUserId = () => {
-        form.querySelector('input[name="userId"]').value = userIdField.value.trim() || 'aaro_hi_user';
+        syncUserIdField();
         renderHistoryList();
         loadServerHistoryIntoStore();
     };
@@ -778,32 +783,48 @@
         }
     };
 
+    const trimPlanData = (planData) => {
+        if (!planData) {
+            return null;
+        }
+        const finalPlan = planData.finalPlan ? String(planData.finalPlan).slice(0, 8000) : '';
+        return {
+            status: planData.status,
+            routeSummary: planData.routeSummary,
+            finalPlan,
+            awaitingApproval: planData.awaitingApproval,
+            threadId: planData.threadId,
+            pipeline: (planData.pipeline || []).slice(-12)
+        };
+    };
+
     const saveStore = (store) => {
-        try {
-            // Keep only last 20 chats; store text only to avoid quota errors.
-            store.chats = (store.chats || []).slice(0, 20).map(chat => ({
+        const chats = (store.chats || [])
+            .slice()
+            .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+        const kept = [];
+        for (const chat of chats) {
+            if (kept.length >= 20 && chat.id !== currentChatId) {
+                continue;
+            }
+            kept.push({
                 id: chat.id,
                 title: chat.title,
                 updatedAt: chat.updatedAt,
-                messages: (chat.messages || []).map(m => ({
+                messages: (chat.messages || []).slice(-40).map(m => ({
                     role: m.role,
-                    text: m.text,
-                    planData: m.planData ? {
-                        status: m.planData.status,
-                        routeSummary: m.planData.routeSummary,
-                        finalPlan: m.planData.finalPlan,
-                        awaitingApproval: m.planData.awaitingApproval,
-                        threadId: m.planData.threadId,
-                        pipeline: m.planData.pipeline
-                    } : null
+                    text: (m.text || '').slice(0, 8000),
+                    planData: trimPlanData(m.planData)
                 }))
-            }));
+            });
+        }
+        store.chats = kept;
+        try {
             localStorage.setItem(storageKey(), JSON.stringify(store));
         } catch (e) {
             console.warn('Could not save chat history locally', e);
             try {
-                // Fallback: drop planData payloads
-                store.chats = (store.chats || []).map(chat => ({
+                store.chats = kept.map(chat => ({
                     ...chat,
                     messages: (chat.messages || []).map(m => ({ role: m.role, text: m.text, planData: null }))
                 }));
@@ -883,14 +904,15 @@
                 messages
             };
             if (existing) {
+                chat.updatedAt = existing.updatedAt || chat.updatedAt;
                 store.chats = store.chats.map(c => c.id === serverId ? chat : c);
             } else {
-                store.chats.unshift(chat);
+                store.chats.push(chat);
             }
             saveStore(store);
             renderHistoryList();
-            // If main thread is empty, auto-open server history so something is visible.
-            if (!chatThread.querySelector('.chat-msg')) {
+            const viewingFresh = startedFreshChat || (currentChatId && String(currentChatId).startsWith('chat-'));
+            if (!viewingFresh && !chatThread.querySelector('.chat-msg')) {
                 openChat(serverId);
             }
         } catch (e) {
@@ -946,6 +968,7 @@
             return;
         }
         currentChatId = chatId;
+        startedFreshChat = String(chatId).startsWith('chat-');
         clearThreadDom();
         (chat.messages || []).forEach(msg => {
             if (msg.role === 'user') {
@@ -964,8 +987,9 @@
     };
 
     newChatBtn.addEventListener('click', () => {
-        // Keep previous chat in history; start a fresh thread.
+        startedFreshChat = true;
         currentChatId = null;
+        ensureCurrentChat('New trip');
         clearThreadDom();
         renderHistoryList();
         promptInput.value = '';
@@ -1051,16 +1075,22 @@
             seen.add(key);
             return true;
         }).map(step =>
-            (step.status === 'warn' ? '⚠ ' : '✓ ') + step.node
+            (step.status === 'warn' ? '⚠ ' : step.status === 'skip' ? '○ ' : '✓ ') + step.node
             + (step.durationMs ? ' (' + (step.durationMs / 1000).toFixed(1) + 's)' : '')
+            + (step.model ? ' [' + step.model + ']' : '')
+            + (step.toolCalls ? ' tools=' + step.toolCalls : '')
             + (step.detail ? ' — ' + step.detail : '')
         ).join('\n');
+        const sources = (data.sources || []).length
+            ? 'Sources\n' + data.sources.join('\n')
+            : '';
 
         if (data.finalPlan) {
             return [
                 data.status || '',
                 data.routeSummary ? 'Route\n' + data.routeSummary : '',
                 'Pipeline\n' + (pipeline || 'n/a'),
+                sources,
                 (data.awaitingApproval ? 'Final report (validated)\n' : 'Final plan\n') + data.finalPlan
             ].filter(Boolean).join('\n\n');
         }
@@ -1088,7 +1118,7 @@
 
     form.addEventListener('submit', async (event) => {
         event.preventDefault();
-        syncUserId();
+        syncUserIdField();
 
         const text = promptInput.value.trim();
         if (!text) {

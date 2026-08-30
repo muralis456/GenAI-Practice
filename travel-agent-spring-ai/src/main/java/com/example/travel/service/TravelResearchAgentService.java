@@ -46,11 +46,14 @@ public class TravelResearchAgentService {
                 : "Best attractions, food, local tips for ")
                 + destination + " with a " + state.travelStyle() + " travel style.";
         log.info("Research agent searching destination={}", destination);
-        String rawResearch = tavilySearchTool.search(query);
-        WeatherForecast weather = weatherTool.forecast(destination, state.departureDate(), state.returnDate());
-        String content;
-        try {
-            content = routedLlm.complete(AgentRole.EXTRACT,
+        String rawResearch = state.needsResearch() ? tavilySearchTool.search(query) : "";
+        WeatherForecast weather = state.needsWeather()
+                ? weatherTool.forecast(destination, state.departureDate(), state.returnDate())
+                : new WeatherForecast("", "", false);
+        String content = rawResearch;
+        if (state.needsResearch()) {
+            try {
+                content = routedLlm.complete(AgentRole.EXTRACT,
                     "You are the Travel Research Agent. Prefer the supplied research and weather. "
                             + "You may call Tavily or weather tools if more detail is needed. "
                             + "If you call Tavily search, you MUST pass a non-empty query string; never omit query. "
@@ -63,9 +66,10 @@ public class TravelResearchAgentService {
                             + "\nReplan guidance: " + state.replanGuidance()
                             + "\nWeather: " + weather.toDisplay() + "\n" + rawResearch,
                     tavilySearchTool, weatherTool);
-        } catch (Exception exception) {
-            log.warn("Research LLM failed for destination={}", destination, exception);
-            content = rawResearch;
+            } catch (Exception exception) {
+                log.warn("Research LLM failed for destination={}", destination, exception);
+                content = rawResearch;
+            }
         }
 
         ResearchExtraction extraction = parseExtraction(content, destination, rawResearch);

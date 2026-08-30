@@ -1,11 +1,14 @@
 package com.example.travel.graph;
 
 import com.example.travel.dto.TravelRequest;
+import com.example.travel.model.AgentDecision;
 import com.example.travel.model.AgentStep;
 import com.example.travel.model.BudgetSummary;
 import com.example.travel.model.FlightOption;
 import com.example.travel.model.HotelOption;
 import com.example.travel.model.Itinerary;
+import com.example.travel.model.ProvenanceEvent;
+import com.example.travel.model.ReplanStrategy;
 import com.example.travel.model.TravelAttraction;
 import com.example.travel.model.TravelResearch;
 import com.example.travel.model.WeatherForecast;
@@ -56,8 +59,23 @@ public class TravelState extends AgentState {
     public static final String WEATHER = "weather";
     public static final String PIPELINE = "pipeline";
     public static final String AWAITING_APPROVAL = "awaitingApproval";
+    /** Human decision written on resume: approve | modify */
+    public static final String HITL_DECISION = "hitlDecision";
     public static final String PREFERRED_AIRPORT = "preferredAirport";
     public static final String CURRENCY = "currency";
+    public static final String REQUEST_TYPE = "requestType";
+    public static final String NEEDS_FLIGHTS = "needsFlights";
+    public static final String NEEDS_HOTELS = "needsHotels";
+    public static final String NEEDS_RESEARCH = "needsResearch";
+    public static final String NEEDS_WEATHER = "needsWeather";
+    public static final String NEEDS_BUDGET = "needsBudget";
+    public static final String NEEDS_ITINERARY = "needsItinerary";
+    public static final String PLAN_STRATEGY = "planStrategy";
+    public static final String PLAN_PRIORITY = "planPriority";
+    public static final String LAST_DECISION = "lastDecision";
+    public static final String REPLAN_STRATEGY = "replanStrategy";
+    public static final String SEMANTIC_NOTES = "semanticNotes";
+    public static final String PROVENANCE = "provenance";
 
     public static final Map<String, Channel<?>> SCHEMA;
 
@@ -92,8 +110,22 @@ public class TravelState extends AgentState {
         schema.put(WEATHER, Channels.base(() -> new WeatherForecast("", "", false)));
         schema.put(PIPELINE, Channels.appender(() -> new ArrayList<AgentStep>()));
         schema.put(AWAITING_APPROVAL, Channels.base(() -> Boolean.TRUE));
+        schema.put(HITL_DECISION, Channels.base(() -> ""));
         schema.put(PREFERRED_AIRPORT, Channels.base(() -> ""));
         schema.put(CURRENCY, Channels.base(() -> "INR"));
+        schema.put(REQUEST_TYPE, Channels.base(() -> "TRIP_PLANNING"));
+        schema.put(NEEDS_FLIGHTS, Channels.base(() -> Boolean.TRUE));
+        schema.put(NEEDS_HOTELS, Channels.base(() -> Boolean.TRUE));
+        schema.put(NEEDS_RESEARCH, Channels.base(() -> Boolean.TRUE));
+        schema.put(NEEDS_WEATHER, Channels.base(() -> Boolean.TRUE));
+        schema.put(NEEDS_BUDGET, Channels.base(() -> Boolean.TRUE));
+        schema.put(NEEDS_ITINERARY, Channels.base(() -> Boolean.TRUE));
+        schema.put(PLAN_STRATEGY, Channels.base(() -> "parallel_search"));
+        schema.put(PLAN_PRIORITY, Channels.base(() -> "balanced"));
+        schema.put(LAST_DECISION, Channels.base(AgentDecision::new));
+        schema.put(REPLAN_STRATEGY, Channels.base(ReplanStrategy::new));
+        schema.put(SEMANTIC_NOTES, Channels.base(() -> new ArrayList<String>()));
+        schema.put(PROVENANCE, Channels.appender(() -> new ArrayList<ProvenanceEvent>()));
         SCHEMA = Collections.unmodifiableMap(schema);
     }
 
@@ -127,6 +159,7 @@ public class TravelState extends AgentState {
         input.put(VALIDATION_ERRORS, new ArrayList<String>());
         input.put(PIPELINE, new ArrayList<AgentStep>());
         input.put(AWAITING_APPROVAL, Boolean.TRUE);
+        input.put(HITL_DECISION, "");
         input.put(CURRENCY, "INR");
         input.put(ITINERARY, new Itinerary());
         input.put(BUDGET_SUMMARY, new BudgetSummary());
@@ -275,12 +308,72 @@ public class TravelState extends AgentState {
         return Boolean.TRUE.equals(this.<Boolean>value(AWAITING_APPROVAL).orElse(Boolean.TRUE));
     }
 
+    public String hitlDecision() {
+        return this.<String>value(HITL_DECISION).orElse("");
+    }
+
     public String preferredAirport() {
         return this.<String>value(PREFERRED_AIRPORT).orElse("");
     }
 
     public String currency() {
         return this.<String>value(CURRENCY).orElse("INR");
+    }
+
+    public String requestType() {
+        return this.<String>value(REQUEST_TYPE).orElse("TRIP_PLANNING");
+    }
+
+    public boolean needsFlights() {
+        return flag(NEEDS_FLIGHTS);
+    }
+
+    public boolean needsHotels() {
+        return flag(NEEDS_HOTELS);
+    }
+
+    public boolean needsResearch() {
+        return flag(NEEDS_RESEARCH);
+    }
+
+    public boolean needsWeather() {
+        return flag(NEEDS_WEATHER);
+    }
+
+    public boolean needsBudget() {
+        return flag(NEEDS_BUDGET);
+    }
+
+    public boolean needsItinerary() {
+        return flag(NEEDS_ITINERARY);
+    }
+
+    public String planStrategy() {
+        return this.<String>value(PLAN_STRATEGY).orElse("parallel_search");
+    }
+
+    public String planPriority() {
+        return this.<String>value(PLAN_PRIORITY).orElse("balanced");
+    }
+
+    public AgentDecision lastDecision() {
+        return this.<AgentDecision>value(LAST_DECISION).orElseGet(AgentDecision::new);
+    }
+
+    public ReplanStrategy replanStrategy() {
+        return this.<ReplanStrategy>value(REPLAN_STRATEGY).orElseGet(ReplanStrategy::new);
+    }
+
+    public List<String> semanticNotes() {
+        return this.<List<String>>value(SEMANTIC_NOTES).orElseGet(List::of);
+    }
+
+    public List<ProvenanceEvent> provenance() {
+        return this.<List<ProvenanceEvent>>value(PROVENANCE).orElseGet(List::of);
+    }
+
+    private boolean flag(String key) {
+        return Boolean.TRUE.equals(this.<Boolean>value(key).orElse(Boolean.TRUE));
     }
 
     public long nights() {
@@ -361,6 +454,10 @@ public class TravelState extends AgentState {
 
     public static Map<String, Object> trace(String node, String status, String detail) {
         return Map.of(PIPELINE, List.of(new AgentStep(node, status, detail)));
+    }
+
+    public static Map<String, Object> provenance(ProvenanceEvent event) {
+        return Map.of(PROVENANCE, List.of(event));
     }
 
     private static int defaultInt(Integer value, int fallback) {

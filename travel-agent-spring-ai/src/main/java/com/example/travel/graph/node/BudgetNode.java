@@ -21,6 +21,16 @@ public class BudgetNode implements NodeAction<TravelState> {
 
     @Override
     public Map<String, Object> apply(TravelState state) {
+        if (!state.needsBudget()) {
+            BudgetSummary skipped = new BudgetSummary();
+            skipped.setWithinBudget(true);
+            skipped.setAssessment("Budget not requested for this query.");
+            skipped.setEstimatedCost(java.math.BigDecimal.ZERO);
+            Map<String, Object> skip = new LinkedHashMap<>();
+            skip.put(TravelState.BUDGET_SUMMARY, skipped);
+            skip.putAll(TravelState.trace(TravelGraphNodes.BUDGET, "skip", "not requested"));
+            return skip;
+        }
         BudgetSummary summary = budgetAgentService.assess(state);
         Map<String, Object> updates = new LinkedHashMap<>();
         updates.put(TravelState.BUDGET_SUMMARY, summary);
