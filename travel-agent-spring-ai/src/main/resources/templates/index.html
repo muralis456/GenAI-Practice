@@ -138,13 +138,22 @@
         }
 
         .main {
+            display: flex;
+            flex-direction: column;
             flex: 1;
-            padding: 22px 28px 34px;
+            min-width: 0;
+            padding: 0;
         }
 
         .content {
-            max-width: 1180px;
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+            min-height: 0;
+            max-width: 920px;
+            width: 100%;
             margin: 0 auto;
+            padding: 24px 24px 0;
         }
 
         .hero {
@@ -351,25 +360,186 @@
             transform: none;
         }
 
-        .response {
-            margin-top: 24px;
-            background: rgba(9, 17, 31, 0.8);
-            border: 1px solid rgba(255,255,255,0.08);
-            border-radius: 14px;
-            padding: 18px 20px;
-            color: var(--text);
-            white-space: pre-wrap;
-            line-height: 1.65;
+        .welcome-block {
+            flex-shrink: 0;
+        }
+
+        .layout.has-chat .welcome-block {
             display: none;
+        }
+
+        .chat-thread {
+            flex: 1;
+            overflow-y: auto;
+            padding: 8px 4px 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            min-height: 180px;
+        }
+
+        .chat-empty {
+            margin: auto;
+            text-align: center;
+            color: var(--muted);
+            font-size: 15px;
+            padding: 40px 16px;
+        }
+
+        .layout.has-chat .chat-empty {
+            display: none;
+        }
+
+        .chat-msg {
+            display: flex;
+            gap: 12px;
+            max-width: 100%;
+            animation: msg-in 0.22s ease;
+        }
+
+        @keyframes msg-in {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: none; }
+        }
+
+        .chat-msg.user {
+            flex-direction: row-reverse;
+        }
+
+        .chat-avatar {
+            flex-shrink: 0;
+            width: 34px;
+            height: 34px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: 700;
+            background: rgba(43, 140, 255, 0.2);
+            border: 1px solid rgba(123, 180, 255, 0.25);
+            color: #dfeeff;
+        }
+
+        .chat-msg.user .chat-avatar {
+            background: rgba(255,255,255,0.08);
+        }
+
+        .chat-bubble {
+            flex: 1;
+            min-width: 0;
+            background: rgba(9, 17, 31, 0.85);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 16px;
+            padding: 14px 16px;
+            line-height: 1.6;
+        }
+
+        .chat-msg.user .chat-bubble {
+            background: rgba(43, 140, 255, 0.16);
+            border-color: rgba(123, 180, 255, 0.28);
+            max-width: 85%;
+            flex: 0 1 auto;
+        }
+
+        .chat-role {
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            color: var(--muted);
+            margin-bottom: 8px;
+        }
+
+        .chat-body {
+            white-space: pre-wrap;
+            word-break: break-word;
+            color: var(--text);
+            font-size: 15px;
+        }
+
+        .chat-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 12px;
+        }
+
+        .chat-actions .submit-button {
+            width: auto;
+            margin-top: 0;
+            padding: 10px 16px;
+            font-size: 14px;
+        }
+
+        .chat-actions .ghost-button {
+            background: transparent;
+            border: 1px solid rgba(123, 180, 255, 0.35);
+            box-shadow: none;
+            color: #dfeeff;
+        }
+
+        .composer-wrap {
+            position: sticky;
+            bottom: 0;
+            padding: 12px 0 20px;
+            background: linear-gradient(180deg, transparent, rgba(2, 11, 24, 0.92) 28%);
+        }
+
+        .prompt-box {
+            max-width: none;
+            margin: 0;
+        }
+
+        .prompt-body textarea {
+            min-height: 72px;
+            max-height: 180px;
+        }
+
+        .composer-row {
+            display: flex;
+            gap: 10px;
+            align-items: flex-end;
+            margin-top: 10px;
+        }
+
+        .composer-row .submit-button {
+            width: auto;
+            margin-top: 0;
+            flex-shrink: 0;
+            padding: 14px 18px;
+            font-size: 15px;
+        }
+
+        .new-chat-btn {
+            width: 100%;
+            margin-top: 8px;
+            padding: 10px 12px;
+            border-radius: 10px;
+            border: 1px solid rgba(123, 180, 255, 0.3);
+            background: transparent;
+            color: #dfeeff;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .new-chat-btn:hover {
+            background: rgba(43, 140, 255, 0.12);
+        }
+
+        .city-card {
+            cursor: pointer;
         }
 
         .loading-shell {
             display: none;
             align-items: center;
             gap: 12px;
-            min-height: 60px;
+            min-height: 28px;
+            margin-top: 8px;
             color: #dfeeff;
-            font-size: 16px;
+            font-size: 14px;
             font-weight: 600;
         }
 
@@ -414,13 +584,17 @@
         }
 
         @media (max-width: 560px) {
-            .main {
-                padding: 18px 16px 30px;
+            .content {
+                padding: 16px 16px 0;
             }
 
             .trip-suggestions,
             .city-grid {
                 grid-template-columns: 1fr;
+            }
+
+            .chat-msg.user .chat-bubble {
+                max-width: 92%;
             }
         }
     </style>
@@ -439,13 +613,14 @@
                 <span>◎</span>
             </div>
             <input class="user-field" type="text" id="userId" value="aaro_hi_user" />
+            <button type="button" id="newChatBtn" class="new-chat-btn">+ New chat</button>
         </div>
 
         <div class="sidebar-card">
             <div class="sidebar-label"><span>Powered by</span></div>
             <div class="sidebar-list">
-                <div class="sidebar-item"><span class="tiny-icon">◌</span> LangGraph</div>
-                <div class="sidebar-item"><span class="tiny-icon">◉</span> Groq · Llama 3.3 70B</div>
+                <div class="sidebar-item"><span class="tiny-icon">◌</span> LangGraph4j</div>
+                <div class="sidebar-item"><span class="tiny-icon">◉</span> Ollama · Llama 3.2</div>
                 <div class="sidebar-item"><span class="tiny-icon">◍</span> PostgreSQL</div>
                 <div class="sidebar-item"><span class="tiny-icon">◈</span> Tavily Search</div>
                 <div class="sidebar-item"><span class="tiny-icon">✦</span> AviationStack</div>
@@ -455,91 +630,220 @@
         <div class="sidebar-card">
             <div class="sidebar-label"><span>Agent Pipeline</span></div>
             <div class="sidebar-list">
-                <div class="sidebar-item"><span class="tiny-icon">✦</span> Flight Agent</div>
-                <div class="sidebar-item"><span class="tiny-icon">◌</span> Hotel Agent</div>
-                <div class="sidebar-item"><span class="tiny-icon">✧</span> Itinerary Agent</div>
-                <div class="sidebar-item"><span class="tiny-icon">✦</span> Final Agent</div>
+                <div class="sidebar-item"><span class="tiny-icon">✦</span> Planner · Airport</div>
+                <div class="sidebar-item"><span class="tiny-icon">◌</span> Flight · Hotel · Research</div>
+                <div class="sidebar-item"><span class="tiny-icon">✧</span> Budget · Itinerary · Validator</div>
+                <div class="sidebar-item"><span class="tiny-icon">✦</span> Re-plan · Human approve</div>
             </div>
         </div>
     </aside>
 
     <main class="main">
         <div class="content">
-            <div class="hero">
-                <div class="badge">Multi-agent AI system</div>
-                <h1 class="title">AI Travel Booking System</h1>
-                <div class="subtitle">
-                    Four specialized agents work together — searching flights, hotels, building an itinerary, and delivering your perfect trip plan.
-                </div>
-                <div class="hero-visual"></div>
-            </div>
-
-            <div class="city-grid">
-                <div class="city-card tokyo">Tokyo</div>
-                <div class="city-card paris">Paris</div>
-                <div class="city-card bangkok">Bangkok</div>
-                <div class="city-card dubai">Dubai</div>
-            </div>
-
-            <form id="travelForm">
-                <div class="prompt-box">
-                    <div class="prompt-header">
-                        <span class="tag">✦</span>
-                        <span>Describe your trip</span>
+            <div class="welcome-block">
+                <div class="hero">
+                    <div class="badge">Multi-agent AI system</div>
+                    <h1 class="title">AI Travel Booking System</h1>
+                    <div class="subtitle">
+                        Chat like ChatGPT — each plan stays in the thread. Parallel agents, budget check, then approve.
                     </div>
+                    <div class="hero-visual"></div>
+                </div>
 
-                    <div class="prompt-body">
-                        <textarea id="tripPrompt" name="preferences" placeholder="e.g. 7-day Japan trip including flights, hotels and sightseeing under ₹2L">Need a family-friendly trip with good food, local experiences, and moderate budget.</textarea>
+                <div class="city-grid">
+                    <div class="city-card tokyo" data-prompt="From Bengaluru to Tokyo for 7 days under ₹2 lakh — family-friendly with good food.">Tokyo</div>
+                    <div class="city-card paris" data-prompt="From Bengaluru to Paris for 5 days under ₹1.5 lakh — museums and cafes.">Paris</div>
+                    <div class="city-card bangkok" data-prompt="From Bengaluru to Bangkok for 4 days under ₹80,000 — food and temples.">Bangkok</div>
+                    <div class="city-card dubai" data-prompt="From Bengaluru to Dubai for 5 days under ₹1.2 lakh — family trip.">Dubai</div>
+                </div>
+            </div>
 
-                        <input type="hidden" name="userId" value="aaro_hi_user" />
-                        <input type="hidden" name="selectedModel" value="llama3.2:3b" />
-                        <input type="hidden" name="departureCity" value="" />
-                        <input type="hidden" name="departureDate" value="" />
-                        <input type="hidden" name="returnDate" value="" />
-                        <input type="hidden" name="budget" value="₹2L" />
-                        <input type="hidden" name="travelStyle" value="balanced" />
+            <div id="chatThread" class="chat-thread" aria-live="polite">
+                <div class="chat-empty">Your trip plans will appear here and stay as you chat.</div>
+            </div>
 
-                        <button type="submit" id="submitButton" class="submit-button">✈ Generate My Travel Plan</button>
-                        <div id="loadingState" class="loading-shell" aria-live="polite">
-                            <span class="spinner"></span>
-                            <span>Planning your trip with the AI agents...</span>
+            <div class="composer-wrap">
+                <form id="travelForm">
+                    <div class="prompt-box">
+                        <div class="prompt-header">
+                            <span class="tag">✦</span>
+                            <span>Message</span>
+                        </div>
+                        <div class="prompt-body">
+                            <textarea id="tripPrompt" name="preferences" placeholder="e.g. From Bengaluru to Japan for 7 days under ₹2 lakh" rows="3">From Bengaluru to Japan for 7 days under ₹2 lakh — family-friendly with good food and local experiences.</textarea>
+
+                            <input type="hidden" name="userId" value="aaro_hi_user" />
+                            <input type="hidden" name="selectedModel" value="llama3.2:3b" />
+                            <input type="hidden" name="departureCity" value="Bengaluru" />
+                            <input type="hidden" name="departureDate" value="" />
+                            <input type="hidden" name="returnDate" value="" />
+                            <input type="hidden" name="budget" value="2 lakh" />
+                            <input type="hidden" name="travelStyle" value="balanced" />
+                            <input type="hidden" name="destination" value="" />
+
+                            <div class="composer-row">
+                                <button type="submit" id="submitButton" class="submit-button">Send</button>
+                            </div>
+                            <div id="loadingState" class="loading-shell" aria-live="polite">
+                                <span class="spinner"></span>
+                                <span>Agents are planning…</span>
+                            </div>
                         </div>
                     </div>
-                </div>
-            </form>
-
-            <div id="response" class="response"></div>
+                </form>
+            </div>
         </div>
     </main>
 </div>
 
 <script>
+    const layout = document.querySelector('.layout');
     const form = document.getElementById('travelForm');
-    const responseBox = document.getElementById('response');
+    const chatThread = document.getElementById('chatThread');
     const userIdField = document.getElementById('userId');
     const promptInput = document.getElementById('tripPrompt');
     const submitButton = document.getElementById('submitButton');
     const loadingState = document.getElementById('loadingState');
+    const newChatBtn = document.getElementById('newChatBtn');
 
     const syncUserId = () => {
-        const hiddenUserId = form.querySelector('input[name="userId"]');
-        hiddenUserId.value = userIdField.value.trim() || 'aaro_hi_user';
+        form.querySelector('input[name="userId"]').value = userIdField.value.trim() || 'aaro_hi_user';
     };
 
     userIdField.addEventListener('input', syncUserId);
+
+    document.querySelectorAll('.city-card[data-prompt]').forEach(card => {
+        card.addEventListener('click', () => {
+            promptInput.value = card.getAttribute('data-prompt');
+            promptInput.focus();
+        });
+    });
+
+    newChatBtn.addEventListener('click', () => {
+        chatThread.querySelectorAll('.chat-msg').forEach(node => node.remove());
+        layout.classList.remove('has-chat');
+        if (!chatThread.querySelector('.chat-empty')) {
+            const empty = document.createElement('div');
+            empty.className = 'chat-empty';
+            empty.textContent = 'Your trip plans will appear here and stay as you chat.';
+            chatThread.appendChild(empty);
+        }
+        promptInput.value = '';
+        promptInput.focus();
+    });
+
+    const markChatActive = () => {
+        layout.classList.add('has-chat');
+        const empty = chatThread.querySelector('.chat-empty');
+        if (empty) {
+            empty.remove();
+        }
+    };
+
+    const scrollChat = () => {
+        chatThread.scrollTop = chatThread.scrollHeight;
+    };
+
+    const appendUserMessage = (text) => {
+        markChatActive();
+        const row = document.createElement('div');
+        row.className = 'chat-msg user';
+        row.innerHTML =
+            '<div class="chat-avatar">You</div>' +
+            '<div class="chat-bubble"><div class="chat-role">You</div><div class="chat-body"></div></div>';
+        row.querySelector('.chat-body').textContent = text;
+        chatThread.appendChild(row);
+        scrollChat();
+    };
+
+    const appendAssistantMessage = (data) => {
+        markChatActive();
+        const row = document.createElement('div');
+        row.className = 'chat-msg assistant';
+        row.innerHTML =
+            '<div class="chat-avatar">AI</div>' +
+            '<div class="chat-bubble">' +
+            '<div class="chat-role">Travel agent</div>' +
+            '<div class="chat-body"></div>' +
+            '<div class="chat-actions"></div>' +
+            '</div>';
+        row.querySelector('.chat-body').textContent = formatPlan(data);
+        const actions = row.querySelector('.chat-actions');
+        if (data.awaitingApproval) {
+            const approve = document.createElement('button');
+            approve.type = 'button';
+            approve.className = 'submit-button';
+            approve.textContent = 'Approve plan';
+            const modify = document.createElement('button');
+            modify.type = 'button';
+            modify.className = 'submit-button ghost-button';
+            modify.textContent = 'Modify / make cheaper';
+            actions.appendChild(approve);
+            actions.appendChild(modify);
+            approve.onclick = () => decide('/api/plan/approve', data.threadId, null, row);
+            modify.onclick = () => decide('/api/plan/modify', data.threadId,
+                'Make it cheaper: lower hotel and flight cost.', row);
+        }
+        chatThread.appendChild(row);
+        scrollChat();
+        return row;
+    };
+
+    const formatPlan = (data) => {
+        const seen = new Set();
+        const pipeline = (data.pipeline || []).filter(step => {
+            const key = step.node + '|' + (step.detail || '');
+            if (seen.has(key)) {
+                return false;
+            }
+            seen.add(key);
+            return true;
+        }).map(step =>
+            (step.status === 'warn' ? '⚠ ' : '✓ ') + step.node
+            + (step.durationMs ? ' (' + (step.durationMs / 1000).toFixed(1) + 's)' : '')
+            + (step.detail ? ' — ' + step.detail : '')
+        ).join('\n');
+        const budget = data.budgetSummary && data.budgetSummary.lineItems
+            ? data.budgetSummary.lineItems.map(item => item.category + ': ₹' + item.amountInr).join('\n')
+                + '\nTotal: ₹' + data.budgetSummary.estimatedCost
+                + (data.budgetSummary.remaining != null ? '\nRemaining: ₹' + data.budgetSummary.remaining : '')
+                + (data.budgetSummary.assessment ? '\n' + data.budgetSummary.assessment : '')
+            : '';
+        const validation = (data.validationErrors || []).length
+            ? 'Validation notes:\n' + data.validationErrors.join('\n')
+            : '';
+        return [
+            data.status || '',
+            data.routeSummary ? 'Route\n' + data.routeSummary : '',
+            'Pipeline\n' + (pipeline || 'n/a'),
+            budget ? 'Budget\n' + budget : '',
+            data.flightInsights ? 'Flights\n' + data.flightInsights : '',
+            data.hotelInsights ? 'Hotels\n' + data.hotelInsights : '',
+            data.travelInsights ? 'Research\n' + data.travelInsights : '',
+            data.itinerarySummary ? 'Itinerary\n' + data.itinerarySummary : '',
+            validation,
+            data.finalPlan ? (data.awaitingApproval ? 'Approval card\n' : 'Final plan\n') + data.finalPlan : ''
+        ].filter(Boolean).join('\n\n');
+    };
 
     form.addEventListener('submit', async (event) => {
         event.preventDefault();
         syncUserId();
 
+        const text = promptInput.value.trim();
+        if (!text) {
+            return;
+        }
+
         const formData = new FormData(form);
         const payload = Object.fromEntries(formData.entries());
-        payload.preferences = promptInput.value.trim() || payload.preferences;
+        payload.preferences = text;
+        payload.prompt = text;
 
+        appendUserMessage(text);
+        promptInput.value = '';
         submitButton.disabled = true;
         loadingState.classList.add('visible');
-        responseBox.style.display = 'block';
-        responseBox.textContent = '';
 
         try {
             const res = await fetch('/api/plan', {
@@ -547,19 +851,70 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             });
-
-            const text = await res.text();
+            const body = await res.text();
             if (!res.ok) {
-                throw new Error(text || 'Request failed');
+                throw new Error(body || 'Request failed');
             }
-
-            const data = JSON.parse(text);
-            responseBox.textContent = data.finalPlan || 'No plan generated.';
+            appendAssistantMessage(JSON.parse(body));
         } catch (error) {
-            responseBox.textContent = 'Error: ' + error.message;
+            appendAssistantMessage({
+                status: 'ERROR',
+                finalPlan: 'Error: ' + error.message,
+                awaitingApproval: false,
+                pipeline: []
+            });
         } finally {
             submitButton.disabled = false;
             loadingState.classList.remove('visible');
+            promptInput.focus();
+        }
+    });
+
+    const decide = async (url, threadId, notes, sourceRow) => {
+        loadingState.classList.add('visible');
+        submitButton.disabled = true;
+        if (sourceRow) {
+            sourceRow.querySelectorAll('.chat-actions button').forEach(btn => {
+                btn.disabled = true;
+            });
+        }
+        try {
+            const res = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    userId: userIdField.value.trim() || 'aaro_hi_user',
+                    threadId,
+                    notes
+                })
+            });
+            const data = await res.json();
+            if (!res.ok) {
+                throw new Error(data.error || 'Request failed');
+            }
+            if (notes) {
+                appendUserMessage(notes);
+            } else {
+                appendUserMessage('Approved this plan.');
+            }
+            appendAssistantMessage(data);
+        } catch (error) {
+            appendAssistantMessage({
+                status: 'ERROR',
+                finalPlan: 'Error: ' + error.message,
+                awaitingApproval: false,
+                pipeline: []
+            });
+        } finally {
+            submitButton.disabled = false;
+            loadingState.classList.remove('visible');
+        }
+    };
+
+    promptInput.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' && !event.shiftKey) {
+            event.preventDefault();
+            form.requestSubmit();
         }
     });
 </script>

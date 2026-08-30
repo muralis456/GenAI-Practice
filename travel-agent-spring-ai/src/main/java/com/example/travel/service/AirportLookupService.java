@@ -35,10 +35,19 @@ public class AirportLookupService {
             return match;
         }
         if (parts.length > 1) {
-            return repository.findFirstByCountryIgnoreCase(parts[1].trim());
+            Optional<AirportLocation> byCountryPart = repository.findFirstByCountryIgnoreCase(parts[1].trim());
+            if (byCountryPart.isPresent()) {
+                return byCountryPart;
+            }
         }
 
-        return repository.findFirstByCityIgnoreCase(normalizeCity(value));
+        Optional<AirportLocation> byCity = repository.findFirstByCityIgnoreCase(normalizeCity(value));
+        if (byCity.isPresent()) {
+            return byCity;
+        }
+
+        // "Japan" / "Thailand" style prompts: resolve via country to a major hub.
+        return repository.findFirstByCountryIgnoreCase(normalizeCountry(value));
     }
 
     private String normalizeCity(String city) {
@@ -48,8 +57,25 @@ public class AirportLookupService {
             case "calcutta" -> "Kolkata";
             case "madras" -> "Chennai";
             case "new delhi" -> "Delhi";
+            case "japan", "nippon" -> "Tokyo";
+            case "thailand" -> "Bangkok";
+            case "uae", "united arab emirates" -> "Dubai";
+            case "uk", "united kingdom", "england" -> "London";
+            case "usa", "united states", "america" -> "New York";
             case "sao paulo", "são paulo" -> "Sao Paulo";
             default -> city;
+        };
+    }
+
+    private String normalizeCountry(String value) {
+        return switch (value.toLowerCase(Locale.ROOT)) {
+            case "japan", "nippon" -> "Japan";
+            case "thailand" -> "Thailand";
+            case "uae", "united arab emirates" -> "United Arab Emirates";
+            case "uk", "united kingdom", "england" -> "United Kingdom";
+            case "usa", "united states", "america" -> "United States";
+            case "india" -> "India";
+            default -> value;
         };
     }
 }

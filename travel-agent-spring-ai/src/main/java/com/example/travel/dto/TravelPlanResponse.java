@@ -1,5 +1,11 @@
 package com.example.travel.dto;
 
+import com.example.travel.model.AgentStep;
+import com.example.travel.model.BudgetSummary;
+
+import java.util.ArrayList;
+import java.util.List;
+
 public class TravelPlanResponse {
 
     private String userId;
@@ -10,6 +16,13 @@ public class TravelPlanResponse {
     private String travelInsights;
     private String hotelInsights;
     private String itinerarySummary;
+    private String status;
+    private String threadId;
+    private boolean awaitingApproval;
+    private String routeSummary;
+    private BudgetSummary budgetSummary;
+    private List<AgentStep> pipeline = new ArrayList<>();
+    private List<String> validationErrors = new ArrayList<>();
 
     public TravelPlanResponse() {
     }
@@ -24,6 +37,7 @@ public class TravelPlanResponse {
         this.travelInsights = travelInsights;
         this.hotelInsights = hotelInsights;
         this.itinerarySummary = itinerarySummary;
+        this.status = "COMPLETE";
     }
 
     public String getUserId() {
@@ -78,6 +92,10 @@ public class TravelPlanResponse {
         return itinerarySummary;
     }
 
+    public void setItinerarySummary(String itinerarySummary) {
+        this.itinerarySummary = itinerarySummary;
+    }
+
     public String getHotelInsights() {
         return hotelInsights;
     }
@@ -86,7 +104,59 @@ public class TravelPlanResponse {
         this.hotelInsights = hotelInsights;
     }
 
-    public void setItinerarySummary(String itinerarySummary) {
-        this.itinerarySummary = itinerarySummary;
+    public String getStatus() {
+        return status;
+    }
+
+    public void setStatus(String status) {
+        this.status = status;
+    }
+
+    public String getThreadId() {
+        return threadId;
+    }
+
+    public void setThreadId(String threadId) {
+        this.threadId = threadId;
+    }
+
+    public boolean isAwaitingApproval() {
+        return awaitingApproval;
+    }
+
+    public void setAwaitingApproval(boolean awaitingApproval) {
+        this.awaitingApproval = awaitingApproval;
+    }
+
+    public String getRouteSummary() {
+        return routeSummary;
+    }
+
+    public void setRouteSummary(String routeSummary) {
+        this.routeSummary = routeSummary;
+    }
+
+    public BudgetSummary getBudgetSummary() {
+        return budgetSummary;
+    }
+
+    public void setBudgetSummary(BudgetSummary budgetSummary) {
+        this.budgetSummary = budgetSummary;
+    }
+
+    public List<AgentStep> getPipeline() {
+        return pipeline;
+    }
+
+    public void setPipeline(List<AgentStep> pipeline) {
+        this.pipeline = pipeline;
+    }
+
+    public List<String> getValidationErrors() {
+        return validationErrors;
+    }
+
+    public void setValidationErrors(List<String> validationErrors) {
+        this.validationErrors = validationErrors;
     }
 }

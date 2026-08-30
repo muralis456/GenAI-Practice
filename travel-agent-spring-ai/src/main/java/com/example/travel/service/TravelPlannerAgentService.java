@@ -2,76 +2,204 @@ package com.example.travel.service;
 
 import com.example.travel.dto.TravelPlanResponse;
 import com.example.travel.dto.TravelRequest;
-import org.springframework.ai.chat.client.ChatClient;
+import com.example.travel.entity.UserPreference;
+import com.example.travel.graph.TravelState;
+import com.example.travel.model.FlightOption;
+import com.example.travel.model.HotelOption;
+import com.example.travel.model.Itinerary;
+import com.example.travel.model.TravelResearch;
+import org.bsc.langgraph4j.CompiledGraph;
+import org.bsc.langgraph4j.RunnableConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDate;
 import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 @Service
 public class TravelPlannerAgentService {
 
     private static final Logger log = LoggerFactory.getLogger(TravelPlannerAgentService.class);
 
-    private final ChatClient chatClient;
-    private final TravelAgentTools travelAgentTools;
+    private final CompiledGraph<TravelState> travelGraph;
+    private final RunnableConfig travelRunnableConfig;
+    private final FinalPlannerAgentService finalPlannerAgentService;
+    private final UserPreferenceService userPreferenceService;
+    private final int maxRetries;
+    private final ConcurrentHashMap<String, TravelState> pendingPlans = new ConcurrentHashMap<>();
 
-    public TravelPlannerAgentService(ChatClient chatClient,
-                                                TravelAgentTools travelAgentTools) {
-        this.chatClient = chatClient;
-        this.travelAgentTools = travelAgentTools;
+    public TravelPlannerAgentService(CompiledGraph<TravelState> travelGraph,
+                                     RunnableConfig travelRunnableConfig,
+                                     FinalPlannerAgentService finalPlannerAgentService,
+                                     UserPreferenceService userPreferenceService,
+                                     @Value("${travel.graph.max-retries:2}") int maxRetries) {
+        this.travelGraph = travelGraph;
+        this.travelRunnableConfig = travelRunnableConfig;
+        this.finalPlannerAgentService = finalPlannerAgentService;
+        this.userPreferenceService = userPreferenceService;
+        this.maxRetries = maxRetries;
     }
 
     public TravelPlanResponse createTravelPlan(TravelRequest request, String historyContext) {
-        log.info("Starting travel plan orchestration for userId={}", request.getUserId());
-        String promptText = request.getPrompt() != null ? request.getPrompt() : request.getPreferences();
-        if (promptText == null || promptText.trim().isEmpty()) {
-            promptText = "Plan a balanced family-friendly trip with good food and local experiences.";
+        String userId = TravelState.firstNonBlank(request.getUserId(), "anonymous");
+        // Unique thread per request so MemorySaver does not append a previous pipeline.
+        String threadId = userId + "-" + UUID.randomUUID();
+        log.info("Starting LangGraph travel orchestration for userId={}, threadId={}", userId, threadId);
+
+        Map<String, Object> input = TravelState.fromRequest(request, historyContext);
+        input.put(TravelState.MAX_RETRIES, maxRetries);
+        userPreferenceService.find(userId).ifPresent(preference -> applyPreferences(input, preference));
+        ensureOrigin(input);
+
+        TravelState state = travelGraph.invoke(input, configFor(threadId))
+                .orElseThrow(() -> new IllegalStateException("Travel graph produced no final state"));
+        pendingPlans.put(threadId, state);
+        userPreferenceService.remember(userId, state.originIata(), state.travelStyle(), state.destination());
+        return toResponse(state, threadId, true);
+    }
+
+    public TravelPlanResponse approve(String userId, String threadId) {
+        TravelState state = requirePending(userId, threadId);
+        String plan = finalPlannerAgentService.compose(state);
+        TravelPlanResponse response = toResponse(state, threadId, false);
+        response.setFinalPlan(plan);
+        response.setStatus("COMPLETE");
+        response.setAwaitingApproval(false);
+        pendingPlans.remove(threadId);
+        return response;
+    }
+
+    public TravelPlanResponse modify(String userId, String threadId, String notes, String historyContext) {
+        TravelState previous = requirePending(userId, threadId);
+        TravelRequest request = new TravelRequest();
+        request.setUserId(userId);
+        request.setDestination(previous.destination());
+        request.setDepartureCity(previous.origin());
+        request.setDepartureDate(previous.departureDate().toString());
+        request.setReturnDate(previous.returnDate().toString());
+        request.setAdults(previous.travelers());
+        request.setBudget(previous.budget() == null ? previous.budgetLabel() : previous.budget().toPlainString());
+        request.setTravelStyle("budget");
+        request.setPrompt(previous.userRequest() + " Modify: " + notes);
+        request.setSelectedModel(previous.selectedModel());
+        Map<String, Object> input = TravelState.fromRequest(request, historyContext);
+        input.put(TravelState.MAX_RETRIES, maxRetries);
+        input.put(TravelState.REPLAN_NOTES, notes);
+        input.put(TravelState.COST_FACTOR, previous.costFactor().multiply(java.math.BigDecimal.valueOf(0.82)));
+        input.put(TravelState.ORIGIN_IATA, previous.originIata());
+        input.put(TravelState.DESTINATION_IATA, previous.destinationIata());
+        ensureOrigin(input);
+        String nextThreadId = userId + "-" + UUID.randomUUID();
+        TravelState state = travelGraph.invoke(input, configFor(nextThreadId))
+                .orElseThrow(() -> new IllegalStateException("Travel graph produced no final state"));
+        pendingPlans.remove(threadId);
+        pendingPlans.put(nextThreadId, state);
+        return toResponse(state, nextThreadId, true);
+    }
+
+    private void ensureOrigin(Map<String, Object> input) {
+        if (!TravelState.isBlank((String) input.get(TravelState.ORIGIN))) {
+            return;
         }
-
-        String selectedModel = request.getSelectedModel() != null ? request.getSelectedModel() : "llama3.2:3b";
-        String departureCity = request.getDepartureCity();
-        LocalDate today = LocalDate.now();
-        String departureDate = request.getDepartureDate() != null ? request.getDepartureDate() : today.toString();
-        String returnDate = request.getReturnDate() != null ? request.getReturnDate() : today.plusDays(5).toString();
-        String travelStyle = request.getTravelStyle() != null ? request.getTravelStyle() : "balanced";
-        String budget = request.getBudget() != null ? request.getBudget() : "medium";
-
-        request.setPreferences(promptText);
-        request.setDepartureCity(departureCity);
-        request.setDepartureDate(departureDate);
-        request.setReturnDate(returnDate);
-        request.setTravelStyle(travelStyle);
-        request.setBudget(budget);
-
-        travelAgentTools.startRequest(promptText);
-        try {
-            String finalPlan = chatClient.prompt()
-                    .system("You are the main travel orchestrator. Use the registered travel tools when they are relevant to the user's request. "
-                            + "Choose only the minimum required tools. Use searchHotels for hotel requests, searchFlights for flight requests, "
-                            + "researchDestination for destination information, and buildItinerary for schedules or trip plans. "
-                            + "First extract the destination city or country from the CURRENT REQUEST. Never call a tool with an empty destination. "
-                            + "After receiving tool results, produce the final answer for the user. Never use a destination or route from conversation history when it conflicts with the current request. For flight requests, preserve the exact FROM and TO direction and do not invent missing locations. Never output bracketed placeholders such as [Insert flight number]; use 'Unavailable' when data is missing.")
-                    .user("CURRENT REQUEST: " + promptText + "\nDestination field (may be stale): " + request.getDestination()
-                            + "\nDeparture city: " + departureCity + "\nDeparture date: " + departureDate
-                            + "\nReturn date: " + returnDate + "\nBudget: " + budget + "\nTravel style: " + travelStyle
-                            + "\nPrevious context (background only): " + historyContext)
-                    .tools(travelAgentTools)
-                    .call()
-                    .content();
-
-            Map<String, String> results = travelAgentTools.getResults();
-            String destination = request.getDestination() != null ? request.getDestination() : "Destination from current request";
-            return new TravelPlanResponse(request.getUserId(), destination, selectedModel, finalPlan,
-                    results.getOrDefault("flightInsights", "Not requested for this trip."),
-                    results.getOrDefault("travelInsights", "Not requested for this trip."),
-                    results.getOrDefault("hotelInsights", "Not requested for this trip."),
-                    results.getOrDefault("itinerary", "Not requested for this trip."));
-        } finally {
-            travelAgentTools.endRequest();
+        String preferred = (String) input.get(TravelState.PREFERRED_AIRPORT);
+        if (!TravelState.isBlank(preferred)) {
+            input.put(TravelState.ORIGIN, preferred);
+            return;
         }
+        // Sensible India-origin default when the prompt omits "from <city>".
+        input.put(TravelState.ORIGIN, "Bengaluru");
+        input.put(TravelState.PREFERRED_AIRPORT, "BLR");
+    }
+
+    private void applyPreferences(Map<String, Object> input, UserPreference preference) {
+        if (TravelState.isBlank((String) input.get(TravelState.ORIGIN)) && preference.getPreferredAirport() != null) {
+            input.put(TravelState.ORIGIN, preference.getPreferredAirport());
+            input.put(TravelState.PREFERRED_AIRPORT, preference.getPreferredAirport());
+        }
+        if (preference.getTravelStyle() != null && TravelState.isBlank((String) input.get(TravelState.TRAVEL_STYLE))) {
+            input.put(TravelState.TRAVEL_STYLE, preference.getTravelStyle());
+        }
+        if (preference.getCurrency() != null) {
+            input.put(TravelState.CURRENCY, preference.getCurrency());
+        }
+        String history = (String) input.getOrDefault(TravelState.HISTORY_CONTEXT, "");
+        input.put(TravelState.HISTORY_CONTEXT, "Long-term preferences: airport=" + preference.getPreferredAirport()
+                + ", style=" + preference.getTravelStyle() + ", currency=" + preference.getCurrency()
+                + ", lastDestination=" + preference.getLastDestination()
+                + "\n" + history);
+    }
+
+    private TravelState requirePending(String userId, String threadId) {
+        String key = TravelState.firstNonBlank(threadId, userId);
+        TravelState state = pendingPlans.get(key);
+        if (state == null) {
+            throw new IllegalStateException("No pending plan found for approval. Generate a plan first.");
+        }
+        return state;
+    }
+
+    private RunnableConfig configFor(String threadId) {
+        return RunnableConfig.builder(travelRunnableConfig)
+                .threadId(threadId)
+                .build();
+    }
+
+    private TravelPlanResponse toResponse(TravelState state, String threadId, boolean awaitingApproval) {
+        TravelPlanResponse response = new TravelPlanResponse(
+                state.userId(),
+                TravelState.firstNonBlank(state.destination(), "Destination from current request"),
+                state.selectedModel(),
+                state.finalPlan(),
+                joinFlights(state),
+                joinResearch(state),
+                joinHotels(state),
+                joinItinerary(state)
+        );
+        response.setThreadId(threadId);
+        response.setAwaitingApproval(awaitingApproval);
+        response.setStatus(awaitingApproval ? "PENDING_APPROVAL" : "COMPLETE");
+        response.setRouteSummary(TravelState.firstNonBlank(state.origin(), "?")
+                + " (" + TravelState.firstNonBlank(state.originIata(), "?") + ") → "
+                + TravelState.firstNonBlank(state.destination(), "?")
+                + " (" + TravelState.firstNonBlank(state.destinationIata(), "?") + ")"
+                + " · " + state.departureDate() + " to " + state.returnDate()
+                + " · " + state.nights() + " nights");
+        response.setBudgetSummary(state.budgetSummary());
+        response.setPipeline(state.pipeline());
+        response.setValidationErrors(state.validationErrors());
+        return response;
+    }
+
+    private String joinFlights(TravelState state) {
+        if (state.flights().isEmpty()) {
+            return "Not requested for this trip.";
+        }
+        return state.flights().stream().map(FlightOption::toDisplay).collect(Collectors.joining("\n"));
+    }
+
+    private String joinResearch(TravelState state) {
+        if (state.research().isEmpty()) {
+            return "Not requested for this trip.";
+        }
+        return state.research().stream().map(TravelResearch::toDisplay).collect(Collectors.joining("\n"));
+    }
+
+    private String joinHotels(TravelState state) {
+        if (state.hotels().isEmpty()) {
+            return "Not requested for this trip.";
+        }
+        return state.hotels().stream().map(HotelOption::toDisplay).collect(Collectors.joining("\n"));
+    }
+
+    private String joinItinerary(TravelState state) {
+        Itinerary itinerary = state.itinerary();
+        if (itinerary == null || itinerary.isEmpty()) {
+            return "Not requested for this trip.";
+        }
+        return itinerary.toDisplay();
     }
 }
-

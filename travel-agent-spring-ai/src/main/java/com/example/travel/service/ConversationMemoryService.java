@@ -16,7 +16,8 @@ import java.util.stream.Collectors;
 public class ConversationMemoryService {
 
     private static final Logger log = LoggerFactory.getLogger(ConversationMemoryService.class);
-    private static final int MAX_HISTORY = 10;
+    private static final int MAX_HISTORY = 6;
+    private static final int MAX_CONTENT = 400;
 
     private final ConversationMemoryRepository repository;
 
@@ -30,7 +31,7 @@ public class ConversationMemoryService {
         memory.setUserId(userId);
         memory.setSessionId(sessionId);
         memory.setRole(role);
-        memory.setContent(content);
+        memory.setContent(truncate(content));
         memory.setCreatedAt(Instant.now());
         repository.save(memory);
         log.debug("Saved conversation memory for userId={}, sessionId={}, role={}", userId, sessionId, role);
@@ -46,9 +47,9 @@ public class ConversationMemoryService {
         if (history.isEmpty()) {
             return "";
         }
-        StringBuilder sb = new StringBuilder("Previous conversation context:\n");
+        StringBuilder sb = new StringBuilder("Short-term conversation (last turns only):\n");
         for (ConversationMemory memory : history) {
-            sb.append(memory.getRole()).append(": ").append(memory.getContent()).append("\n");
+            sb.append(memory.getRole()).append(": ").append(truncate(memory.getContent())).append("\n");
         }
         return sb.toString();
     }
@@ -73,5 +74,16 @@ public class ConversationMemoryService {
         return memories.stream()
                 .sorted((a, b) -> a.getCreatedAt().compareTo(b.getCreatedAt()))
                 .collect(Collectors.toList());
+    }
+
+    private String truncate(String content) {
+        if (content == null) {
+            return "";
+        }
+        String trimmed = content.trim();
+        if (trimmed.length() <= MAX_CONTENT) {
+            return trimmed;
+        }
+        return trimmed.substring(0, MAX_CONTENT) + "...";
     }
 }

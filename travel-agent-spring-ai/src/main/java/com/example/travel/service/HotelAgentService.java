@@ -1,34 +1,104 @@
 package com.example.travel.service;
 
-import com.example.travel.dto.TravelRequest;
+import com.example.travel.config.TravelModelsProperties.AgentRole;
+import com.example.travel.graph.TravelState;
+import com.example.travel.graph.model.HotelExtraction;
+import com.example.travel.model.HotelOption;
+import com.example.travel.support.JsonSupport;
+import com.example.travel.tool.HotelSearchTool;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.stereotype.Service;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
 
 @Service
 public class HotelAgentService {
 
     private static final Logger log = LoggerFactory.getLogger(HotelAgentService.class);
 
-    private final ChatClient chatClient;
-    private final ExternalApiService externalApiService;
+    private final RoutedLlm routedLlm;
+    private final HotelSearchTool hotelSearchTool;
+    private final JsonSupport jsonSupport;
 
-    public HotelAgentService(ChatClient chatClient, ExternalApiService externalApiService) {
-        this.chatClient = chatClient;
-        this.externalApiService = externalApiService;
+    public HotelAgentService(RoutedLlm routedLlm, HotelSearchTool hotelSearchTool, JsonSupport jsonSupport) {
+        this.routedLlm = routedLlm;
+        this.hotelSearchTool = hotelSearchTool;
+        this.jsonSupport = jsonSupport;
     }
 
-    public String findHotels(TravelRequest request, String selectedModel) {
-        String destination = request.getDestination();
-        String query = "Best hotels in " + destination + " for a 3-day trip, including location, price range, family suitability, and guest ratings.";
-        log.debug("Searching hotels for destination={}, model={}", destination, selectedModel);
-        String rawResearch = externalApiService.searchTravelInfo(query);
+    public List<HotelOption> search(TravelState state) {
+        String destination = state.destination();
+        boolean cheaper = state.retryCount() > 0
+                || (state.replanNotes() != null && state.replanNotes().toLowerCase().contains("budget"));
+        log.info("Hotel agent searching destination={} cheaper={}", destination, cheaper);
 
-        return chatClient.prompt()
-                .system("You are the Hotel Agent. Recommend suitable hotels using only the supplied research. Include area, approximate price range, strengths, and who each hotel suits. Do not invent availability or exact prices.")
-                .user("Destination=" + destination + ", Model=" + selectedModel + "\nHotel research:\n" + rawResearch)
-                .call()
-                .content();
+        String rawResearch = hotelSearchTool.search(destination, state.travelStyle(), cheaper);
+        String content;
+        try {
+            content = routedLlm.complete(AgentRole.EXTRACT,
+                    "You are the Hotel Agent. Extract concrete hotel options from the research. "
+                            + "Return JSON only with shape "
+                            + "{\"hotels\":[{\"name\":\"\",\"area\":\"\",\"priceRange\":\"\",\"rating\":\"\",\"suitableFor\":\"\",\"notes\":\"\"}]}. "
+                            + "Never use placeholders like 'Not specified' — leave a field empty or omit it. "
+                            + "Prefer 2-4 real hotel names with area and rough price band when available. "
+                            + "Do not invent exact availability.",
+                    "Destination=" + destination + "\nCheaper=" + cheaper
+                            + "\nStyle=" + state.travelStyle()
+                            + "\nHotel research:\n" + rawResearch,
+                    hotelSearchTool);
+        } catch (Exception exception) {
+            log.warn("Hotel LLM failed for destination={}", destination, exception);
+            content = rawResearch;
+        }
+        final String rawContent = content;
+
+        List<HotelOption> hotels = jsonSupport.read(rawContent, HotelExtraction.class)
+                .map(HotelExtraction::getHotels)
+                .filter(list -> list != null && !list.isEmpty())
+                .orElseGet(ArrayList::new)
+                .stream()
+                .map(this::scrubPlaceholders)
+                .filter(hotel -> !TravelState.isBlank(hotel.getName()))
+                .toList();
+
+        if (hotels.isEmpty()) {
+            HotelOption fallback = new HotelOption();
+            fallback.setName("Hotel options in " + destination);
+            fallback.setArea(destination);
+            fallback.setPriceRange(cheaper ? "budget" : "mid-range");
+            fallback.setNotes(rawContent.length() > 500 ? rawContent.substring(0, 500) + "..." : rawContent);
+            hotels = List.of(fallback);
+        }
+        return new ArrayList<>(hotels);
+    }
+
+    private HotelOption scrubPlaceholders(HotelOption hotel) {
+        hotel.setArea(clean(hotel.getArea()));
+        hotel.setPriceRange(clean(hotel.getPriceRange()));
+        hotel.setRating(clean(hotel.getRating()));
+        hotel.setSuitableFor(clean(hotel.getSuitableFor()));
+        hotel.setNotes(clean(hotel.getNotes()));
+        if (isPlaceholder(hotel.getName())) {
+            hotel.setName("");
+        }
+        return hotel;
+    }
+
+    private String clean(String value) {
+        return isPlaceholder(value) ? "" : value;
+    }
+
+    private boolean isPlaceholder(String value) {
+        if (value == null || value.isBlank()) {
+            return true;
+        }
+        String normalized = value.trim().toLowerCase(Locale.ROOT);
+        return normalized.equals("not specified")
+                || normalized.equals("n/a")
+                || normalized.equals("unknown")
+                || normalized.equals("none");
     }
 }

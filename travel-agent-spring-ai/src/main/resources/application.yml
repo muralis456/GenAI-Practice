@@ -9,8 +9,10 @@ spring:
       base-url: http://localhost:11434
       chat:
         model: llama3.2:3b
-        temperature: 0.2
-        num-predict: 600
+        options:
+          model: llama3.2:3b
+          temperature: 0.2
+          num-predict: 600
   datasource:
     url: jdbc:postgresql://localhost:5432/travel_agent
     username: ${DB_USERNAME:postgres}
@@ -37,16 +39,30 @@ spring:
           handling_mode: DELAYED_ACQUISITION_AND_RELEASE_AFTER_STATEMENT
 
 travel:
+  graph:
+    max-retries: 2
+  models:
+    extraction: ${TRAVEL_MODEL_FAST:llama3.2:3b}
+    planner: ${TRAVEL_MODEL_PLANNER:llama3.2:3b}
+    itinerary: ${TRAVEL_MODEL_ITINERARY:llama3.2:3b}
+    finale: ${TRAVEL_MODEL_FINAL:llama3.2:3b}
   tavily:
     api-url: https://api.tavily.com/search
     api-key: ${TAVILY_API_KEY:}
   aviation:
     api-url: https://api.aviationstack.com/v1
     api-key: ${AVIATIONSTACK_API_KEY:}
+    # Free plans reject flight_date with 403 function_access_restricted.
+    include-flight-date: false
+  weather:
+    geocode-url: https://geocoding-api.open-meteo.com/v1/search
+    forecast-url: https://api.open-meteo.com/v1/forecast
+  currency:
+    rates-url: https://api.frankfurter.app/latest
 
 logging:
   level:
     com.example.travel: INFO
     org.springframework.ai: INFO
-    org.hibernate.SQL: DEBUG
+    org.hibernate.SQL: INFO
     org.hibernate.type.descriptor.sql.BasicBinder: TRACE
