@@ -3,7 +3,7 @@ server:
 
 spring:
   application:
-    name: travel-agent-spring-ai
+    name: agentic-trip-ai
   ai:
     ollama:
       base-url: http://localhost:11434
@@ -17,7 +17,7 @@ spring:
     password: ${DB_PASSWORD:postgres}
     driver-class-name: org.postgresql.Driver
     hikari:
-      pool-name: TravelAgentHikariPool
+      pool-name: AgenticTripAiHikariPool
       maximum-pool-size: 10
       minimum-idle: 2
       connection-timeout: 30000

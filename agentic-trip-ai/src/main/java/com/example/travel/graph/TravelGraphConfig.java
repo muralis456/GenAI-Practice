@@ -62,7 +62,7 @@ public class TravelGraphConfig {
         AtomicInteger index = new AtomicInteger();
         return Executors.newFixedThreadPool(4, runnable -> {
             Thread thread = new Thread(runnable);
-            thread.setName("travel-agent-parallel-" + index.incrementAndGet());
+            thread.setName("agentic-trip-ai-parallel-" + index.incrementAndGet());
             thread.setDaemon(true);
             return thread;
         });

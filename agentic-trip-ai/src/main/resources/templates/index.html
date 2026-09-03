@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>AI Travel Planner</title>
+    <title>AgenticTripAI</title>
     <style>
         :root {
             --bg-1: #020b18;
@@ -642,7 +642,7 @@
     <aside class="sidebar">
         <div class="brand">
             <span class="brand-mark"></span>
-            <span>AI Travel Planner</span>
+            <span>AgenticTripAI</span>
         </div>
 
         <div class="sidebar-card">
@@ -688,7 +688,8 @@
             <div class="welcome-block">
                 <div class="hero">
                     <div class="badge">Multi-agent AI system</div>
-                    <h1 class="title">AI Travel Booking System</h1>
+                    <h1 class="title">AgenticTripAI</h1>
+                    <p class="subtitle">An Agentic AI Travel Planning &amp; Orchestration Platform</p>
                     <div class="subtitle">
                         Chat like ChatGPT — each plan stays in the thread. Parallel agents, budget check, then approve.
                     </div>
@@ -756,7 +757,7 @@
     const loadingState = document.getElementById('loadingState');
     const newChatBtn = document.getElementById('newChatBtn');
 
-    const storageKey = () => 'travel-chats:' + (userIdField.value.trim() || 'aaro_hi_user');
+    const storageKey = () => 'agentic-trip-ai-chats:' + (userIdField.value.trim() || 'aaro_hi_user');
     let currentChatId = null;
     let startedFreshChat = false;
 
@@ -1035,7 +1036,7 @@
         row.innerHTML =
             '<div class="chat-avatar">AI</div>' +
             '<div class="chat-bubble">' +
-            '<div class="chat-role">Travel agent</div>' +
+            '<div class="chat-role">AgenticTripAI</div>' +
             '<div class="chat-body"></div>' +
             '<div class="chat-actions"></div>' +
             '</div>';

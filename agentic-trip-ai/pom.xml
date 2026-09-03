@@ -10,10 +10,10 @@
     </parent>
 
     <groupId>com.example</groupId>
-    <artifactId>travel-agent-spring-ai</artifactId>
+    <artifactId>agentic-trip-ai</artifactId>
     <version>0.0.1-SNAPSHOT</version>
-    <name>travel-agent-spring-ai</name>
-    <description>Agentic travel planner with Spring AI and LangGraph-inspired orchestration</description>
+    <name>agentic-trip-ai</name>
+    <description>AgenticTripAI — An Agentic AI Travel Planning &amp; Orchestration Platform</description>
 
     <properties>
         <java.version>26</java.version>
@@ -94,7 +94,7 @@
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
                 <configuration>
-                    <mainClass>com.example.travel.TravelAgentApplication</mainClass>
+                    <mainClass>com.example.travel.AgenticTripAiApplication</mainClass>
                 </configuration>
             </plugin>
         </plugins>

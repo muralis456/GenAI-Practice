@@ -2,14 +2,14 @@
   "configurations": [
     {
       "type": "java",
-      "name": "Spring Boot-TravelAgentApplication<travel-agent-spring-ai>",
+      "name": "Spring Boot-AgenticTripAiApplication<agentic-trip-ai>",
       "request": "launch",
-      "cwd": "${workspaceFolder}/travel-agent-spring-ai",
-      "mainClass": "com.example.travel.TravelAgentApplication",
-      "projectName": "travel-agent-spring-ai",
+      "cwd": "${workspaceFolder}/agentic-trip-ai",
+      "mainClass": "com.example.travel.AgenticTripAiApplication",
+      "projectName": "agentic-trip-ai",
       "args": "",
       "envFile": "${workspaceFolder}/.env",
-      "preLaunchTask": "travel-agent: mvn compile",
+      "preLaunchTask": "agentic-trip-ai: mvn compile",
       "shortenCommandLine": "argfile"
     }
   ]

@@ -2,11 +2,11 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "travel-agent: mvn compile",
+      "label": "agentic-trip-ai: mvn compile",
       "type": "shell",
       "command": "mvn -DskipTests compile",
       "options": {
-        "cwd": "${workspaceFolder}/travel-agent-spring-ai",
+        "cwd": "${workspaceFolder}/agentic-trip-ai",
         "env": {
           "JAVA_HOME": "C:\\Program Files\\Java\\jdk-26.0.2.1"
         }
@@ -24,11 +24,11 @@
       "problemMatcher": []
     },
     {
-      "label": "travel-agent: mvn clean compile",
+      "label": "agentic-trip-ai: mvn clean compile",
       "type": "shell",
       "command": "mvn -DskipTests clean compile",
       "options": {
-        "cwd": "${workspaceFolder}/travel-agent-spring-ai",
+        "cwd": "${workspaceFolder}/agentic-trip-ai",
         "env": {
           "JAVA_HOME": "C:\\Program Files\\Java\\jdk-26.0.2.1"
         }
