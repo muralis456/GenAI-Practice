@@ -12,7 +12,9 @@ public class ReplanStrategy implements Serializable {
 
     private String reason = "";
     private Double targetReduction;
+    private double expectedImpact;
     private List<String> actions = new ArrayList<>();
+    private List<ReplanAction> resolvedActions = new ArrayList<>();
     private String priority = "hotel";
 
     public String getReason() {
@@ -31,12 +33,28 @@ public class ReplanStrategy implements Serializable {
         this.targetReduction = targetReduction;
     }
 
+    public double getExpectedImpact() {
+        return expectedImpact;
+    }
+
+    public void setExpectedImpact(double expectedImpact) {
+        this.expectedImpact = expectedImpact;
+    }
+
     public List<String> getActions() {
         return actions;
     }
 
     public void setActions(List<String> actions) {
         this.actions = actions == null ? new ArrayList<>() : actions;
+    }
+
+    public List<ReplanAction> getResolvedActions() {
+        return resolvedActions;
+    }
+
+    public void setResolvedActions(List<ReplanAction> resolvedActions) {
+        this.resolvedActions = resolvedActions == null ? new ArrayList<>() : resolvedActions;
     }
 
     public String getPriority() {
@@ -52,6 +70,14 @@ public class ReplanStrategy implements Serializable {
             return false;
         }
         String needle = action == null ? "" : action.toLowerCase();
-        return actions.stream().anyMatch(item -> item != null && item.toLowerCase().contains(needle));
+        if (actions.stream().anyMatch(item -> item != null && item.toLowerCase().contains(needle))) {
+            return true;
+        }
+        return resolvedActions != null && resolvedActions.stream()
+                .anyMatch(resolved -> resolved.wireName().contains(needle));
+    }
+
+    public boolean hasResolved(ReplanAction action) {
+        return resolvedActions != null && resolvedActions.contains(action);
     }
 }

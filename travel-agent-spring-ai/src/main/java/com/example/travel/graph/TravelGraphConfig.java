@@ -4,16 +4,22 @@ import com.example.travel.graph.node.AirportResolverNode;
 import com.example.travel.graph.node.BudgetNode;
 import com.example.travel.graph.node.CancelNode;
 import com.example.travel.graph.node.CompleteNode;
+import com.example.travel.graph.node.FanOutNode;
 import com.example.travel.graph.node.FinalNode;
+import com.example.travel.graph.node.FlightNode;
 import com.example.travel.graph.node.HitlNode;
+import com.example.travel.graph.node.HotelNode;
 import com.example.travel.graph.node.IntentNode;
 import com.example.travel.graph.node.ItineraryNode;
 import com.example.travel.graph.node.PlannerNode;
 import com.example.travel.graph.node.ReplanNode;
+import com.example.travel.graph.node.ResearchNode;
 import com.example.travel.graph.node.RouterNode;
-import com.example.travel.graph.node.SpecialistsNode;
 import com.example.travel.graph.node.SupervisorNode;
 import com.example.travel.graph.node.ValidatorNode;
+import com.example.travel.graph.node.WeatherNode;
+import com.example.travel.service.GraphRunContext;
+import com.example.travel.service.ModelRoutingContext;
 import org.bsc.langgraph4j.CompileConfig;
 import org.bsc.langgraph4j.CompiledGraph;
 import org.bsc.langgraph4j.GraphStateException;
@@ -44,6 +50,12 @@ import static org.bsc.langgraph4j.action.AsyncNodeAction.node_async;
 
 @Configuration
 public class TravelGraphConfig {
+
+    private final GraphRunContext graphRunContext;
+
+    public TravelGraphConfig(GraphRunContext graphRunContext) {
+        this.graphRunContext = graphRunContext;
+    }
 
     @Bean(destroyMethod = "shutdown")
     public ExecutorService travelParallelExecutor() {
@@ -88,7 +100,11 @@ public class TravelGraphConfig {
                                                      PlannerNode plannerNode,
                                                      RouterNode routerNode,
                                                      AirportResolverNode airportResolverNode,
-                                                     SpecialistsNode specialistsNode,
+                                                     FanOutNode fanOutNode,
+                                                     FlightNode flightNode,
+                                                     HotelNode hotelNode,
+                                                     ResearchNode researchNode,
+                                                     WeatherNode weatherNode,
                                                      SupervisorNode supervisorNode,
                                                      BudgetNode budgetNode,
                                                      ItineraryNode itineraryNode,
@@ -108,10 +124,14 @@ public class TravelGraphConfig {
                     return new Command(SpecialistRouter.afterPlanner(state), updates);
                 }), Map.of(
                         TravelGraphNodes.AIRPORT, TravelGraphNodes.AIRPORT,
-                        TravelGraphNodes.SPECIALISTS, TravelGraphNodes.SPECIALISTS,
+                        TravelGraphNodes.FAN_OUT, TravelGraphNodes.FAN_OUT,
                         TravelGraphNodes.SUPERVISOR, TravelGraphNodes.SUPERVISOR))
                 .addNode(TravelGraphNodes.AIRPORT, async(airportResolverNode))
-                .addNode(TravelGraphNodes.SPECIALISTS, async(specialistsNode))
+                .addNode(TravelGraphNodes.FAN_OUT, async(fanOutNode))
+                .addNode(TravelGraphNodes.FLIGHT, async(flightNode))
+                .addNode(TravelGraphNodes.HOTEL, async(hotelNode))
+                .addNode(TravelGraphNodes.RESEARCH, async(researchNode))
+                .addNode(TravelGraphNodes.WEATHER, async(weatherNode))
                 .addNode(TravelGraphNodes.SUPERVISOR, async(supervisorNode))
                 .addNode(TravelGraphNodes.BUDGET, async(budgetNode))
                 .addNode(TravelGraphNodes.ITINERARY, async(itineraryNode))
@@ -127,10 +147,17 @@ public class TravelGraphConfig {
                 .addConditionalEdges(TravelGraphNodes.AIRPORT,
                         edge_async(SpecialistRouter::afterAirport),
                         EdgeMappings.builder()
-                                .to(TravelGraphNodes.SPECIALISTS, TravelGraphNodes.SPECIALISTS)
+                                .to(TravelGraphNodes.FAN_OUT, TravelGraphNodes.FAN_OUT)
                                 .to(TravelGraphNodes.SUPERVISOR, TravelGraphNodes.SUPERVISOR)
                                 .build())
-                .addEdge(TravelGraphNodes.SPECIALISTS, TravelGraphNodes.SUPERVISOR)
+                .addEdge(TravelGraphNodes.FAN_OUT, TravelGraphNodes.FLIGHT)
+                .addEdge(TravelGraphNodes.FAN_OUT, TravelGraphNodes.HOTEL)
+                .addEdge(TravelGraphNodes.FAN_OUT, TravelGraphNodes.RESEARCH)
+                .addEdge(TravelGraphNodes.FAN_OUT, TravelGraphNodes.WEATHER)
+                .addEdge(TravelGraphNodes.FLIGHT, TravelGraphNodes.SUPERVISOR)
+                .addEdge(TravelGraphNodes.HOTEL, TravelGraphNodes.SUPERVISOR)
+                .addEdge(TravelGraphNodes.RESEARCH, TravelGraphNodes.SUPERVISOR)
+                .addEdge(TravelGraphNodes.WEATHER, TravelGraphNodes.SUPERVISOR)
                 .addConditionalEdges(TravelGraphNodes.SUPERVISOR,
                         edge_async(SpecialistRouter::afterSupervisor),
                         EdgeMappings.builder()
@@ -200,16 +227,28 @@ public class TravelGraphConfig {
     @Bean
     public RunnableConfig travelRunnableConfig(Executor travelParallelExecutor) {
         return RunnableConfig.builder()
-                .addParallelNodeExecutor(TravelGraphNodes.AIRPORT, travelParallelExecutor)
+                .addParallelNodeExecutor(TravelGraphNodes.FAN_OUT, travelParallelExecutor)
                 .build();
     }
 
     private AsyncNodeAction<TravelState> async(org.bsc.langgraph4j.action.NodeAction<TravelState> node) {
         return node_async(state -> {
+            String threadId = state.graphThreadId();
+            if (!TravelState.isBlank(threadId)) {
+                graphRunContext.attach(threadId);
+            } else {
+                ModelRoutingContext.set(state.modelPolicy());
+            }
             try {
                 return enrich(node, state);
             } catch (Exception ex) {
                 throw new RuntimeException(ex);
+            } finally {
+                if (!TravelState.isBlank(threadId)) {
+                    graphRunContext.detach();
+                } else {
+                    com.example.travel.service.ModelRoutingContext.clear();
+                }
             }
         });
     }

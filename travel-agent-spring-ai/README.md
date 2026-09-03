@@ -7,11 +7,15 @@
 ```
 USER → Intent (heuristic, LLM if confidence < 0.75) → Planner → Router
          → Airport (only if needsFlights)
-         → Specialists (parallel: only Flight / Hotel / Research / Weather that Intent selected)
-         → Supervisor (proceed | replan)
+         → fan_out (native LangGraph parallel fan-out)
+              ├→ Flight
+              ├→ Hotel
+              ├→ Research
+              └→ Weather  (each node no-ops when its needs* flag is false)
+         → Supervisor (deterministic + LLM quality hint → proceed | retry)
          → Budget → Itinerary (or skip)
-         → Hybrid Validator (deterministic + semantic)
-              FAIL → Replanner → Router
+         → Hybrid Validator (deterministic + structured semantic JSON + plan quality score)
+              FAIL / quality < 0.80 → Replanner (ReplanAction enum + selective needs*) → Router
               PASS → Final (Grounded Finalization)
          → interruptBefore(HITL)
               Approve → Complete → END
@@ -19,7 +23,7 @@ USER → Intent (heuristic, LLM if confidence < 0.75) → Planner → Router
               Reject  → Cancel → END
 ```
 
-LangGraph4j 1.8 Command is **single-destination**, so a 4-way parallel fan-in cannot omit unused incoming edges. Unused specialists are therefore **never scheduled**: Router skips Airport/Specialists when they are not needed, and Specialists runs only the selected agents in parallel.
+LangGraph4j parallel fan-out uses `addParallelNodeExecutor(fan_out, …)` so Flight/Hotel/Research/Weather run concurrently and fan in at Supervisor. Unused specialists are never scheduled at the Router; individual nodes still skip when their `needs*` flag is false.
 
 ### Grounded Finalization Pattern
 
@@ -37,7 +41,7 @@ Validated `TravelState` is rendered deterministically. The Final LLM writes **ti
 
 `POST /api/plan/start` → **202** `{threadId}` then `GET /api/plan/{threadId}/events` (SSE: `started` / `node` / `complete` / `failed`). Sync `POST /api/plan` still waits for the full graph.
 
-`GET /api/plan/{threadId}/history` returns pipeline + LangGraph **state snapshots** (time-travel inspection).
+`GET /api/plan/{threadId}/history` returns pipeline, plan quality, node failures, execution timeline, and LangGraph **state snapshots** (time-travel inspection). SSE events include `ts` timestamps for observability.
 
 ## Guardrails
 
@@ -45,7 +49,7 @@ Validated `TravelState` is rendered deterministically. The Final LLM writes **ti
 
 ## Tests
 
-`AgentEvaluationTest` plus `src/test/resources/evaluation/travel_cases.json`. `HitlPostgresCheckpointIT` needs PostgreSQL.
+`AgentEvaluationTest`, `GraphTransitionTest`, plus `src/test/resources/evaluation/travel_cases.json`. `HitlPostgresCheckpointIT` needs PostgreSQL.
 
 ## Run
 

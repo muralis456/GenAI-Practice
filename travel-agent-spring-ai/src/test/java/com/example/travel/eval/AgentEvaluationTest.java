@@ -1,8 +1,17 @@
 package com.example.travel.eval;
 
+import com.example.travel.agent.ModificationAgentService;
+import com.example.travel.agent.ReplanStrategyExecutor;
+import com.example.travel.agent.SupervisorAgentService;
+import com.example.travel.graph.NodeFailureRouting;
+import com.example.travel.graph.SpecialistRouter;
+import com.example.travel.graph.TravelGraphNodes;
 import com.example.travel.graph.TravelState;
 import com.example.travel.model.IntentPlan;
+import com.example.travel.model.NodeFailureInfo;
+import com.example.travel.model.PlanQualityScore;
 import com.example.travel.agent.ValidatorAgentService;
+import com.example.travel.service.ReplanActionValidator;
 import com.example.travel.support.IntentClassifier;
 import com.example.travel.support.ToolFailureClassifier;
 import com.example.travel.tool.ToolErrorCode;
@@ -117,7 +126,7 @@ class AgentEvaluationTest {
         com.example.travel.model.ReplanStrategy strategy = new com.example.travel.model.ReplanStrategy();
         strategy.setActions(List.of("hotel_upgrade"));
         strategy.setPriority("hotel");
-        Map<String, Object> updates = new com.example.travel.agent.ReplanStrategyExecutor().apply(state, strategy);
+        Map<String, Object> updates = new ReplanStrategyExecutor(new ReplanActionValidator()).apply(state, strategy);
         assertEquals("upscale", updates.get(TravelState.TRAVEL_STYLE));
         assertEquals(Boolean.FALSE, updates.get(TravelState.HOTEL_CHEAPER));
         assertEquals(java.math.BigDecimal.ONE, updates.get(TravelState.COST_FACTOR));
@@ -149,8 +158,8 @@ class AgentEvaluationTest {
         data.put(TravelState.NEEDS_RESEARCH, Boolean.TRUE);
         data.put(TravelState.NEEDS_WEATHER, Boolean.TRUE);
         TravelState state = new TravelState(data);
-        assertEquals("specialists", com.example.travel.graph.SpecialistRouter.afterPlanner(state));
-        assertFalse(com.example.travel.graph.SpecialistRouter.plannedSpecialists(state).contains("flight"));
+        assertEquals(TravelGraphNodes.FAN_OUT, SpecialistRouter.afterPlanner(state));
+        assertFalse(SpecialistRouter.plannedSpecialists(state).contains("flight"));
     }
 
     @Test
@@ -161,7 +170,7 @@ class AgentEvaluationTest {
         data.put(TravelState.RETRY_COUNT, 0);
         data.put(TravelState.MAX_RETRIES, 2);
         TravelState state = new TravelState(data);
-        assertEquals("retry", new com.example.travel.agent.SupervisorAgentService().decide(state));
+        assertEquals(TravelGraphNodes.ROUTE_RETRY, new SupervisorAgentService(null, null).decide(state));
     }
 
     @Test
@@ -170,7 +179,7 @@ class AgentEvaluationTest {
         data.put(TravelState.NEEDS_BUDGET, Boolean.FALSE);
         data.put(TravelState.NEEDS_ITINERARY, Boolean.TRUE);
         TravelState state = new TravelState(data);
-        assertEquals("itinerary", com.example.travel.graph.SpecialistRouter.afterSupervisor(state));
+        assertEquals(TravelGraphNodes.ITINERARY, SpecialistRouter.afterSupervisor(state));
     }
 
     @Test
@@ -188,9 +197,57 @@ class AgentEvaluationTest {
         TravelState state = new TravelState(data);
         com.example.travel.model.ReplanStrategy strategy = new com.example.travel.model.ReplanStrategy();
         strategy.setActions(List.of("add_destination", "adjust_itinerary"));
-        Map<String, Object> updates = new com.example.travel.agent.ReplanStrategyExecutor().apply(state, strategy);
+        Map<String, Object> updates = new ReplanStrategyExecutor(new ReplanActionValidator()).apply(state, strategy);
         assertEquals(Boolean.TRUE, updates.get(TravelState.NEEDS_ITINERARY));
         assertEquals(Boolean.TRUE, updates.get(TravelState.NEEDS_RESEARCH));
         assertFalse(updates.containsKey(TravelState.DESTINATION));
+    }
+
+    @Test
+    void modificationHeuristicParsesHotelBudgetAndFlightPreference() {
+        var request = ModificationAgentService.heuristic("Set hotel budget to 50000 and prefer direct flights");
+        assertEquals(new java.math.BigDecimal("50000"), request.getHotelBudget());
+        assertEquals("direct", request.getFlightPreference());
+    }
+
+    @Test
+    void supervisorRetriesOnRetryableNodeFailure() {
+        NodeFailureInfo failure = new NodeFailureInfo();
+        failure.setLastFailedNode(TravelGraphNodes.HOTEL);
+        failure.setLastError("timeout");
+        failure.setRetryable(true);
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put(TravelState.NODE_FAILURE, failure);
+        data.put(TravelState.RETRY_COUNT, 0);
+        data.put(TravelState.MAX_RETRIES, 2);
+        TravelState state = new TravelState(data);
+        assertEquals(TravelGraphNodes.ROUTE_RETRY, new SupervisorAgentService(null, null).decide(state));
+    }
+
+    @Test
+    void nodeFailureReplanTargetsFailedSpecialist() {
+        NodeFailureInfo failure = new NodeFailureInfo();
+        failure.setLastFailedNode(TravelGraphNodes.FLIGHT);
+        failure.setRetryable(true);
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put(TravelState.NODE_FAILURE, failure);
+        data.put(TravelState.NEEDS_BUDGET, Boolean.TRUE);
+        TravelState state = new TravelState(data);
+        var strategy = NodeFailureRouting.replanForFailure(state);
+        assertFalse(strategy.getActions().isEmpty());
+        Map<String, Object> updates = new ReplanStrategyExecutor(new ReplanActionValidator()).apply(state, strategy);
+        assertEquals(Boolean.TRUE, updates.get(TravelState.NEEDS_FLIGHTS));
+    }
+
+    @Test
+    void lowQualityScoreTriggersReplan() {
+        PlanQualityScore score = new PlanQualityScore();
+        score.setOverall(0.62);
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put(TravelState.PLAN_QUALITY, score);
+        data.put(TravelState.RETRY_COUNT, 0);
+        data.put(TravelState.MAX_RETRIES, 2);
+        TravelState state = new TravelState(data);
+        assertTrue(state.shouldReplan());
     }
 }

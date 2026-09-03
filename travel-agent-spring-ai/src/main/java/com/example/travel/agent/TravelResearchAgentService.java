@@ -6,7 +6,6 @@ import com.example.travel.graph.model.ResearchExtraction;
 import com.example.travel.model.TravelAttraction;
 import com.example.travel.model.TravelResearch;
 import com.example.travel.model.SearchHit;
-import com.example.travel.service.AgentExecutionBudget;
 import com.example.travel.service.RoutedLlm;
 import com.example.travel.support.JsonSupport;
 import com.example.travel.tool.CurrencyTool;
@@ -19,6 +18,9 @@ import tools.jackson.databind.JsonNode;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Research agent: LLM decides which tools to call (Tavily, currency), then structures output.
+ */
 @Service
 public class TravelResearchAgentService {
 
@@ -28,56 +30,41 @@ public class TravelResearchAgentService {
     private final TavilySearchTool tavilySearchTool;
     private final CurrencyTool currencyTool;
     private final JsonSupport jsonSupport;
-    private final AgentExecutionBudget executionBudget;
 
     public TravelResearchAgentService(RoutedLlm routedLlm,
                                       TavilySearchTool tavilySearchTool,
                                       CurrencyTool currencyTool,
-                                      JsonSupport jsonSupport,
-                                      AgentExecutionBudget executionBudget) {
+                                      JsonSupport jsonSupport) {
         this.routedLlm = routedLlm;
         this.tavilySearchTool = tavilySearchTool;
         this.currencyTool = currencyTool;
         this.jsonSupport = jsonSupport;
-        this.executionBudget = executionBudget;
     }
 
     public ResearchResult research(TravelState state) {
         String destination = state.destination();
-        boolean budgetMode = state.hotelCheaper() || "budget".equalsIgnoreCase(state.travelStyle());
-        String query = (budgetMode
-                ? "Best budget attractions, food, local tips for "
-                : "Best attractions, food, local tips for ")
-                + destination + " with a " + state.travelStyle() + " travel style.";
-        log.info("Research agent searching destination={}", destination);
-        List<SearchHit> hits = state.needsResearch() ? tavilySearchTool.searchHits(query) : List.of();
-        String rawResearch = formatHits(hits);
-        String content = rawResearch;
+        log.info("Research agent (LLM-first) destination={}", destination);
+
+        String content = "";
         if (state.needsResearch()) {
             try {
-                String system = "You are the Travel Research Agent. Extract attractions and local tips from the research text. "
-                        + "Do not call weather tools; weather is handled by a separate agent. "
-                        + "Return JSON only with shape "
+                String system = "You are the Travel Research Agent. Decide which tools you need. "
+                        + "Use Tavily for attractions/food/local tips. Use Currency when prices need conversion. "
+                        + "Do NOT call weather tools. After observations, return JSON only: "
                         + "{\"research\":[{\"topic\":\"\",\"summary\":\"\"}],"
                         + "\"attractions\":[{\"name\":\"\",\"description\":\"\",\"area\":\"\"}]}. "
-                        + "Use plain ASCII in JSON strings. Do not put raw quotation marks inside summary text.";
+                        + "Use plain ASCII in JSON strings.";
                 String user = "Destination=" + destination + ", style=" + state.travelStyle()
                         + "\nReplan guidance: " + state.replanGuidance()
-                        + "\nWeather from Weather agent (may be empty if still running): "
-                        + (state.weather() == null ? "n/a" : state.weather().toDisplay())
-                        + "\n" + rawResearch;
-                if (hits.isEmpty() && executionBudget.tavilyAvailable()) {
-                    content = routedLlm.complete(AgentRole.EXTRACT, system, user, tavilySearchTool, currencyTool);
-                } else {
-                    content = routedLlm.complete(AgentRole.EXTRACT, system, user, currencyTool);
-                }
+                        + "\nWeather from dedicated agent: "
+                        + (state.weather() == null ? "n/a" : state.weather().toDisplay());
+                content = routedLlm.complete(AgentRole.EXTRACT, system, user, tavilySearchTool, currencyTool);
             } catch (Exception exception) {
                 log.warn("Research LLM failed for destination={}", destination, exception);
-                content = rawResearch;
             }
         }
 
-        ResearchExtraction extraction = parseExtraction(content, destination, rawResearch);
+        ResearchExtraction extraction = parseExtraction(content, destination, "");
         List<TravelResearch> research = new ArrayList<>(
                 extraction.getResearch() == null ? List.of() : extraction.getResearch());
         research.removeIf(item -> item == null || JsonSupport.looksLikeJsonObject(item.getSummary()));
@@ -85,25 +72,7 @@ public class TravelResearchAgentService {
         if (extraction.getAttractions() == null) {
             extraction.setAttractions(List.of());
         }
-        return new ResearchResult(extraction, hits);
-    }
-
-    private String formatHits(List<SearchHit> hits) {
-        if (hits == null || hits.isEmpty()) {
-            return "";
-        }
-        StringBuilder sb = new StringBuilder();
-        for (SearchHit hit : hits) {
-            sb.append(hit.getTitle() == null ? "" : hit.getTitle()).append('\n');
-            if (hit.getUrl() != null && !hit.getUrl().isBlank()) {
-                sb.append(hit.getUrl()).append('\n');
-            }
-            if (hit.getContent() != null) {
-                sb.append(hit.getContent()).append('\n');
-            }
-            sb.append('\n');
-        }
-        return sb.toString();
+        return new ResearchResult(extraction, List.of());
     }
 
     private ResearchExtraction parseExtraction(String content, String destination, String rawResearch) {
@@ -157,7 +126,6 @@ public class TravelResearchAgentService {
 
     private ResearchExtraction plaintextFallback(String destination, String rawResearch, String content) {
         ResearchExtraction fallback = new ResearchExtraction();
-        // If content is broken JSON, still try to lift attractions/topics for the UI.
         return fromTree(content).filter(this::hasUsefulContent).orElseGet(() -> {
             String summary = readablePlaintext(rawResearch, content, destination);
             fallback.setResearch(List.of(new TravelResearch("Destination guide", summary)));
@@ -174,7 +142,7 @@ public class TravelResearchAgentService {
             return trim(content, 900);
         }
         return "Local tips and attractions for " + destination
-                + " will be refined in the itinerary. (Structured research parse failed.)";
+                + " will be refined in the itinerary.";
     }
 
     private static String text(JsonNode node, String field) {

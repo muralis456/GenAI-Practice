@@ -2,6 +2,7 @@ package com.example.travel.dto;
 
 import com.example.travel.model.AgentStep;
 import com.example.travel.model.BudgetSummary;
+import com.example.travel.model.PlanQualityScore;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -24,6 +25,7 @@ public class TravelPlanResponse {
     private List<AgentStep> pipeline = new ArrayList<>();
     private List<String> validationErrors = new ArrayList<>();
     private List<String> sources = new ArrayList<>();
+    private PlanQualityScore planQuality;
 
     public TravelPlanResponse() {
     }
@@ -167,5 +169,13 @@ public class TravelPlanResponse {
 
     public void setSources(List<String> sources) {
         this.sources = sources == null ? new ArrayList<>() : sources;
+    }
+
+    public PlanQualityScore getPlanQuality() {
+        return planQuality;
+    }
+
+    public void setPlanQuality(PlanQualityScore planQuality) {
+        this.planQuality = planQuality;
     }
 }

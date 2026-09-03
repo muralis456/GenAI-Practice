@@ -1,6 +1,8 @@
 package com.example.travel.graph.node;
 
 import com.example.travel.agent.HotelAgentService;
+import com.example.travel.graph.NodeFailureSupport;
+import com.example.travel.support.ToolFailureClassifier;
 import com.example.travel.graph.TravelGraphNodes;
 import com.example.travel.graph.TravelState;
 import com.example.travel.model.ProvenanceEvent;
@@ -30,22 +32,28 @@ public class HotelNode implements NodeAction<TravelState> {
             skip.putAll(TravelState.trace(TravelGraphNodes.HOTEL, "skip", "not requested"));
             return skip;
         }
-        HotelAgentService.HotelSearchResult result = hotelAgentService.search(state);
-        Map<String, Object> updates = new LinkedHashMap<>();
-        updates.put(TravelState.HOTELS, result.hotels());
-        updates.putAll(TravelState.trace(TravelGraphNodes.HOTEL, "ok",
-                state.hotelCheaper() ? "cheaper hotel search" : "hotel search"));
-        List<ProvenanceEvent> events = new ArrayList<>();
-        for (SearchHit hit : result.hits()) {
-            events.add(new ProvenanceEvent("hotels", "Tavily",
-                    hit.getUrl() == null ? "" : hit.getUrl(),
-                    hit.getScore(),
-                    hit.getTitle()));
+        try {
+            HotelAgentService.HotelSearchResult result = hotelAgentService.search(state);
+            Map<String, Object> updates = new LinkedHashMap<>();
+            updates.put(TravelState.HOTELS, result.hotels());
+            updates.putAll(TravelState.trace(TravelGraphNodes.HOTEL, "ok",
+                    state.hotelCheaper() ? "cheaper hotel search" : "hotel search"));
+            List<ProvenanceEvent> events = new ArrayList<>();
+            for (SearchHit hit : result.hits()) {
+                events.add(new ProvenanceEvent("hotels", "Tavily",
+                        hit.getUrl() == null ? "" : hit.getUrl(),
+                        hit.getScore(),
+                        hit.getTitle()));
+            }
+            if (events.isEmpty()) {
+                events.add(new ProvenanceEvent("hotels", "Tavily", "", 0, state.destination()));
+            }
+            updates.put(TravelState.PROVENANCE, events);
+            return updates;
+        } catch (Exception ex) {
+            return NodeFailureSupport.record(TravelGraphNodes.HOTEL, ex,
+                    ToolFailureClassifier.fromException(ex).isRetryable(),
+                    state.nodeFailure().getNodeRetryCount());
         }
-        if (events.isEmpty()) {
-            events.add(new ProvenanceEvent("hotels", "Tavily", "", 0, state.destination()));
-        }
-        updates.put(TravelState.PROVENANCE, events);
-        return updates;
     }
 }

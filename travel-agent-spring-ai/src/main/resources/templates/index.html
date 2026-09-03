@@ -1107,12 +1107,29 @@
             ? 'Sources\n' + data.sources.join('\n')
             : '';
         const history = data.executionHistory ? 'Execution history\n' + data.executionHistory : '';
+        const timeline = (data.executionTimeline || []).length
+            ? 'Timeline\n' + data.executionTimeline.map(step =>
+                (step.node || '?') + ' [' + (step.status || 'ok') + ']'
+                + (step.detail ? ' — ' + step.detail : '')).join('\n')
+            : '';
+        const quality = data.planQuality;
+        const qualityLine = quality && quality.overall > 0
+            ? 'Quality score: ' + (quality.overall * 100).toFixed(0) + '%'
+                + (quality.overall < 0.8 ? ' (below 80% threshold)' : '')
+            : '';
+        const failure = data.nodeFailure;
+        const failureLine = failure && failure.lastFailedNode
+            ? 'Node failure: ' + failure.lastFailedNode + ' — ' + (failure.lastError || failure.failureType)
+            : '';
 
         if (data.finalPlan) {
             return [
                 data.status || '',
                 data.routeSummary ? 'Route\n' + data.routeSummary : '',
+                qualityLine,
+                failureLine,
                 'Pipeline\n' + (pipeline || 'n/a'),
+                timeline,
                 sources,
                 history,
                 (data.awaitingApproval ? 'Final report (validated)\n' : 'Final plan\n') + data.finalPlan
@@ -1130,7 +1147,10 @@
         return [
             data.status || '',
             data.routeSummary ? 'Route\n' + data.routeSummary : '',
+            qualityLine,
+            failureLine,
             'Pipeline\n' + (pipeline || 'n/a'),
+            timeline,
             budget ? 'Budget\n' + budget : '',
             data.flightInsights ? 'Flights\n' + data.flightInsights : '',
             data.hotelInsights ? 'Hotels\n' + data.hotelInsights : '',
@@ -1192,7 +1212,11 @@
                         try {
                             const hist = await fetch('/api/plan/' + encodeURIComponent(threadId) + '/history').then(r => r.json());
                             plan.executionHistory = (hist.snapshots || []).map(s =>
-                                (s.node || '?') + ' → ' + (s.next || 'end')).join('\n');
+                                (s.node || '?') + ' → ' + (s.next || 'end')
+                                + (s.planQuality != null ? ' q=' + (s.planQuality * 100).toFixed(0) + '%' : '')).join('\n');
+                            if (hist.planQuality) plan.planQuality = hist.planQuality;
+                            if (hist.nodeFailure) plan.nodeFailure = hist.nodeFailure;
+                            if (hist.executionTimeline) plan.executionTimeline = hist.executionTimeline;
                         } catch (ignored) {}
                         appendAssistantMessage(plan);
                         resolve();

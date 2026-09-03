@@ -23,6 +23,24 @@ public class ModificationRequest implements Serializable {
     private String targetRating = "";
     private boolean preserveBudget = true;
     private String notes = "";
+    private java.math.BigDecimal hotelBudget;
+    private String flightPreference = "";
+
+    public java.math.BigDecimal getHotelBudget() {
+        return hotelBudget;
+    }
+
+    public void setHotelBudget(java.math.BigDecimal hotelBudget) {
+        this.hotelBudget = hotelBudget;
+    }
+
+    public String getFlightPreference() {
+        return flightPreference;
+    }
+
+    public void setFlightPreference(String flightPreference) {
+        this.flightPreference = flightPreference == null ? "" : flightPreference;
+    }
 
     public String getChangeType() {
         return changeType;

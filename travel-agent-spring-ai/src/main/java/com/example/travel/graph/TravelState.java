@@ -8,20 +8,22 @@ import com.example.travel.model.FlightOption;
 import com.example.travel.model.HotelOption;
 import com.example.travel.model.Itinerary;
 import com.example.travel.model.ModificationRequest;
+import com.example.travel.model.NodeFailureInfo;
+import com.example.travel.model.PlanQualityScore;
 import com.example.travel.model.ProvenanceEvent;
 import com.example.travel.model.ReplanStrategy;
+import com.example.travel.model.SemanticValidationResult;
+import com.example.travel.model.SupervisorAssessment;
 import com.example.travel.model.TravelAttraction;
 import com.example.travel.model.TravelResearch;
 import com.example.travel.model.WeatherForecast;
 import org.bsc.langgraph4j.state.AgentState;
 import org.bsc.langgraph4j.state.Channel;
-import org.bsc.langgraph4j.state.Channels;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -31,118 +33,66 @@ public class TravelState extends AgentState {
     /** Sentinel for "no numeric budget ceiling" — LangGraph schema defaults cannot be null. */
     public static final BigDecimal UNSET_BUDGET = new BigDecimal("-1");
 
-    public static final String USER_REQUEST = "userRequest";
-    public static final String USER_ID = "userId";
-    public static final String SELECTED_MODEL = "selectedModel";
-    public static final String HISTORY_CONTEXT = "historyContext";
-    public static final String ORIGIN = "origin";
-    public static final String DESTINATION = "destination";
-    public static final String DEPARTURE_DATE = "departureDate";
-    public static final String RETURN_DATE = "returnDate";
-    public static final String TRAVELERS = "travelers";
-    public static final String BUDGET = "budget";
-    public static final String BUDGET_LABEL = "budgetLabel";
-    public static final String TRAVEL_STYLE = "travelStyle";
-    public static final String ORIGIN_IATA = "originIata";
-    public static final String DESTINATION_IATA = "destinationIata";
-    public static final String FLIGHTS = "flights";
-    public static final String HOTELS = "hotels";
-    public static final String ATTRACTIONS = "attractions";
-    public static final String RESEARCH = "research";
-    public static final String ITINERARY = "itinerary";
-    public static final String BUDGET_SUMMARY = "budgetSummary";
-    public static final String VALIDATION_ERRORS = "validationErrors";
-    public static final String RETRY_COUNT = "retryCount";
-    public static final String MAX_RETRIES = "maxRetries";
-    public static final String FINAL_PLAN = "finalPlan";
-    public static final String REPLAN_NOTES = "replanNotes";
-    public static final String COST_FACTOR = "costFactor";
-    public static final String WEATHER = "weather";
-    public static final String PIPELINE = "pipeline";
-    public static final String AWAITING_APPROVAL = "awaitingApproval";
-    /** Human decision written on resume: approve | modify | reject */
-    public static final String HITL_DECISION = "hitlDecision";
-    public static final String PREFERRED_AIRPORT = "preferredAirport";
-    public static final String CURRENCY = "currency";
-    public static final String REQUEST_TYPE = "requestType";
-    public static final String NEEDS_FLIGHTS = "needsFlights";
-    public static final String NEEDS_HOTELS = "needsHotels";
-    public static final String NEEDS_RESEARCH = "needsResearch";
-    public static final String NEEDS_WEATHER = "needsWeather";
-    public static final String NEEDS_BUDGET = "needsBudget";
-    public static final String NEEDS_ITINERARY = "needsItinerary";
-    public static final String PLAN_STRATEGY = "planStrategy";
-    public static final String PLAN_PRIORITY = "planPriority";
-    public static final String LAST_DECISION = "lastDecision";
-    public static final String REPLAN_STRATEGY = "replanStrategy";
-    public static final String SEMANTIC_NOTES = "semanticNotes";
-    public static final String PROVENANCE = "provenance";
-    public static final String HOTEL_CHEAPER = "hotelCheaper";
-    public static final String FLIGHT_PREFERENCE = "flightPreference";
-    public static final String MODEL_POLICY = "modelPolicy";
-    public static final String INTENT_CONFIDENCE = "intentConfidence";
-    public static final String MODIFICATION = "modification";
-    public static final String DISPATCH_ROUTE = "dispatchRoute";
-    public static final String SUPERVISOR_DECISION = "supervisorDecision";
+    // Re-export grouped keys for backward compatibility (see TravelStateKeys).
+    public static final String USER_REQUEST = TravelStateKeys.Request.USER_REQUEST;
+    public static final String USER_ID = TravelStateKeys.Request.USER_ID;
+    public static final String SELECTED_MODEL = TravelStateKeys.Request.SELECTED_MODEL;
+    public static final String HISTORY_CONTEXT = TravelStateKeys.Request.HISTORY_CONTEXT;
+    public static final String ORIGIN = TravelStateKeys.Trip.ORIGIN;
+    public static final String DESTINATION = TravelStateKeys.Trip.DESTINATION;
+    public static final String DEPARTURE_DATE = TravelStateKeys.Trip.DEPARTURE_DATE;
+    public static final String RETURN_DATE = TravelStateKeys.Trip.RETURN_DATE;
+    public static final String TRAVELERS = TravelStateKeys.Trip.TRAVELERS;
+    public static final String BUDGET = TravelStateKeys.Budget.BUDGET;
+    public static final String BUDGET_LABEL = TravelStateKeys.Budget.BUDGET_LABEL;
+    public static final String TRAVEL_STYLE = TravelStateKeys.Preferences.TRAVEL_STYLE;
+    public static final String ORIGIN_IATA = TravelStateKeys.Trip.ORIGIN_IATA;
+    public static final String DESTINATION_IATA = TravelStateKeys.Trip.DESTINATION_IATA;
+    public static final String FLIGHTS = TravelStateKeys.Results.FLIGHTS;
+    public static final String HOTELS = TravelStateKeys.Results.HOTELS;
+    public static final String ATTRACTIONS = TravelStateKeys.Results.ATTRACTIONS;
+    public static final String RESEARCH = TravelStateKeys.Results.RESEARCH;
+    public static final String ITINERARY = TravelStateKeys.Results.ITINERARY;
+    public static final String BUDGET_SUMMARY = TravelStateKeys.Budget.BUDGET_SUMMARY;
+    public static final String VALIDATION_ERRORS = TravelStateKeys.Validation.VALIDATION_ERRORS;
+    public static final String RETRY_COUNT = TravelStateKeys.Control.RETRY_COUNT;
+    public static final String MAX_RETRIES = TravelStateKeys.Control.MAX_RETRIES;
+    public static final String FINAL_PLAN = TravelStateKeys.Results.FINAL_PLAN;
+    public static final String REPLAN_NOTES = TravelStateKeys.Planning.REPLAN_NOTES;
+    public static final String COST_FACTOR = TravelStateKeys.Budget.COST_FACTOR;
+    public static final String WEATHER = TravelStateKeys.Results.WEATHER;
+    public static final String PIPELINE = TravelStateKeys.Control.PIPELINE;
+    public static final String AWAITING_APPROVAL = TravelStateKeys.Hitl.AWAITING_APPROVAL;
+    public static final String HITL_DECISION = TravelStateKeys.Hitl.HITL_DECISION;
+    public static final String PREFERRED_AIRPORT = TravelStateKeys.Trip.PREFERRED_AIRPORT;
+    public static final String CURRENCY = TravelStateKeys.Trip.CURRENCY;
+    public static final String REQUEST_TYPE = TravelStateKeys.Request.REQUEST_TYPE;
+    public static final String NEEDS_FLIGHTS = TravelStateKeys.Needs.NEEDS_FLIGHTS;
+    public static final String NEEDS_HOTELS = TravelStateKeys.Needs.NEEDS_HOTELS;
+    public static final String NEEDS_RESEARCH = TravelStateKeys.Needs.NEEDS_RESEARCH;
+    public static final String NEEDS_WEATHER = TravelStateKeys.Needs.NEEDS_WEATHER;
+    public static final String NEEDS_BUDGET = TravelStateKeys.Needs.NEEDS_BUDGET;
+    public static final String NEEDS_ITINERARY = TravelStateKeys.Needs.NEEDS_ITINERARY;
+    public static final String PLAN_STRATEGY = TravelStateKeys.Planning.PLAN_STRATEGY;
+    public static final String PLAN_PRIORITY = TravelStateKeys.Planning.PLAN_PRIORITY;
+    public static final String LAST_DECISION = TravelStateKeys.Control.LAST_DECISION;
+    public static final String REPLAN_STRATEGY = TravelStateKeys.Planning.REPLAN_STRATEGY;
+    public static final String SEMANTIC_NOTES = TravelStateKeys.Validation.SEMANTIC_NOTES;
+    public static final String PROVENANCE = TravelStateKeys.Control.PROVENANCE;
+    public static final String HOTEL_CHEAPER = TravelStateKeys.Preferences.HOTEL_CHEAPER;
+    public static final String FLIGHT_PREFERENCE = TravelStateKeys.Preferences.FLIGHT_PREFERENCE;
+    public static final String MODEL_POLICY = TravelStateKeys.Request.MODEL_POLICY;
+    public static final String INTENT_CONFIDENCE = TravelStateKeys.Request.INTENT_CONFIDENCE;
+    public static final String MODIFICATION = TravelStateKeys.Hitl.MODIFICATION;
+    public static final String DISPATCH_ROUTE = TravelStateKeys.Control.DISPATCH_ROUTE;
+    public static final String SUPERVISOR_DECISION = TravelStateKeys.Control.SUPERVISOR_DECISION;
+    public static final String GRAPH_THREAD_ID = TravelStateKeys.Request.GRAPH_THREAD_ID;
+    public static final String PLAN_QUALITY = TravelStateKeys.Validation.PLAN_QUALITY;
+    public static final String SEMANTIC_VALIDATION = TravelStateKeys.Validation.SEMANTIC_VALIDATION;
+    public static final String SUPERVISOR_ASSESSMENT = TravelStateKeys.Control.SUPERVISOR_ASSESSMENT;
+    public static final String NODE_FAILURE = TravelStateKeys.Control.NODE_FAILURE;
 
-    public static final Map<String, Channel<?>> SCHEMA;
-
-    static {
-        Map<String, Channel<?>> schema = new LinkedHashMap<>();
-        schema.put(USER_REQUEST, Channels.base(() -> ""));
-        schema.put(USER_ID, Channels.base(() -> "anonymous"));
-        schema.put(SELECTED_MODEL, Channels.base(() -> ""));
-        schema.put(HISTORY_CONTEXT, Channels.base(() -> ""));
-        schema.put(ORIGIN, Channels.base(() -> ""));
-        schema.put(DESTINATION, Channels.base(() -> ""));
-        schema.put(DEPARTURE_DATE, Channels.base(() -> LocalDate.now()));
-        schema.put(RETURN_DATE, Channels.base(() -> LocalDate.now().plusDays(5)));
-        schema.put(TRAVELERS, Channels.base(() -> 1));
-        schema.put(BUDGET, Channels.base(() -> UNSET_BUDGET));
-        schema.put(BUDGET_LABEL, Channels.base(() -> "medium"));
-        schema.put(TRAVEL_STYLE, Channels.base(() -> "balanced"));
-        schema.put(ORIGIN_IATA, Channels.base(() -> ""));
-        schema.put(DESTINATION_IATA, Channels.base(() -> ""));
-        schema.put(FLIGHTS, Channels.base(() -> new ArrayList<FlightOption>()));
-        schema.put(HOTELS, Channels.base(() -> new ArrayList<HotelOption>()));
-        schema.put(ATTRACTIONS, Channels.base(() -> new ArrayList<TravelAttraction>()));
-        schema.put(RESEARCH, Channels.base(() -> new ArrayList<TravelResearch>()));
-        schema.put(ITINERARY, Channels.base(() -> new Itinerary()));
-        schema.put(BUDGET_SUMMARY, Channels.base(() -> new BudgetSummary()));
-        schema.put(VALIDATION_ERRORS, Channels.base(() -> new ArrayList<String>()));
-        schema.put(RETRY_COUNT, Channels.base(() -> 0));
-        schema.put(MAX_RETRIES, Channels.base(() -> 2));
-        schema.put(FINAL_PLAN, Channels.base(() -> ""));
-        schema.put(REPLAN_NOTES, Channels.base(() -> ""));
-        schema.put(COST_FACTOR, Channels.base(() -> BigDecimal.ONE));
-        schema.put(WEATHER, Channels.base(() -> new WeatherForecast("", "", false)));
-        schema.put(PIPELINE, Channels.appender(() -> new ArrayList<AgentStep>()));
-        schema.put(AWAITING_APPROVAL, Channels.base(() -> Boolean.TRUE));
-        schema.put(HITL_DECISION, Channels.base(() -> ""));
-        schema.put(PREFERRED_AIRPORT, Channels.base(() -> ""));
-        schema.put(CURRENCY, Channels.base(() -> "INR"));
-        schema.put(REQUEST_TYPE, Channels.base(() -> "TRIP_PLANNING"));
-        schema.put(NEEDS_FLIGHTS, Channels.base(() -> Boolean.TRUE));
-        schema.put(NEEDS_HOTELS, Channels.base(() -> Boolean.TRUE));
-        schema.put(NEEDS_RESEARCH, Channels.base(() -> Boolean.TRUE));
-        schema.put(NEEDS_WEATHER, Channels.base(() -> Boolean.TRUE));
-        schema.put(NEEDS_BUDGET, Channels.base(() -> Boolean.TRUE));
-        schema.put(NEEDS_ITINERARY, Channels.base(() -> Boolean.TRUE));
-        schema.put(PLAN_STRATEGY, Channels.base(() -> "parallel_search"));
-        schema.put(PLAN_PRIORITY, Channels.base(() -> "balanced"));
-        schema.put(LAST_DECISION, Channels.base(AgentDecision::new));
-        schema.put(REPLAN_STRATEGY, Channels.base(ReplanStrategy::new));
-        schema.put(SEMANTIC_NOTES, Channels.base(() -> new ArrayList<String>()));
-        schema.put(PROVENANCE, Channels.appender(() -> new ArrayList<ProvenanceEvent>()));
-        schema.put(HOTEL_CHEAPER, Channels.base(() -> Boolean.FALSE));
-        schema.put(FLIGHT_PREFERENCE, Channels.base(() -> "balanced"));
-        schema.put(MODEL_POLICY, Channels.base(() -> "BALANCED"));
-        schema.put(INTENT_CONFIDENCE, Channels.base(() -> 1.0d));
-        schema.put(MODIFICATION, Channels.base(ModificationRequest::new));
-        schema.put(DISPATCH_ROUTE, Channels.base(() -> ""));
-        schema.put(SUPERVISOR_DECISION, Channels.base(() -> ""));
-        SCHEMA = Collections.unmodifiableMap(schema);
-    }
+    public static final Map<String, Channel<?>> SCHEMA = TravelStateSchema.SCHEMA;
 
     public TravelState(Map<String, Object> initData) {
         super(initData);
@@ -435,10 +385,32 @@ public class TravelState extends AgentState {
         return this.<String>value(DISPATCH_ROUTE).orElse("");
     }
 
+    public String graphThreadId() {
+        return this.<String>value(GRAPH_THREAD_ID).orElse("");
+    }
+
+    public PlanQualityScore planQuality() {
+        return this.<PlanQualityScore>value(PLAN_QUALITY).orElseGet(PlanQualityScore::new);
+    }
+
+    public SemanticValidationResult semanticValidation() {
+        return this.<SemanticValidationResult>value(SEMANTIC_VALIDATION).orElseGet(SemanticValidationResult::new);
+    }
+
+    public SupervisorAssessment supervisorAssessment() {
+        return this.<SupervisorAssessment>value(SUPERVISOR_ASSESSMENT).orElseGet(SupervisorAssessment::new);
+    }
+
+    public NodeFailureInfo nodeFailure() {
+        return this.<NodeFailureInfo>value(NODE_FAILURE).orElseGet(NodeFailureInfo::new);
+    }
+
     public boolean shouldReplan() {
         boolean deterministicFailure = !validationErrors().isEmpty();
-        boolean semanticFailure = !semanticNotes().isEmpty();
-        return (deterministicFailure || semanticFailure) && retryCount() < maxRetries();
+        boolean semanticFailure = !semanticNotes().isEmpty() || semanticValidation().failed();
+        boolean qualityFailure = planQuality() != null && planQuality().getOverall() > 0
+                && planQuality().getOverall() < PlanQualityScore.PASS_THRESHOLD;
+        return (deterministicFailure || semanticFailure || qualityFailure) && retryCount() < maxRetries();
     }
 
     public boolean shouldReplanForBudget() {

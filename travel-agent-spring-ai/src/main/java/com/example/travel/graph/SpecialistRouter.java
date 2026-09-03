@@ -5,9 +5,8 @@ import java.util.List;
 
 /**
  * Picks the next graph node so unused specialists are never scheduled.
- * LangGraph4j 1.8 Command is single-destination, so a 4-way parallel fan-in
- * cannot legally omit unused incoming edges; needed specialists run in parallel
- * inside {@code specialists}, and this router skips that node entirely when none are needed.
+ * Native LangGraph fan-out uses {@link TravelGraphNodes#FAN_OUT} with parallel executors;
+ * each specialist node no-ops when its {@code needs*} flag is false.
  */
 public final class SpecialistRouter {
 
@@ -19,13 +18,13 @@ public final class SpecialistRouter {
             return TravelGraphNodes.AIRPORT;
         }
         if (anySpecialist(state)) {
-            return TravelGraphNodes.SPECIALISTS;
+            return TravelGraphNodes.FAN_OUT;
         }
         return TravelGraphNodes.SUPERVISOR;
     }
 
     public static String afterAirport(TravelState state) {
-        return anySpecialist(state) ? TravelGraphNodes.SPECIALISTS : TravelGraphNodes.SUPERVISOR;
+        return anySpecialist(state) ? TravelGraphNodes.FAN_OUT : TravelGraphNodes.SUPERVISOR;
     }
 
     public static String afterSupervisor(TravelState state) {

@@ -14,6 +14,7 @@ import com.example.travel.model.TravelResearch;
 import com.example.travel.service.AgentExecutionBudget;
 import com.example.travel.service.ConversationMemoryService;
 import com.example.travel.service.GraphProgressHub;
+import com.example.travel.service.GraphRunContext;
 import com.example.travel.service.ModelRoutingContext;
 import com.example.travel.service.UserPreferenceService;
 import org.bsc.langgraph4j.CompiledGraph;
@@ -53,6 +54,7 @@ public class TravelPlannerAgentService {
     private final ModificationAgentService modificationAgentService;
     private final AgentExecutionBudget executionBudget;
     private final GraphProgressHub graphProgressHub;
+    private final GraphRunContext graphRunContext;
     private final ExecutorService travelPlanExecutor;
     private final ConversationMemoryService conversationMemoryService;
     private final int maxRetries;
@@ -66,6 +68,7 @@ public class TravelPlannerAgentService {
                                      ModificationAgentService modificationAgentService,
                                      AgentExecutionBudget executionBudget,
                                      GraphProgressHub graphProgressHub,
+                                     GraphRunContext graphRunContext,
                                      @org.springframework.beans.factory.annotation.Qualifier("travelPlanExecutor") ExecutorService travelPlanExecutor,
                                      ConversationMemoryService conversationMemoryService,
                                      @Value("${travel.graph.max-retries:2}") int maxRetries) {
@@ -78,6 +81,7 @@ public class TravelPlannerAgentService {
         this.modificationAgentService = modificationAgentService;
         this.executionBudget = executionBudget;
         this.graphProgressHub = graphProgressHub;
+        this.graphRunContext = graphRunContext;
         this.travelPlanExecutor = travelPlanExecutor;
         this.conversationMemoryService = conversationMemoryService;
         this.maxRetries = maxRetries;
@@ -90,6 +94,7 @@ public class TravelPlannerAgentService {
 
         Map<String, Object> input = TravelState.fromRequest(request, historyContext);
         input.put(TravelState.MAX_RETRIES, maxRetries);
+        input.put(TravelState.GRAPH_THREAD_ID, threadId);
         String policy = ModelRoutingContext.normalize(request.getSelectedModel());
         input.put(TravelState.SELECTED_MODEL, policy);
         input.put(TravelState.MODEL_POLICY, policy);
@@ -99,9 +104,11 @@ public class TravelPlannerAgentService {
         RunnableConfig config = configFor(threadId);
         ModelRoutingContext.set(policy);
         executionBudget.begin();
+        graphRunContext.open(threadId, executionBudget.capture(), policy);
         try {
             travelGraph.invoke(input, config);
         } finally {
+            graphRunContext.close(threadId);
             executionBudget.end();
             ModelRoutingContext.clear();
         }
@@ -117,6 +124,7 @@ public class TravelPlannerAgentService {
         String threadId = userId + "-" + UUID.randomUUID();
         Map<String, Object> input = TravelState.fromRequest(request, historyContext);
         input.put(TravelState.MAX_RETRIES, maxRetries);
+        input.put(TravelState.GRAPH_THREAD_ID, threadId);
         String policy = ModelRoutingContext.normalize(request.getSelectedModel());
         input.put(TravelState.SELECTED_MODEL, policy);
         input.put(TravelState.MODEL_POLICY, policy);
@@ -131,6 +139,7 @@ public class TravelPlannerAgentService {
         RunnableConfig config = configFor(threadId);
         ModelRoutingContext.set(policy);
         executionBudget.begin();
+        graphRunContext.open(threadId, executionBudget.capture(), policy);
         try {
             graphProgressHub.emit(threadId, "started", Map.of("threadId", threadId, "node", "START"));
             for (NodeOutput<TravelState> output : travelGraph.stream(input, config)) {
@@ -157,13 +166,14 @@ public class TravelPlannerAgentService {
             graphProgressHub.emit(threadId, "failed", Map.of("error",
                     ex.getMessage() == null ? ex.getClass().getSimpleName() : ex.getMessage()));
         } finally {
+            graphRunContext.close(threadId);
             executionBudget.end();
             ModelRoutingContext.clear();
         }
     }
 
     public TravelPlanResponse approve(String userId, String threadId) {
-        String key = TravelState.firstNonBlank(threadId, userId);
+        String key = requireOwnedThread(userId, threadId);
         requireCheckpointState(key);
         RunnableConfig config = configFor(key);
 
@@ -173,11 +183,13 @@ public class TravelPlannerAgentService {
 
         ModelRoutingContext.set(previousPolicy(key));
         executionBudget.begin();
+        graphRunContext.open(key, executionBudget.capture(), previousPolicy(key));
         TravelState state;
         try {
             state = travelGraph.invoke(GraphInput.resume(decision), config)
                     .orElseGet(() -> requireCheckpointState(key));
         } finally {
+            graphRunContext.close(key);
             executionBudget.end();
             ModelRoutingContext.clear();
         }
@@ -196,7 +208,7 @@ public class TravelPlannerAgentService {
     }
 
     public TravelPlanResponse modify(String userId, String threadId, String notes, String historyContext) {
-        String key = TravelState.firstNonBlank(threadId, userId);
+        String key = requireOwnedThread(userId, threadId);
         TravelState previous = requireCheckpointState(key);
         RunnableConfig config = configFor(key);
 
@@ -218,6 +230,12 @@ public class TravelPlannerAgentService {
         if (modification.isReduceCost()) {
             decision.put(TravelState.HOTEL_CHEAPER, Boolean.TRUE);
         }
+        if (!TravelState.isBlank(modification.getFlightPreference())) {
+            decision.put(TravelState.FLIGHT_PREFERENCE, modification.getFlightPreference());
+        }
+        if (modification.getHotelBudget() != null) {
+            decision.put(TravelState.BUDGET, modification.getHotelBudget());
+        }
         if (!TravelState.isBlank(historyContext)) {
             decision.put(TravelState.HISTORY_CONTEXT, historyContext);
         }
@@ -225,9 +243,11 @@ public class TravelPlannerAgentService {
         log.info("Resuming graph for MODIFY type={} on same threadId={}", modification.getChangeType(), key);
         ModelRoutingContext.set(previous.modelPolicy());
         executionBudget.begin();
+        graphRunContext.open(key, executionBudget.capture(), previous.modelPolicy());
         try {
             travelGraph.invoke(GraphInput.resume(decision), config);
         } finally {
+            graphRunContext.close(key);
             executionBudget.end();
             ModelRoutingContext.clear();
         }
@@ -237,7 +257,7 @@ public class TravelPlannerAgentService {
     }
 
     public TravelPlanResponse reject(String userId, String threadId) {
-        String key = TravelState.firstNonBlank(threadId, userId);
+        String key = requireOwnedThread(userId, threadId);
         requireCheckpointState(key);
         RunnableConfig config = configFor(key);
         Map<String, Object> decision = new LinkedHashMap<>();
@@ -245,11 +265,13 @@ public class TravelPlannerAgentService {
         decision.put(TravelState.AWAITING_APPROVAL, Boolean.FALSE);
         ModelRoutingContext.set(previousPolicy(key));
         executionBudget.begin();
+        graphRunContext.open(key, executionBudget.capture(), previousPolicy(key));
         TravelState state;
         try {
             state = travelGraph.invoke(GraphInput.resume(decision), config)
                     .orElseGet(() -> requireCheckpointState(key));
         } finally {
+            graphRunContext.close(key);
             executionBudget.end();
             ModelRoutingContext.clear();
         }
@@ -276,6 +298,13 @@ public class TravelPlannerAgentService {
         body.put("intentConfidence", state.intentConfidence());
         body.put("validationErrors", state.validationErrors());
         body.put("semanticNotes", state.semanticNotes());
+        if (state.planQuality() != null) {
+            body.put("planQuality", state.planQuality());
+        }
+        if (state.nodeFailure() != null && !TravelState.isBlank(state.nodeFailure().getLastFailedNode())) {
+            body.put("nodeFailure", state.nodeFailure());
+        }
+        body.put("executionTimeline", state.pipeline());
         try {
             List<Map<String, Object>> snapshots = new ArrayList<>();
             for (StateSnapshot<TravelState> item : travelGraph.getStateHistory(configFor(key))) {
@@ -286,6 +315,9 @@ public class TravelPlannerAgentService {
                     row.put("pipeline", item.state().pipeline());
                     row.put("supervisorDecision", item.state().supervisorDecision());
                     row.put("dispatchRoute", item.state().dispatchRoute());
+                    if (item.state().planQuality() != null) {
+                        row.put("planQuality", item.state().planQuality().getOverall());
+                    }
                 }
                 snapshots.add(row);
             }
@@ -295,6 +327,20 @@ public class TravelPlannerAgentService {
             body.put("snapshots", List.of());
         }
         return body;
+    }
+
+    private String requireOwnedThread(String userId, String threadId) {
+        String key = TravelState.firstNonBlank(threadId, userId);
+        String requester = TravelState.firstNonBlank(userId, "anonymous");
+        if (!key.equals(requester) && !key.startsWith(requester + "-")) {
+            throw new IllegalArgumentException("Thread " + key + " is not owned by user " + requester);
+        }
+        TravelState state = requireCheckpointState(key);
+        String owner = TravelState.firstNonBlank(state.userId(), requester);
+        if (!owner.equals(requester)) {
+            throw new IllegalArgumentException("Thread " + key + " belongs to " + owner + ", not " + requester);
+        }
+        return key;
     }
 
     private TravelState requireCheckpointState(String threadId) {
@@ -399,6 +445,7 @@ public class TravelPlannerAgentService {
         response.setPipeline(state.pipeline());
         response.setValidationErrors(state.validationErrors());
         response.setSources(state.provenance().stream().map(event -> event.toDisplay()).toList());
+        response.setPlanQuality(state.planQuality());
         return response;
     }
 

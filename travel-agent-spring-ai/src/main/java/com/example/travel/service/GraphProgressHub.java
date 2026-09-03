@@ -45,6 +45,7 @@ public class GraphProgressHub {
     public void emit(String threadId, String type, Map<String, Object> payload) {
         Map<String, Object> event = new LinkedHashMap<>();
         event.put("type", type);
+        event.put("ts", System.currentTimeMillis());
         event.putAll(payload);
         HubSession hubSession = hubSession(threadId);
         hubSession.appendReplay(event);

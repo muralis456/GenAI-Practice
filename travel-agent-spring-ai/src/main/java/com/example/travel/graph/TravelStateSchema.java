@@ -1,0 +1,108 @@
+package com.example.travel.graph;
+
+import com.example.travel.model.AgentDecision;
+import com.example.travel.model.AgentStep;
+import com.example.travel.model.BudgetSummary;
+import com.example.travel.model.FlightOption;
+import com.example.travel.model.HotelOption;
+import com.example.travel.model.Itinerary;
+import com.example.travel.model.ModificationRequest;
+import com.example.travel.model.NodeFailureInfo;
+import com.example.travel.model.PlanQualityScore;
+import com.example.travel.model.ProvenanceEvent;
+import com.example.travel.model.ReplanStrategy;
+import com.example.travel.model.SemanticValidationResult;
+import com.example.travel.model.SupervisorAssessment;
+import com.example.travel.model.TravelAttraction;
+import com.example.travel.model.TravelResearch;
+import com.example.travel.model.WeatherForecast;
+import org.bsc.langgraph4j.state.Channel;
+import org.bsc.langgraph4j.state.Channels;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+import static com.example.travel.graph.TravelStateKeys.Budget;
+import static com.example.travel.graph.TravelStateKeys.Control;
+import static com.example.travel.graph.TravelStateKeys.Hitl;
+import static com.example.travel.graph.TravelStateKeys.Needs;
+import static com.example.travel.graph.TravelStateKeys.Planning;
+import static com.example.travel.graph.TravelStateKeys.Preferences;
+import static com.example.travel.graph.TravelStateKeys.Request;
+import static com.example.travel.graph.TravelStateKeys.Results;
+import static com.example.travel.graph.TravelStateKeys.Trip;
+import static com.example.travel.graph.TravelStateKeys.Validation;
+
+public final class TravelStateSchema {
+
+    public static final Map<String, Channel<?>> SCHEMA;
+
+    static {
+        Map<String, Channel<?>> schema = new LinkedHashMap<>();
+        schema.put(Request.USER_REQUEST, Channels.base(() -> ""));
+        schema.put(Request.USER_ID, Channels.base(() -> "anonymous"));
+        schema.put(Request.SELECTED_MODEL, Channels.base(() -> ""));
+        schema.put(Request.HISTORY_CONTEXT, Channels.base(() -> ""));
+        schema.put(Trip.ORIGIN, Channels.base(() -> ""));
+        schema.put(Trip.DESTINATION, Channels.base(() -> ""));
+        schema.put(Trip.DEPARTURE_DATE, Channels.base(() -> LocalDate.now()));
+        schema.put(Trip.RETURN_DATE, Channels.base(() -> LocalDate.now().plusDays(5)));
+        schema.put(Trip.TRAVELERS, Channels.base(() -> 1));
+        schema.put(Budget.BUDGET, Channels.base(() -> TravelState.UNSET_BUDGET));
+        schema.put(Budget.BUDGET_LABEL, Channels.base(() -> "medium"));
+        schema.put(Preferences.TRAVEL_STYLE, Channels.base(() -> "balanced"));
+        schema.put(Trip.ORIGIN_IATA, Channels.base(() -> ""));
+        schema.put(Trip.DESTINATION_IATA, Channels.base(() -> ""));
+        schema.put(Results.FLIGHTS, Channels.base(() -> new ArrayList<FlightOption>()));
+        schema.put(Results.HOTELS, Channels.base(() -> new ArrayList<HotelOption>()));
+        schema.put(Results.ATTRACTIONS, Channels.base(() -> new ArrayList<TravelAttraction>()));
+        schema.put(Results.RESEARCH, Channels.base(() -> new ArrayList<TravelResearch>()));
+        schema.put(Results.ITINERARY, Channels.base(() -> new Itinerary()));
+        schema.put(Budget.BUDGET_SUMMARY, Channels.base(() -> new BudgetSummary()));
+        schema.put(Validation.VALIDATION_ERRORS, Channels.base(() -> new ArrayList<String>()));
+        schema.put(Control.RETRY_COUNT, Channels.base(() -> 0));
+        schema.put(Control.MAX_RETRIES, Channels.base(() -> 2));
+        schema.put(Results.FINAL_PLAN, Channels.base(() -> ""));
+        schema.put(Planning.REPLAN_NOTES, Channels.base(() -> ""));
+        schema.put(Budget.COST_FACTOR, Channels.base(() -> BigDecimal.ONE));
+        schema.put(Results.WEATHER, Channels.base(() -> new WeatherForecast("", "", false)));
+        schema.put(Control.PIPELINE, Channels.appender(() -> new ArrayList<AgentStep>()));
+        schema.put(Hitl.AWAITING_APPROVAL, Channels.base(() -> Boolean.TRUE));
+        schema.put(Hitl.HITL_DECISION, Channels.base(() -> ""));
+        schema.put(Trip.PREFERRED_AIRPORT, Channels.base(() -> ""));
+        schema.put(Trip.CURRENCY, Channels.base(() -> "INR"));
+        schema.put(Request.REQUEST_TYPE, Channels.base(() -> "TRIP_PLANNING"));
+        schema.put(Needs.NEEDS_FLIGHTS, Channels.base(() -> Boolean.TRUE));
+        schema.put(Needs.NEEDS_HOTELS, Channels.base(() -> Boolean.TRUE));
+        schema.put(Needs.NEEDS_RESEARCH, Channels.base(() -> Boolean.TRUE));
+        schema.put(Needs.NEEDS_WEATHER, Channels.base(() -> Boolean.TRUE));
+        schema.put(Needs.NEEDS_BUDGET, Channels.base(() -> Boolean.TRUE));
+        schema.put(Needs.NEEDS_ITINERARY, Channels.base(() -> Boolean.TRUE));
+        schema.put(Planning.PLAN_STRATEGY, Channels.base(() -> "parallel_search"));
+        schema.put(Planning.PLAN_PRIORITY, Channels.base(() -> "balanced"));
+        schema.put(Control.LAST_DECISION, Channels.base(AgentDecision::new));
+        schema.put(Planning.REPLAN_STRATEGY, Channels.base(ReplanStrategy::new));
+        schema.put(Validation.SEMANTIC_NOTES, Channels.base(() -> new ArrayList<String>()));
+        schema.put(Control.PROVENANCE, Channels.appender(() -> new ArrayList<ProvenanceEvent>()));
+        schema.put(Preferences.HOTEL_CHEAPER, Channels.base(() -> Boolean.FALSE));
+        schema.put(Preferences.FLIGHT_PREFERENCE, Channels.base(() -> "balanced"));
+        schema.put(Request.MODEL_POLICY, Channels.base(() -> "BALANCED"));
+        schema.put(Request.INTENT_CONFIDENCE, Channels.base(() -> 1.0d));
+        schema.put(Hitl.MODIFICATION, Channels.base(ModificationRequest::new));
+        schema.put(Control.DISPATCH_ROUTE, Channels.base(() -> ""));
+        schema.put(Control.SUPERVISOR_DECISION, Channels.base(() -> ""));
+        schema.put(Request.GRAPH_THREAD_ID, Channels.base(() -> ""));
+        schema.put(Validation.PLAN_QUALITY, Channels.base(PlanQualityScore::new));
+        schema.put(Validation.SEMANTIC_VALIDATION, Channels.base(SemanticValidationResult::new));
+        schema.put(Control.SUPERVISOR_ASSESSMENT, Channels.base(SupervisorAssessment::new));
+        schema.put(Control.NODE_FAILURE, Channels.base(NodeFailureInfo::new));
+        SCHEMA = Collections.unmodifiableMap(schema);
+    }
+
+    private TravelStateSchema() {
+    }
+}

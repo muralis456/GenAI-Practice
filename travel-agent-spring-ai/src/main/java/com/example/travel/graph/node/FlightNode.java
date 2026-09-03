@@ -4,6 +4,8 @@ import com.example.travel.graph.TravelGraphNodes;
 import com.example.travel.graph.TravelState;
 import com.example.travel.model.ProvenanceEvent;
 import com.example.travel.agent.FlightAgentService;
+import com.example.travel.graph.NodeFailureSupport;
+import com.example.travel.support.ToolFailureClassifier;
 import org.bsc.langgraph4j.action.NodeAction;
 import org.springframework.stereotype.Component;
 
@@ -28,19 +30,25 @@ public class FlightNode implements NodeAction<TravelState> {
             skip.putAll(TravelState.trace(TravelGraphNodes.FLIGHT, "skip", "not requested"));
             return skip;
         }
-        FlightAgentService.FlightSearchResult result = flightAgentService.search(state);
-        Map<String, Object> updates = new LinkedHashMap<>();
-        updates.put(TravelState.FLIGHTS, result.flights());
-        if (!TravelState.isBlank(result.originIata())) {
-            updates.put(TravelState.ORIGIN_IATA, result.originIata());
+        try {
+            FlightAgentService.FlightSearchResult result = flightAgentService.search(state);
+            Map<String, Object> updates = new LinkedHashMap<>();
+            updates.put(TravelState.FLIGHTS, result.flights());
+            if (!TravelState.isBlank(result.originIata())) {
+                updates.put(TravelState.ORIGIN_IATA, result.originIata());
+            }
+            if (!TravelState.isBlank(result.destinationIata())) {
+                updates.put(TravelState.DESTINATION_IATA, result.destinationIata());
+            }
+            updates.putAll(TravelState.trace(TravelGraphNodes.FLIGHT, "ok",
+                    result.originIata() + " -> " + result.destinationIata() + " on " + state.departureDate()));
+            updates.putAll(TravelState.provenance(new ProvenanceEvent(
+                    "flights", "AviationStack", "", 0, result.originIata() + "->" + result.destinationIata())));
+            return updates;
+        } catch (Exception ex) {
+            return NodeFailureSupport.record(TravelGraphNodes.FLIGHT, ex,
+                    ToolFailureClassifier.fromException(ex).isRetryable(),
+                    state.nodeFailure().getNodeRetryCount());
         }
-        if (!TravelState.isBlank(result.destinationIata())) {
-            updates.put(TravelState.DESTINATION_IATA, result.destinationIata());
-        }
-        updates.putAll(TravelState.trace(TravelGraphNodes.FLIGHT, "ok",
-                result.originIata() + " -> " + result.destinationIata() + " on " + state.departureDate()));
-        updates.putAll(TravelState.provenance(new ProvenanceEvent(
-                "flights", "AviationStack", "", 0, result.originIata() + "->" + result.destinationIata())));
-        return updates;
     }
 }
