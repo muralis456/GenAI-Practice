@@ -88,7 +88,11 @@ public class ModificationAgentService {
             request.setPreserveBudget(true);
             return request;
         }
-        if (containsAny(text, "cheaper", "budget", "reduce cost", "lower cost", "save money", "too expensive")) {
+        if (containsAny(text, "cheaper", "budget", "reduce cost", "lower cost", "save money", "too expensive",
+            "hotel price", "hotel prices", "hotel rate", "hotel rates", "hotel cost", "hotel costs",
+            "hotel is expensive", "hotels are expensive", "hotel is high", "hotels are high",
+            "flight price", "flight prices", "flight fare", "flight fares", "flight cost", "flight costs",
+            "flight is expensive", "flights are expensive", "flight is high", "flights are high")) {
             request.setChangeType(ModificationRequest.REDUCE_COST);
             request.setPreserveBudget(false);
             return request;

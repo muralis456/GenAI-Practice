@@ -2,6 +2,7 @@ package com.example.travel.model;
 
 import java.io.Serial;
 import java.io.Serializable;
+import java.util.Locale;
 
 /**
  * Structured human modification so Modify is not hardcoded to "make it cheaper".
@@ -94,11 +95,32 @@ public class ModificationRequest implements Serializable {
         return REDUCE_COST.equalsIgnoreCase(changeType);
     }
 
+    public boolean isHotelCostReduction() {
+        String text = notes == null ? "" : notes.toLowerCase(Locale.ROOT);
+        return isReduceCost() && text.contains("hotel")
+                && containsAny(text, "price", "prices", "rate", "rates", "cost", "costs", "expensive", "high");
+    }
+
+    public boolean isFlightCostReduction() {
+        String text = notes == null ? "" : notes.toLowerCase(Locale.ROOT);
+        return isReduceCost() && text.contains("flight")
+                && containsAny(text, "price", "prices", "fare", "fares", "cost", "costs", "expensive", "high");
+    }
+
     public boolean isHotelUpgrade() {
         return HOTEL_UPGRADE.equalsIgnoreCase(changeType);
     }
 
     public boolean isAddDestination() {
         return ADD_DESTINATION.equalsIgnoreCase(changeType);
+    }
+
+    private static boolean containsAny(String text, String... terms) {
+        for (String term : terms) {
+            if (text.contains(term)) {
+                return true;
+            }
+        }
+        return false;
     }
 }

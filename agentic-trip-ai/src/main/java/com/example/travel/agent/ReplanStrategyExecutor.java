@@ -131,7 +131,12 @@ public class ReplanStrategyExecutor {
         for (ReplanAction action : actions) {
             switch (action) {
                 case CHEAPER_FLIGHT -> runFlights = true;
-                case REDUCE_HOTEL_BUDGET, HOTEL_UPGRADE -> runHotels = true;
+                case REDUCE_HOTEL_BUDGET -> {
+                    runHotels = true;
+                    runBudget = true;
+                    runItinerary = true;
+                }
+                case HOTEL_UPGRADE -> runHotels = true;
                 case REMOVE_EXPENSIVE_ATTRACTIONS, ADD_DESTINATION -> runResearch = true;
                 case ADJUST_ITINERARY -> runItinerary = true;
             }

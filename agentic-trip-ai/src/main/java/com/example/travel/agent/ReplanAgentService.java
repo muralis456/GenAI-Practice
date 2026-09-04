@@ -57,9 +57,17 @@ public class ReplanAgentService {
         strategy.setReason(modification.getChangeType() + ": " + modification.getNotes());
         List<String> actions = new ArrayList<>();
         if (modification.isReduceCost()) {
-            strategy.setPriority("hotel");
-            actions.add(ReplanAction.REDUCE_HOTEL_BUDGET.wireName());
-            actions.add(ReplanAction.CHEAPER_FLIGHT.wireName());
+            if (modification.isHotelCostReduction()) {
+                strategy.setPriority("hotel");
+                actions.add(ReplanAction.REDUCE_HOTEL_BUDGET.wireName());
+            } else if (modification.isFlightCostReduction()) {
+                strategy.setPriority("flight");
+                actions.add(ReplanAction.CHEAPER_FLIGHT.wireName());
+            } else {
+                strategy.setPriority("hotel");
+                actions.add(ReplanAction.REDUCE_HOTEL_BUDGET.wireName());
+                actions.add(ReplanAction.CHEAPER_FLIGHT.wireName());
+            }
         } else if (modification.isHotelUpgrade()) {
             strategy.setPriority("hotel");
             actions.add(ReplanAction.HOTEL_UPGRADE.wireName());
