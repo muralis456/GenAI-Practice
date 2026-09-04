@@ -53,8 +53,9 @@ public class Itinerary implements Serializable {
                     sb.append(" — ").append(day.getTitle());
                 }
                 sb.append('\n');
-                if (day.getActivities() != null) {
-                    sb.append(day.getActivities()).append('\n');
+                String text = day.activitiesText();
+                if (!text.isBlank()) {
+                    sb.append(text).append('\n');
                 }
             }
             return sb.toString().trim();

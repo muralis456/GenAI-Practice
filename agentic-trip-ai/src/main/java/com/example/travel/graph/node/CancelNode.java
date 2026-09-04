@@ -16,9 +16,9 @@ public class CancelNode implements NodeAction<TravelState> {
         Map<String, Object> updates = new LinkedHashMap<>();
         updates.put(TravelState.AWAITING_APPROVAL, Boolean.FALSE);
         updates.put(TravelState.HITL_DECISION, "reject");
-        String plan = TravelState.firstNonBlank(state.finalPlan(), "")
+        String tips = TravelState.firstNonBlank(state.finalTips(), "")
                 + "\n\n---\nHuman rejected this plan. Graph ended without applying it.";
-        updates.put(TravelState.FINAL_PLAN, plan);
+        updates.put(TravelState.FINAL_TIPS, tips);
         updates.putAll(TravelState.trace(TravelGraphNodes.CANCEL, "ok", "plan rejected"));
         return updates;
     }

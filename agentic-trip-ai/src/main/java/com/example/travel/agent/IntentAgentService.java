@@ -6,6 +6,7 @@ import com.example.travel.model.AgentDecision;
 import com.example.travel.model.IntentPlan;
 import com.example.travel.service.RoutedLlm;
 import com.example.travel.support.IntentClassifier;
+import com.example.travel.support.TripRequirementsParser;
 import com.example.travel.support.JsonSupport;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,15 +38,11 @@ public class IntentAgentService {
         AgentDecision decision = new AgentDecision("intent", plan.getRequestType(), plan.summary(), plan.getConfidence());
         Map<String, Object> updates = new LinkedHashMap<>();
         updates.put(TravelState.REQUEST_TYPE, plan.getRequestType());
-        updates.put(TravelState.NEEDS_FLIGHTS, plan.isNeedsFlights());
-        updates.put(TravelState.NEEDS_HOTELS, plan.isNeedsHotels());
-        updates.put(TravelState.NEEDS_RESEARCH, plan.isNeedsResearch());
-        updates.put(TravelState.NEEDS_WEATHER, plan.isNeedsWeather());
-        updates.put(TravelState.NEEDS_BUDGET, plan.isNeedsBudget());
-        updates.put(TravelState.NEEDS_ITINERARY, plan.isNeedsItinerary());
+        TravelState.applyIntentAndRun(updates, plan);
         updates.put(TravelState.PLAN_STRATEGY, plan.getStrategy());
         updates.put(TravelState.PLAN_PRIORITY, plan.getPriority());
         updates.put(TravelState.INTENT_CONFIDENCE, plan.getConfidence());
+        updates.put(TravelState.TRIP_REQUIREMENTS, TripRequirementsParser.parse(state.userRequest()));
         updates.put(TravelState.LAST_DECISION, decision);
         return updates;
     }
@@ -64,11 +61,31 @@ public class IntentAgentService {
                 if (parsed.getConfidence() <= 0) {
                     parsed.setConfidence(0.8);
                 }
-                return parsed;
+                return mergeTripScope(fallback, parsed);
             }).orElse(fallback);
         } catch (Exception exception) {
             log.warn("Intent LLM fallback failed; using deterministic plan", exception);
             return fallback;
         }
+    }
+
+    private IntentPlan mergeTripScope(IntentPlan base, IntentPlan llm) {
+        if (IntentPlan.TRIP_PLANNING.equals(base.getRequestType())) {
+            llm.setRequestType(IntentPlan.TRIP_PLANNING);
+            llm.setNeedsFlights(true);
+            llm.setNeedsHotels(true);
+            llm.setNeedsResearch(true);
+            llm.setNeedsWeather(true);
+            llm.setNeedsBudget(true);
+            llm.setNeedsItinerary(true);
+            return llm;
+        }
+        llm.setNeedsFlights(base.isNeedsFlights() || llm.isNeedsFlights());
+        llm.setNeedsHotels(base.isNeedsHotels() || llm.isNeedsHotels());
+        llm.setNeedsResearch(base.isNeedsResearch() || llm.isNeedsResearch());
+        llm.setNeedsWeather(base.isNeedsWeather() || llm.isNeedsWeather());
+        llm.setNeedsBudget(base.isNeedsBudget() || llm.isNeedsBudget());
+        llm.setNeedsItinerary(base.isNeedsItinerary() || llm.isNeedsItinerary());
+        return llm;
     }
 }

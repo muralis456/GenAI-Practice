@@ -45,7 +45,7 @@ class HitlPostgresCheckpointIT {
 
         StateGraph<TravelState> graph = new StateGraph<>(TravelState.SCHEMA, serializer)
                 .addNode("draft", node_async(state -> Map.of(
-                        TravelState.FINAL_PLAN, "draft-plan",
+                        TravelState.FINAL_TIPS, "draft-plan",
                         TravelState.AWAITING_APPROVAL, Boolean.TRUE)))
                 .addNode(TravelGraphNodes.HITL, node_async(state -> TravelState.trace(
                         TravelGraphNodes.HITL, "ok", "decision=" + state.hitlDecision())))
@@ -79,7 +79,7 @@ class HitlPostgresCheckpointIT {
 
         StateSnapshot<TravelState> paused = compiled.getState(config);
         assertEquals(TravelGraphNodes.HITL, paused.next());
-        assertEquals("draft-plan", paused.state().finalPlan());
+        assertEquals("draft-plan", paused.state().finalTips());
         assertTrue(paused.state().awaitingApproval());
 
         // Simulate app restart: new saver (empty cache) + recompile against same DB.
@@ -96,7 +96,7 @@ class HitlPostgresCheckpointIT {
 
         StateSnapshot<TravelState> afterRestart = reloaded.getState(config);
         assertEquals(TravelGraphNodes.HITL, afterRestart.next());
-        assertEquals("draft-plan", afterRestart.state().finalPlan());
+        assertEquals("draft-plan", afterRestart.state().finalTips());
 
         TravelState approved = reloaded.invoke(GraphInput.resume(Map.of(
                 TravelState.HITL_DECISION, "approve",
@@ -124,7 +124,7 @@ class HitlPostgresCheckpointIT {
 
         StateGraph<TravelState> graph = new StateGraph<>(TravelState.SCHEMA, serializer)
                 .addNode("draft", node_async(state -> Map.of(
-                        TravelState.FINAL_PLAN, "draft-plan",
+                        TravelState.FINAL_TIPS, "draft-plan",
                         TravelState.AWAITING_APPROVAL, Boolean.TRUE)))
                 .addNode(TravelGraphNodes.HITL, node_async(state -> TravelState.trace(
                         TravelGraphNodes.HITL, "ok", "decision=" + state.hitlDecision())))
@@ -134,7 +134,7 @@ class HitlPostgresCheckpointIT {
                 .addNode(TravelGraphNodes.CANCEL, node_async(state -> Map.of(
                         TravelState.AWAITING_APPROVAL, Boolean.FALSE,
                         TravelState.HITL_DECISION, "reject",
-                        TravelState.FINAL_PLAN, "rejected")))
+                        TravelState.FINAL_TIPS, "rejected")))
                 .addEdge(START, "draft")
                 .addEdge("draft", TravelGraphNodes.HITL)
                 .addConditionalEdges(TravelGraphNodes.HITL,
@@ -177,7 +177,7 @@ class HitlPostgresCheckpointIT {
                 TravelState.AWAITING_APPROVAL, Boolean.FALSE)), config)
                 .orElseThrow();
         assertEquals("reject", rejected.hitlDecision());
-        assertEquals("rejected", rejected.finalPlan());
+        assertEquals("rejected", rejected.finalTips());
 
         saver.release(config);
     }

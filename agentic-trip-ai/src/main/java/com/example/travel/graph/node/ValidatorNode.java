@@ -2,6 +2,7 @@ package com.example.travel.graph.node;
 
 import com.example.travel.agent.SemanticValidatorService;
 import com.example.travel.agent.ValidatorAgentService;
+import com.example.travel.graph.GraphExecutionLogger;
 import com.example.travel.graph.TravelGraphNodes;
 import com.example.travel.graph.TravelState;
 import com.example.travel.model.PlanQualityScore;
@@ -51,6 +52,7 @@ public class ValidatorNode implements NodeAction<TravelState> {
             detail += " | semantic: " + String.join("; ", semanticNotes);
         }
         boolean pass = errors.isEmpty() && !semantic.failed() && quality.passes();
+        GraphExecutionLogger.validation(state, quality.getOverall(), pass, errors, semanticNotes);
         updates.putAll(TravelState.trace(TravelGraphNodes.VALIDATOR, pass ? "ok" : "warn", detail));
         return updates;
     }

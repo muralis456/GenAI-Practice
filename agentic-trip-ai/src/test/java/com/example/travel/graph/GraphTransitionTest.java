@@ -26,18 +26,29 @@ class GraphTransitionTest {
     @Test
     void plannerRoutesToAirportWhenFlightsNeeded() {
         TravelState state = state(Map.of(
-                TravelState.NEEDS_FLIGHTS, Boolean.TRUE,
-                TravelState.NEEDS_HOTELS, Boolean.TRUE));
+                TravelState.RUN_FLIGHTS, Boolean.TRUE,
+                TravelState.RUN_HOTELS, Boolean.TRUE));
         assertEquals(TravelGraphNodes.AIRPORT, SpecialistRouter.afterPlanner(state));
     }
 
     @Test
-    void plannerRoutesToFanOutWhenFlightsSkippedButHotelsNeeded() {
+    void soleSpecialistBypassesFanOut() {
         TravelState state = state(Map.of(
-                TravelState.NEEDS_FLIGHTS, Boolean.FALSE,
-                TravelState.NEEDS_HOTELS, Boolean.TRUE,
-                TravelState.NEEDS_RESEARCH, Boolean.TRUE,
-                TravelState.NEEDS_WEATHER, Boolean.FALSE));
+                TravelState.RUN_FLIGHTS, Boolean.FALSE,
+                TravelState.RUN_HOTELS, Boolean.TRUE,
+                TravelState.RUN_RESEARCH, Boolean.FALSE,
+                TravelState.RUN_WEATHER, Boolean.FALSE));
+        assertEquals(TravelGraphNodes.HOTEL, SpecialistRouter.specialistEntry(state));
+        assertEquals(TravelGraphNodes.HOTEL, SpecialistRouter.afterPlanner(state));
+    }
+
+    @Test
+    void multipleSpecialistsUseFanOut() {
+        TravelState state = state(Map.of(
+                TravelState.RUN_FLIGHTS, Boolean.FALSE,
+                TravelState.RUN_HOTELS, Boolean.TRUE,
+                TravelState.RUN_RESEARCH, Boolean.TRUE,
+                TravelState.RUN_WEATHER, Boolean.FALSE));
         assertEquals(TravelGraphNodes.FAN_OUT, SpecialistRouter.afterPlanner(state));
         assertEquals(List.of(TravelGraphNodes.HOTEL, TravelGraphNodes.RESEARCH),
                 SpecialistRouter.plannedSpecialists(state));
@@ -46,11 +57,11 @@ class GraphTransitionTest {
     @Test
     void plannerSkipsSpecialistsWhenNothingRequested() {
         TravelState state = state(Map.of(
-                TravelState.NEEDS_FLIGHTS, Boolean.FALSE,
-                TravelState.NEEDS_HOTELS, Boolean.FALSE,
-                TravelState.NEEDS_RESEARCH, Boolean.FALSE,
-                TravelState.NEEDS_WEATHER, Boolean.FALSE,
-                TravelState.NEEDS_BUDGET, Boolean.TRUE));
+                TravelState.RUN_FLIGHTS, Boolean.FALSE,
+                TravelState.RUN_HOTELS, Boolean.FALSE,
+                TravelState.RUN_RESEARCH, Boolean.FALSE,
+                TravelState.RUN_WEATHER, Boolean.FALSE,
+                TravelState.RUN_BUDGET, Boolean.TRUE));
         assertEquals(TravelGraphNodes.SUPERVISOR, SpecialistRouter.afterPlanner(state));
     }
 
@@ -65,8 +76,8 @@ class GraphTransitionTest {
     void supervisorProceedSkipsBudgetWhenNotNeeded() {
         TravelState state = state(Map.of(
                 TravelState.SUPERVISOR_DECISION, TravelGraphNodes.ROUTE_PROCEED,
-                TravelState.NEEDS_BUDGET, Boolean.FALSE,
-                TravelState.NEEDS_ITINERARY, Boolean.TRUE));
+                TravelState.RUN_BUDGET, Boolean.FALSE,
+                TravelState.RUN_ITINERARY, Boolean.TRUE));
         assertEquals(TravelGraphNodes.ITINERARY, SpecialistRouter.afterSupervisor(state));
     }
 
@@ -97,10 +108,11 @@ class GraphTransitionTest {
         ReplanStrategy strategy = new ReplanStrategy();
         strategy.setActions(List.of("cheaper_flight"));
         Map<String, Object> updates = replanExecutor.apply(state, strategy);
-        assertEquals(Boolean.TRUE, updates.get(TravelState.NEEDS_FLIGHTS));
-        assertEquals(Boolean.TRUE, updates.get(TravelState.NEEDS_BUDGET));
-        assertEquals(Boolean.FALSE, updates.get(TravelState.NEEDS_HOTELS));
-        assertEquals(Boolean.FALSE, updates.get(TravelState.NEEDS_ITINERARY));
+        assertEquals(Boolean.TRUE, updates.get(TravelState.RUN_FLIGHTS));
+        assertEquals(Boolean.TRUE, updates.get(TravelState.RUN_BUDGET));
+        assertEquals(Boolean.FALSE, updates.get(TravelState.RUN_HOTELS));
+        assertEquals(Boolean.FALSE, updates.get(TravelState.RUN_ITINERARY));
+        assertEquals(Boolean.TRUE, state.needsHotels());
     }
 
     @Test
@@ -121,6 +133,35 @@ class GraphTransitionTest {
                 TravelState.RETRY_COUNT, 2,
                 TravelState.MAX_RETRIES, 2));
         assertEquals(TravelGraphNodes.ROUTE_PROCEED, new SupervisorAgentService(null, null).decide(state));
+    }
+
+    @Test
+    void includeReportSectionsWhenResultsExistDespiteSelectiveReplanFlags() {
+        TravelState state = state(Map.of(
+                TravelState.NEEDS_FLIGHTS, Boolean.FALSE,
+                TravelState.NEEDS_HOTELS, Boolean.FALSE,
+                TravelState.NEEDS_BUDGET, Boolean.FALSE,
+                TravelState.FLIGHTS, List.of(flight("BLR", "NRT")),
+                TravelState.HOTELS, List.of(),
+                TravelState.BUDGET_SUMMARY, budgetSummary(120_000)));
+        assertTrue(state.includeFlightsInReport());
+        assertFalse(state.includeHotelsInReport());
+        assertTrue(state.includeBudgetInReport());
+    }
+
+    private static com.example.travel.model.FlightOption flight(String from, String to) {
+        com.example.travel.model.FlightOption option = new com.example.travel.model.FlightOption();
+        option.setOrigin(from);
+        option.setDestination(to);
+        option.setStatus("available");
+        return option;
+    }
+
+    private static com.example.travel.model.BudgetSummary budgetSummary(int total) {
+        com.example.travel.model.BudgetSummary summary = new com.example.travel.model.BudgetSummary();
+        summary.setEstimatedCost(java.math.BigDecimal.valueOf(total));
+        summary.setWithinBudget(true);
+        return summary;
     }
 
     private static TravelState state(Map<String, Object> values) {

@@ -2,6 +2,7 @@ package com.example.travel.agent;
 
 import com.example.travel.graph.NodeFailureRouting;
 import com.example.travel.graph.NodeFailureSupport;
+import com.example.travel.graph.GraphExecutionLogger;
 import com.example.travel.graph.TravelState;
 import com.example.travel.model.AgentDecision;
 import com.example.travel.model.ReplanAction;
@@ -69,9 +70,14 @@ public class ReplanStrategyExecutor {
                         }
                         updates.put(TravelState.NEEDS_RESEARCH, Boolean.TRUE);
                         updates.put(TravelState.NEEDS_ITINERARY, Boolean.TRUE);
+                        updates.put(TravelState.RUN_RESEARCH, Boolean.TRUE);
+                        updates.put(TravelState.RUN_ITINERARY, Boolean.TRUE);
                     }
                 }
-                case ADJUST_ITINERARY -> updates.put(TravelState.NEEDS_ITINERARY, Boolean.TRUE);
+                case ADJUST_ITINERARY -> {
+                    updates.put(TravelState.NEEDS_ITINERARY, Boolean.TRUE);
+                    updates.put(TravelState.RUN_ITINERARY, Boolean.TRUE);
+                }
             }
         }
 
@@ -97,6 +103,17 @@ public class ReplanStrategyExecutor {
         updates.put(TravelState.REPLAN_STRATEGY, strategy);
         updates.put(TravelState.LAST_DECISION, decision);
         updates.putAll(NodeFailureSupport.clear());
+
+        Map<String, Object> selectiveNeeds = Map.of(
+                "runFlights", updates.getOrDefault(TravelState.RUN_FLIGHTS, state.runFlights()),
+                "runHotels", updates.getOrDefault(TravelState.RUN_HOTELS, state.runHotels()),
+                "runResearch", updates.getOrDefault(TravelState.RUN_RESEARCH, state.runResearch()),
+                "runWeather", updates.getOrDefault(TravelState.RUN_WEATHER, state.runWeather()),
+                "runBudget", updates.getOrDefault(TravelState.RUN_BUDGET, state.runBudget()),
+                "runItinerary", updates.getOrDefault(TravelState.RUN_ITINERARY, state.runItinerary()),
+                "needsFlights", state.needsFlights(),
+                "needsHotels", state.needsHotels());
+        GraphExecutionLogger.replan(state, actions, selectiveNeeds);
         return updates;
     }
 
@@ -104,33 +121,33 @@ public class ReplanStrategyExecutor {
         if (actions.isEmpty()) {
             return;
         }
-        boolean needsFlights = false;
-        boolean needsHotels = false;
-        boolean needsResearch = false;
-        boolean needsWeather = false;
-        boolean needsBudget = false;
-        boolean needsItinerary = false;
+        boolean runFlights = false;
+        boolean runHotels = false;
+        boolean runResearch = false;
+        boolean runWeather = false;
+        boolean runBudget = false;
+        boolean runItinerary = false;
 
         for (ReplanAction action : actions) {
             switch (action) {
-                case CHEAPER_FLIGHT -> needsFlights = true;
-                case REDUCE_HOTEL_BUDGET, HOTEL_UPGRADE -> needsHotels = true;
-                case REMOVE_EXPENSIVE_ATTRACTIONS, ADD_DESTINATION -> needsResearch = true;
-                case ADJUST_ITINERARY -> needsItinerary = true;
+                case CHEAPER_FLIGHT -> runFlights = true;
+                case REDUCE_HOTEL_BUDGET, HOTEL_UPGRADE -> runHotels = true;
+                case REMOVE_EXPENSIVE_ATTRACTIONS, ADD_DESTINATION -> runResearch = true;
+                case ADJUST_ITINERARY -> runItinerary = true;
             }
         }
-        if (needsFlights || needsHotels || needsResearch) {
-            needsBudget = state.needsBudget();
+        if (runFlights || runHotels || runResearch) {
+            runBudget = state.needsBudget();
         }
-        if (needsItinerary || actions.contains(ReplanAction.ADD_DESTINATION)) {
-            needsItinerary = true;
+        if (runItinerary || actions.contains(ReplanAction.ADD_DESTINATION)) {
+            runItinerary = true;
         }
 
-        updates.put(TravelState.NEEDS_FLIGHTS, needsFlights);
-        updates.put(TravelState.NEEDS_HOTELS, needsHotels);
-        updates.put(TravelState.NEEDS_RESEARCH, needsResearch);
-        updates.put(TravelState.NEEDS_WEATHER, needsWeather);
-        updates.put(TravelState.NEEDS_BUDGET, needsBudget);
-        updates.put(TravelState.NEEDS_ITINERARY, needsItinerary);
+        updates.put(TravelState.RUN_FLIGHTS, runFlights);
+        updates.put(TravelState.RUN_HOTELS, runHotels);
+        updates.put(TravelState.RUN_RESEARCH, runResearch);
+        updates.put(TravelState.RUN_WEATHER, runWeather);
+        updates.put(TravelState.RUN_BUDGET, runBudget);
+        updates.put(TravelState.RUN_ITINERARY, runItinerary);
     }
 }

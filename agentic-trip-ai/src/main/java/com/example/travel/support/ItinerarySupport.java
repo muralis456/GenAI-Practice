@@ -1,6 +1,7 @@
 package com.example.travel.support;
 
 import com.example.travel.model.Itinerary;
+import com.example.travel.model.ItineraryActivity;
 import com.example.travel.model.ItineraryDay;
 import com.example.travel.model.TravelAttraction;
 
@@ -10,17 +11,9 @@ import java.util.Locale;
 
 /**
  * Ensures itineraries match trip length and arrival/departure expectations
- * even when the LLM returns a short or incomplete day list.
+ * with structured {@link ItineraryActivity} entries.
  */
 public final class ItinerarySupport {
-
-    private static final List<String> FALLBACK_ACTIVITIES = List.of(
-            "Morning: neighborhood walk and local breakfast. Afternoon: main shopping or park area. Evening: casual dinner.",
-            "Morning: landmark / temple or shrine visit. Afternoon: food market tasting. Evening: free time.",
-            "Morning: museum or indoor attraction (good rain backup). Afternoon: cafe and shopping street. Evening: local cuisine.",
-            "Morning: scenic viewpoint or garden. Afternoon: family-friendly activity. Evening: rest or onsen-style bath if available.",
-            "Morning: flexible day — revisit favorites. Afternoon: souvenirs. Evening: farewell dinner."
-    );
 
     private ItinerarySupport() {
     }
@@ -62,34 +55,111 @@ public final class ItinerarySupport {
         String place = destination == null || destination.isBlank() ? "destination" : destination;
 
         if (day == 1) {
-            // Never keep LLM day-1 content that talks about checkout/departure.
-            String modelTitle = fromModel == null ? null : fromModel.getTitle();
-            String modelActs = fromModel == null ? null : fromModel.getActivities();
-            if (looksLikeDeparture(modelTitle) || looksLikeDeparture(modelActs)) {
-                modelTitle = null;
-                modelActs = null;
+            if (fromModel != null && (looksLikeDeparture(fromModel.getTitle())
+                    || dayText(fromModel).contains("depart"))) {
+                fromModel = null;
             }
-            return new ItineraryDay(1, "Arrival",
-                    firstNonBlank(modelActs,
-                            "Arrive in " + place + ", airport transfer, and hotel check-in. Light local food nearby."));
+            List<ItineraryActivity> activities = fromModel == null || fromModel.getActivities().isEmpty()
+                    ? arrivalActivities(place)
+                    : sanitizeActivities(fromModel.getActivities());
+            return new ItineraryDay(1, "Arrival", activities);
         }
 
         if (day == expected) {
-            String modelTitle = fromModel == null ? null : fromModel.getTitle();
-            String modelActs = fromModel == null ? null : fromModel.getActivities();
-            if (looksLikeArrivalOnly(modelTitle) || looksLikeArrivalOnly(modelActs)) {
-                modelActs = null;
-            }
-            return new ItineraryDay(day, "Departure",
-                    firstNonBlank(modelActs,
-                            "Hotel checkout, airport transfer, and depart from " + place + "."));
+            List<ItineraryActivity> activities = fromModel == null || fromModel.getActivities().isEmpty()
+                    ? departureActivities(place)
+                    : sanitizeActivities(fromModel.getActivities());
+            return new ItineraryDay(day, "Departure", activities);
         }
 
         String title = sanitizeExploreTitle(fromModel == null ? null : fromModel.getTitle(), place, day);
-        String activities = firstNonBlank(
-                usableExploreActivities(fromModel == null ? null : fromModel.getActivities()),
-                activityFor(day, attractions, place));
+        List<ItineraryActivity> activities = fromModel != null && !fromModel.getActivities().isEmpty()
+                ? sanitizeActivities(fromModel.getActivities())
+                : exploreActivities(day, attractions, place);
         return new ItineraryDay(day, title, activities);
+    }
+
+    private static List<ItineraryActivity> arrivalActivities(String place) {
+        return List.of(
+                activity("Arrive at " + place, "transport", "mixed", true, false, false),
+                activity("Hotel check-in", "lodging", "indoor", true, false, false),
+                activity("Light local dinner nearby", "food", "outdoor", true, true, true));
+    }
+
+    private static List<ItineraryActivity> departureActivities(String place) {
+        return List.of(
+                activity("Hotel checkout", "lodging", "indoor", true, false, false),
+                activity("Airport transfer", "transport", "mixed", true, false, false),
+                activity("Depart from " + place, "transport", "mixed", true, false, false));
+    }
+
+    private static List<ItineraryActivity> exploreActivities(int day,
+                                                              List<TravelAttraction> attractions,
+                                                              String place) {
+        List<TravelAttraction> useful = attractions == null ? List.of() : attractions.stream()
+                .filter(a -> a != null && a.getName() != null && !a.getName().isBlank())
+                .filter(a -> place == null || !a.getName().equalsIgnoreCase(place))
+                .toList();
+
+        int exploreIndex = day - 2;
+        if (!useful.isEmpty()) {
+            TravelAttraction pick = useful.get(Math.floorMod(exploreIndex, useful.size()));
+            String area = pick.getArea() == null || pick.getArea().isBlank() ? "" : " (" + pick.getArea() + ")";
+            return List.of(
+                    activity("Visit " + pick.getName() + area, "sightseeing", "outdoor", true, false, true),
+                    activity("Local food nearby", "food", "outdoor", true, true, true),
+                    activity("Neighborhood walk", "leisure", "outdoor", true, false, true));
+        }
+
+        return switch (Math.floorMod(exploreIndex, 4)) {
+            case 0 -> List.of(
+                    activity("Neighborhood walk in " + place, "leisure", "outdoor", true, false, true),
+                    activity("Local breakfast spot", "food", "indoor", true, true, true),
+                    activity("Evening casual dinner", "food", "outdoor", true, true, true));
+            case 1 -> List.of(
+                    activity("Landmark or shrine visit", "culture", "outdoor", true, false, true),
+                    activity("Food market tasting", "food", "outdoor", true, true, true),
+                    activity("Free evening", "leisure", "mixed", true, false, false));
+            case 2 -> List.of(
+                    activity("Museum or indoor attraction", "culture", "indoor", true, true, false),
+                    activity("Cafe and shopping street", "shopping", "outdoor", true, false, true),
+                    activity("Local cuisine dinner", "food", "indoor", true, true, true));
+            default -> List.of(
+                    activity("Scenic garden or park", "nature", "outdoor", true, true, false),
+                    activity("Family-friendly activity", "family", "mixed", true, true, false),
+                    activity("Farewell dinner", "food", "indoor", true, true, true));
+        };
+    }
+
+    private static List<ItineraryActivity> sanitizeActivities(List<ItineraryActivity> incoming) {
+        List<ItineraryActivity> cleaned = new ArrayList<>();
+        for (ItineraryActivity item : incoming) {
+            if (item == null || item.getName() == null || item.getName().isBlank()) {
+                continue;
+            }
+            String lower = item.getName().toLowerCase(Locale.ROOT);
+            if (lower.contains("(indoor activity)") || lower.contains("(outdoor activity)")) {
+                item.setName(item.getName().replaceAll("(?i)\\((indoor|outdoor) activity\\)", "").trim());
+            }
+            if (item.getIndoorOutdoor() == null || item.getIndoorOutdoor().isBlank()) {
+                item.setIndoorOutdoor(lower.contains("museum") || lower.contains("indoor") ? "indoor" : "outdoor");
+            }
+            cleaned.add(item);
+        }
+        return cleaned.isEmpty() ? List.of() : cleaned;
+    }
+
+    private static ItineraryActivity activity(String name,
+                                              String type,
+                                              String indoorOutdoor,
+                                              boolean familyFriendly,
+                                              boolean foodExperience,
+                                              boolean localExperience) {
+        return new ItineraryActivity(name, type, indoorOutdoor, familyFriendly, foodExperience, localExperience);
+    }
+
+    private static String dayText(ItineraryDay day) {
+        return (day.getTitle() == null ? "" : day.getTitle()) + " " + day.activitiesText();
     }
 
     private static String sanitizeExploreTitle(String title, String place, int day) {
@@ -97,16 +167,6 @@ public final class ItinerarySupport {
             return "Explore " + place + " — Day " + day;
         }
         return title.trim();
-    }
-
-    private static String usableExploreActivities(String activities) {
-        if (activities == null || activities.isBlank()) {
-            return "";
-        }
-        if (looksLikeDeparture(activities) || looksLikeArrivalOnly(activities)) {
-            return "";
-        }
-        return activities.trim();
     }
 
     private static boolean looksLikeDeparture(String text) {
@@ -127,43 +187,5 @@ public final class ItinerarySupport {
                 || lower.contains("check in");
         boolean departure = looksLikeDeparture(lower);
         return arrival && !departure && !lower.contains("explore");
-    }
-
-    private static String activityFor(int day, List<TravelAttraction> attractions, String place) {
-        List<TravelAttraction> useful = attractions == null ? List.of() : attractions.stream()
-                .filter(a -> a != null && a.getName() != null && !a.getName().isBlank())
-                .filter(a -> place == null || !a.getName().equalsIgnoreCase(place))
-                .filter(a -> !"See destination guide.".equalsIgnoreCase(
-                        a.getDescription() == null ? "" : a.getDescription().trim()))
-                .toList();
-
-        int exploreIndex = day - 2;
-        if (!useful.isEmpty() && useful.size() > 1) {
-            TravelAttraction pick = useful.get(Math.floorMod(exploreIndex, useful.size()));
-            return formatAttractionDay(pick);
-        }
-        if (useful.size() == 1 && exploreIndex == 0) {
-            return formatAttractionDay(useful.get(0));
-        }
-        return FALLBACK_ACTIVITIES.get(Math.floorMod(exploreIndex, FALLBACK_ACTIVITIES.size()))
-                .replace("neighborhood", place);
-    }
-
-    private static String formatAttractionDay(TravelAttraction pick) {
-        String area = pick.getArea() == null || pick.getArea().isBlank() ? "" : " (" + pick.getArea() + ")";
-        return "Morning: visit " + pick.getName() + area
-                + ". Afternoon: local food nearby and a neighborhood walk. Evening: free time.";
-    }
-
-    private static String firstNonBlank(String... values) {
-        if (values == null) {
-            return "";
-        }
-        for (String value : values) {
-            if (value != null && !value.isBlank()) {
-                return value.trim();
-            }
-        }
-        return "";
     }
 }

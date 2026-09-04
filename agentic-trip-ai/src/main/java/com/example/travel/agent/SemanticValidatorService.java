@@ -1,14 +1,19 @@
 package com.example.travel.agent;
 
 import com.example.travel.config.TravelModelsProperties.AgentRole;
+import com.example.travel.graph.GraphExecutionLogger;
 import com.example.travel.graph.TravelState;
+import com.example.travel.model.ReplanAction;
 import com.example.travel.model.SemanticValidationResult;
+import com.example.travel.model.TripRequirements;
 import com.example.travel.model.ValidationStatus;
+import com.example.travel.service.RequirementEvaluator;
 import com.example.travel.service.RoutedLlm;
 import com.example.travel.support.JsonSupport;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import tools.jackson.databind.JsonNode;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -24,10 +29,14 @@ public class SemanticValidatorService {
 
     private final RoutedLlm routedLlm;
     private final JsonSupport jsonSupport;
+    private final RequirementEvaluator requirementEvaluator;
 
-    public SemanticValidatorService(RoutedLlm routedLlm, JsonSupport jsonSupport) {
+    public SemanticValidatorService(RoutedLlm routedLlm,
+                                    JsonSupport jsonSupport,
+                                    RequirementEvaluator requirementEvaluator) {
         this.routedLlm = routedLlm;
         this.jsonSupport = jsonSupport;
+        this.requirementEvaluator = requirementEvaluator;
     }
 
     public SemanticValidationResult review(TravelState state) {
@@ -38,8 +47,8 @@ public class SemanticValidatorService {
             return result;
         }
 
-        List<String> heuristicIssues = heuristicIssues(state);
-        result.getIssues().addAll(heuristicIssues);
+        TripRequirements requirements = state.tripRequirements();
+        result.getIssues().addAll(requirementEvaluator.evaluateIssues(state, requirements));
 
         try {
             String content = routedLlm.complete(AgentRole.EXTRACT,
@@ -53,31 +62,28 @@ public class SemanticValidatorService {
                             + "\nStyle: " + state.travelStyle()
                             + "\nBudget within ceiling: " + (state.budgetSummary() == null || state.budgetSummary().isWithinBudget())
                             + "\nItinerary:\n" + state.itinerary().toDisplay());
-            SemanticValidationResult parsed = jsonSupport.read(content, SemanticValidationResult.class)
-                    .orElseGet(SemanticValidationResult::new);
-            if (parsed.getStatus() != null) {
-                result.setStatus(parsed.getStatus());
-            }
-            if (parsed.getScore() > 0) {
-                result.setScore(parsed.getScore());
-            }
-            for (String issue : parsed.getIssues()) {
-                if (!TravelState.isBlank(issue) && !result.getIssues().contains(issue)) {
-                    result.getIssues().add(issue);
-                }
-            }
-            result.setRecommendedActions(parsed.getRecommendedActions());
+            jsonSupport.readTree(content).ifPresent(tree -> mergeLlmResult(result, tree));
         } catch (Exception exception) {
-            log.warn("Semantic validator LLM failed; using heuristics only", exception);
-            if (!heuristicIssues.isEmpty()) {
+            log.warn("Semantic validator LLM failed; using structured heuristics only", exception);
+            if (!result.getIssues().isEmpty()) {
                 result.setStatus(ValidationStatus.WARN);
                 result.setScore(0.72);
             }
         }
 
+        if (!result.getIssues().isEmpty() && result.getScore() >= 0.8) {
+            result.setScore(Math.min(result.getScore(), 0.72));
+        }
         if (result.failed() && result.getStatus() != ValidationStatus.FAIL) {
             result.setStatus(ValidationStatus.FAIL);
         }
+        if (result.getRecommendedActions().isEmpty() && result.failed()) {
+            result.getRecommendedActions().add(ReplanAction.ADJUST_ITINERARY);
+        }
+        GraphExecutionLogger.semanticValidation(state,
+                result.getStatus() == null ? "PASS" : result.getStatus().name(),
+                result.getScore(),
+                result.getIssues());
         return result;
     }
 
@@ -85,25 +91,35 @@ public class SemanticValidatorService {
         return result == null ? List.of() : new ArrayList<>(result.getIssues());
     }
 
-    private List<String> heuristicIssues(TravelState state) {
-        List<String> notes = new ArrayList<>();
-        String request = state.userRequest().toLowerCase(Locale.ROOT);
-        boolean family = request.contains("family") || request.contains("children") || request.contains("kids");
-        if (family) {
-            String itineraryText = state.itinerary().toDisplay().toLowerCase(Locale.ROOT);
-            if (!containsAny(itineraryText, "park", "family", "kid", "museum", "zoo", "aquarium", "garden")) {
-                notes.add("Itinerary may not clearly include family-friendly activities.");
+    private void mergeLlmResult(SemanticValidationResult result, JsonNode tree) {
+        if (tree.hasNonNull("status")) {
+            try {
+                result.setStatus(ValidationStatus.valueOf(tree.get("status").asText().toUpperCase(Locale.ROOT)));
+            } catch (IllegalArgumentException ignored) {
+                // keep existing status
             }
         }
-        return notes;
-    }
-
-    private boolean containsAny(String text, String... needles) {
-        for (String needle : needles) {
-            if (text.contains(needle)) {
-                return true;
+        if (tree.has("score")) {
+            result.setScore(tree.get("score").asDouble());
+        }
+        if (tree.has("issues") && tree.get("issues").isArray()) {
+            for (JsonNode issue : tree.get("issues")) {
+                String text = issue.asText("");
+                if (!TravelState.isBlank(text) && !result.getIssues().contains(text)) {
+                    result.getIssues().add(text);
+                }
             }
         }
-        return false;
+        if (tree.has("recommendedActions") && tree.get("recommendedActions").isArray()) {
+            List<ReplanAction> actions = new ArrayList<>();
+            for (JsonNode token : tree.get("recommendedActions")) {
+                ReplanAction.fromToken(token.asText("")).ifPresent(action -> {
+                    if (!actions.contains(action)) {
+                        actions.add(action);
+                    }
+                });
+            }
+            result.setRecommendedActions(actions);
+        }
     }
 }

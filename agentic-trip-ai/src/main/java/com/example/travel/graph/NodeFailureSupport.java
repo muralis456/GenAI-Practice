@@ -10,7 +10,7 @@ public final class NodeFailureSupport {
     private NodeFailureSupport() {
     }
 
-    public static Map<String, Object> record(String node, Exception ex, boolean retryable, int previousRetries) {
+    public static Map<String, Object> record(String node, TravelState state, Exception ex, boolean retryable, int previousRetries) {
         NodeFailureInfo failure = new NodeFailureInfo();
         failure.setLastFailedNode(node);
         failure.setLastError(ex.getMessage() == null ? ex.getClass().getSimpleName() : ex.getMessage());
@@ -20,6 +20,7 @@ public final class NodeFailureSupport {
         Map<String, Object> updates = new LinkedHashMap<>();
         updates.put(TravelState.NODE_FAILURE, failure);
         updates.putAll(TravelState.trace(node, "fail", failure.getLastError()));
+        GraphExecutionLogger.nodeFailure(node, state, failure.getLastError(), retryable, failure.getNodeRetryCount());
         return updates;
     }
 

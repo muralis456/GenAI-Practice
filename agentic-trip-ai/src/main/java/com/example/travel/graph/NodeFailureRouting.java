@@ -48,6 +48,7 @@ public final class NodeFailureRouting {
             actions.add(ReplanAction.ADJUST_ITINERARY.wireName());
         }
         strategy.setActions(actions);
+        GraphExecutionLogger.replan(state, actions, Map.of("failedNode", node));
         return strategy;
     }
 
@@ -57,16 +58,16 @@ public final class NodeFailureRouting {
         }
         String node = state.nodeFailure().getLastFailedNode();
         if (TravelGraphNodes.FLIGHT.equals(node)) {
-            updates.put(TravelState.NEEDS_FLIGHTS, Boolean.TRUE);
+            updates.put(TravelState.RUN_FLIGHTS, Boolean.TRUE);
         } else if (TravelGraphNodes.HOTEL.equals(node)) {
-            updates.put(TravelState.NEEDS_HOTELS, Boolean.TRUE);
+            updates.put(TravelState.RUN_HOTELS, Boolean.TRUE);
         } else if (TravelGraphNodes.RESEARCH.equals(node)) {
-            updates.put(TravelState.NEEDS_RESEARCH, Boolean.TRUE);
+            updates.put(TravelState.RUN_RESEARCH, Boolean.TRUE);
         } else if (TravelGraphNodes.WEATHER.equals(node)) {
-            updates.put(TravelState.NEEDS_WEATHER, Boolean.TRUE);
+            updates.put(TravelState.RUN_WEATHER, Boolean.TRUE);
         }
         if (state.needsBudget()) {
-            updates.put(TravelState.NEEDS_BUDGET, Boolean.TRUE);
+            updates.put(TravelState.RUN_BUDGET, Boolean.TRUE);
         }
     }
 }

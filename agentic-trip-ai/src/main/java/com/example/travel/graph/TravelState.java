@@ -16,6 +16,7 @@ import com.example.travel.model.SemanticValidationResult;
 import com.example.travel.model.SupervisorAssessment;
 import com.example.travel.model.TravelAttraction;
 import com.example.travel.model.TravelResearch;
+import com.example.travel.model.TripRequirements;
 import com.example.travel.model.WeatherForecast;
 import org.bsc.langgraph4j.state.AgentState;
 import org.bsc.langgraph4j.state.Channel;
@@ -57,6 +58,9 @@ public class TravelState extends AgentState {
     public static final String VALIDATION_ERRORS = TravelStateKeys.Validation.VALIDATION_ERRORS;
     public static final String RETRY_COUNT = TravelStateKeys.Control.RETRY_COUNT;
     public static final String MAX_RETRIES = TravelStateKeys.Control.MAX_RETRIES;
+    public static final String FINAL_TIPS = TravelStateKeys.Results.FINAL_TIPS;
+    /** @deprecated Use {@link #FINAL_TIPS}. */
+    @Deprecated
     public static final String FINAL_PLAN = TravelStateKeys.Results.FINAL_PLAN;
     public static final String REPLAN_NOTES = TravelStateKeys.Planning.REPLAN_NOTES;
     public static final String COST_FACTOR = TravelStateKeys.Budget.COST_FACTOR;
@@ -73,6 +77,12 @@ public class TravelState extends AgentState {
     public static final String NEEDS_WEATHER = TravelStateKeys.Needs.NEEDS_WEATHER;
     public static final String NEEDS_BUDGET = TravelStateKeys.Needs.NEEDS_BUDGET;
     public static final String NEEDS_ITINERARY = TravelStateKeys.Needs.NEEDS_ITINERARY;
+    public static final String RUN_FLIGHTS = TravelStateKeys.Run.RUN_FLIGHTS;
+    public static final String RUN_HOTELS = TravelStateKeys.Run.RUN_HOTELS;
+    public static final String RUN_RESEARCH = TravelStateKeys.Run.RUN_RESEARCH;
+    public static final String RUN_WEATHER = TravelStateKeys.Run.RUN_WEATHER;
+    public static final String RUN_BUDGET = TravelStateKeys.Run.RUN_BUDGET;
+    public static final String RUN_ITINERARY = TravelStateKeys.Run.RUN_ITINERARY;
     public static final String PLAN_STRATEGY = TravelStateKeys.Planning.PLAN_STRATEGY;
     public static final String PLAN_PRIORITY = TravelStateKeys.Planning.PLAN_PRIORITY;
     public static final String LAST_DECISION = TravelStateKeys.Control.LAST_DECISION;
@@ -81,6 +91,7 @@ public class TravelState extends AgentState {
     public static final String PROVENANCE = TravelStateKeys.Control.PROVENANCE;
     public static final String HOTEL_CHEAPER = TravelStateKeys.Preferences.HOTEL_CHEAPER;
     public static final String FLIGHT_PREFERENCE = TravelStateKeys.Preferences.FLIGHT_PREFERENCE;
+    public static final String TRIP_REQUIREMENTS = TravelStateKeys.Preferences.TRIP_REQUIREMENTS;
     public static final String MODEL_POLICY = TravelStateKeys.Request.MODEL_POLICY;
     public static final String INTENT_CONFIDENCE = TravelStateKeys.Request.INTENT_CONFIDENCE;
     public static final String MODIFICATION = TravelStateKeys.Hitl.MODIFICATION;
@@ -230,8 +241,18 @@ public class TravelState extends AgentState {
         return 0;
     }
 
-    public String finalPlan() {
+    public String finalTips() {
+        String tips = this.<String>value(FINAL_TIPS).orElse("");
+        if (!isBlank(tips)) {
+            return tips;
+        }
         return this.<String>value(FINAL_PLAN).orElse("");
+    }
+
+    /** @deprecated Use {@link #finalTips()}. */
+    @Deprecated
+    public String finalPlan() {
+        return finalTips();
     }
 
     public int maxRetries() {
@@ -314,6 +335,82 @@ public class TravelState extends AgentState {
 
     public boolean needsItinerary() {
         return flag(NEEDS_ITINERARY);
+    }
+
+    public boolean runFlights() {
+        return flag(RUN_FLIGHTS);
+    }
+
+    public boolean runHotels() {
+        return flag(RUN_HOTELS);
+    }
+
+    public boolean runResearch() {
+        return flag(RUN_RESEARCH);
+    }
+
+    public boolean runWeather() {
+        return flag(RUN_WEATHER);
+    }
+
+    public boolean runBudget() {
+        return flag(RUN_BUDGET);
+    }
+
+    public boolean runItinerary() {
+        return flag(RUN_ITINERARY);
+    }
+
+    public static void applyIntentAndRun(Map<String, Object> updates, com.example.travel.model.IntentPlan plan) {
+        updates.put(NEEDS_FLIGHTS, plan.isNeedsFlights());
+        updates.put(NEEDS_HOTELS, plan.isNeedsHotels());
+        updates.put(NEEDS_RESEARCH, plan.isNeedsResearch());
+        updates.put(NEEDS_WEATHER, plan.isNeedsWeather());
+        updates.put(NEEDS_BUDGET, plan.isNeedsBudget());
+        updates.put(NEEDS_ITINERARY, plan.isNeedsItinerary());
+        updates.put(RUN_FLIGHTS, plan.isNeedsFlights());
+        updates.put(RUN_HOTELS, plan.isNeedsHotels());
+        updates.put(RUN_RESEARCH, plan.isNeedsResearch());
+        updates.put(RUN_WEATHER, plan.isNeedsWeather());
+        updates.put(RUN_BUDGET, plan.isNeedsBudget());
+        updates.put(RUN_ITINERARY, plan.isNeedsItinerary());
+    }
+
+    /** Whether flight results exist in state (independent of selective replan routing flags). */
+    public boolean hasUsableFlights() {
+        return flights().stream().anyMatch(flight ->
+                flight != null && !"unavailable".equalsIgnoreCase(flight.getStatus()));
+    }
+
+    public boolean hasHotelResults() {
+        return !hotels().isEmpty();
+    }
+
+    public boolean hasBudgetEstimate() {
+        BudgetSummary budget = budgetSummary();
+        return budget != null && budget.getEstimatedCost() != null && budget.getEstimatedCost().signum() > 0;
+    }
+
+    public boolean includeFlightsInReport() {
+        return needsFlights() || hasUsableFlights();
+    }
+
+    public boolean includeHotelsInReport() {
+        return needsHotels() || hasHotelResults();
+    }
+
+    public boolean includeBudgetInReport() {
+        return needsBudget() || hasBudgetEstimate();
+    }
+
+    public boolean includeItineraryInReport() {
+        Itinerary plan = itinerary();
+        return needsItinerary() || (plan != null && !plan.isEmpty());
+    }
+
+    public boolean includeWeatherInReport() {
+        WeatherForecast forecast = weather();
+        return needsWeather() || (forecast != null && !TravelState.isBlank(forecast.getSummary()));
     }
 
     public String planStrategy() {
@@ -399,6 +496,10 @@ public class TravelState extends AgentState {
 
     public SupervisorAssessment supervisorAssessment() {
         return this.<SupervisorAssessment>value(SUPERVISOR_ASSESSMENT).orElseGet(SupervisorAssessment::new);
+    }
+
+    public TripRequirements tripRequirements() {
+        return this.<TripRequirements>value(TRIP_REQUIREMENTS).orElseGet(TripRequirements::new);
     }
 
     public NodeFailureInfo nodeFailure() {

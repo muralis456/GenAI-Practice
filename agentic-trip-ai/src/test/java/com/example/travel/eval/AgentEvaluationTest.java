@@ -153,10 +153,10 @@ class AgentEvaluationTest {
     @Test
     void routerSkipsAirportWhenFlightsNotNeeded() {
         Map<String, Object> data = new LinkedHashMap<>();
-        data.put(TravelState.NEEDS_FLIGHTS, Boolean.FALSE);
-        data.put(TravelState.NEEDS_HOTELS, Boolean.TRUE);
-        data.put(TravelState.NEEDS_RESEARCH, Boolean.TRUE);
-        data.put(TravelState.NEEDS_WEATHER, Boolean.TRUE);
+        data.put(TravelState.RUN_FLIGHTS, Boolean.FALSE);
+        data.put(TravelState.RUN_HOTELS, Boolean.TRUE);
+        data.put(TravelState.RUN_RESEARCH, Boolean.TRUE);
+        data.put(TravelState.RUN_WEATHER, Boolean.TRUE);
         TravelState state = new TravelState(data);
         assertEquals(TravelGraphNodes.FAN_OUT, SpecialistRouter.afterPlanner(state));
         assertFalse(SpecialistRouter.plannedSpecialists(state).contains("flight"));
@@ -176,8 +176,8 @@ class AgentEvaluationTest {
     @Test
     void supervisorSkipBudgetWhenNotNeeded() {
         Map<String, Object> data = new LinkedHashMap<>();
-        data.put(TravelState.NEEDS_BUDGET, Boolean.FALSE);
-        data.put(TravelState.NEEDS_ITINERARY, Boolean.TRUE);
+        data.put(TravelState.RUN_BUDGET, Boolean.FALSE);
+        data.put(TravelState.RUN_ITINERARY, Boolean.TRUE);
         TravelState state = new TravelState(data);
         assertEquals(TravelGraphNodes.ITINERARY, SpecialistRouter.afterSupervisor(state));
     }
@@ -236,7 +236,7 @@ class AgentEvaluationTest {
         var strategy = NodeFailureRouting.replanForFailure(state);
         assertFalse(strategy.getActions().isEmpty());
         Map<String, Object> updates = new ReplanStrategyExecutor(new ReplanActionValidator()).apply(state, strategy);
-        assertEquals(Boolean.TRUE, updates.get(TravelState.NEEDS_FLIGHTS));
+        assertEquals(Boolean.TRUE, updates.get(TravelState.RUN_FLIGHTS));
     }
 
     @Test

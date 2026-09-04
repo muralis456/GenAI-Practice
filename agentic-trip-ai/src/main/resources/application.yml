@@ -67,8 +67,15 @@ travel:
   currency:
     rates-url: https://api.frankfurter.app/latest
 
+app:
+  browser:
+    enabled: true
+    use-chrome: true
+    # chrome-path: "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"
+
 logging:
   level:
+    com.example.travel.graph.GraphExecutionLogger: INFO
     com.example.travel: INFO
     org.springframework.ai: INFO
     org.hibernate.SQL: INFO

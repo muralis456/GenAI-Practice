@@ -1,181 +1,149 @@
 package com.example.travel.dto;
 
-import com.example.travel.model.AgentStep;
-import com.example.travel.model.BudgetSummary;
-import com.example.travel.model.PlanQualityScore;
 
-import java.util.ArrayList;
-import java.util.List;
+
+/**
+
+ * API response: metadata + structured plan + execution observability.
+
+ */
 
 public class TravelPlanResponse {
 
-    private String userId;
-    private String destination;
-    private String model;
-    private String finalPlan;
-    private String flightInsights;
-    private String travelInsights;
-    private String hotelInsights;
-    private String itinerarySummary;
-    private String status;
+
+
     private String threadId;
+
+    private String status;
+
     private boolean awaitingApproval;
-    private String routeSummary;
-    private BudgetSummary budgetSummary;
-    private List<AgentStep> pipeline = new ArrayList<>();
-    private List<String> validationErrors = new ArrayList<>();
-    private List<String> sources = new ArrayList<>();
-    private PlanQualityScore planQuality;
+
+    private String userId;
+
+    private String model;
+
+    private TripPlanResult plan = new TripPlanResult();
+
+    private AgentExecutionDetails execution = new AgentExecutionDetails();
+
+
 
     public TravelPlanResponse() {
+
     }
 
-    public TravelPlanResponse(String userId, String destination, String model, String finalPlan,
-                             String flightInsights, String travelInsights, String hotelInsights, String itinerarySummary) {
-        this.userId = userId;
-        this.destination = destination;
-        this.model = model;
-        this.finalPlan = finalPlan;
-        this.flightInsights = flightInsights;
-        this.travelInsights = travelInsights;
-        this.hotelInsights = hotelInsights;
-        this.itinerarySummary = itinerarySummary;
-        this.status = "COMPLETE";
-    }
 
-    public String getUserId() {
-        return userId;
-    }
-
-    public void setUserId(String userId) {
-        this.userId = userId;
-    }
-
-    public String getDestination() {
-        return destination;
-    }
-
-    public void setDestination(String destination) {
-        this.destination = destination;
-    }
-
-    public String getModel() {
-        return model;
-    }
-
-    public void setModel(String model) {
-        this.model = model;
-    }
-
-    public String getFinalPlan() {
-        return finalPlan;
-    }
-
-    public void setFinalPlan(String finalPlan) {
-        this.finalPlan = finalPlan;
-    }
-
-    public String getFlightInsights() {
-        return flightInsights;
-    }
-
-    public void setFlightInsights(String flightInsights) {
-        this.flightInsights = flightInsights;
-    }
-
-    public String getTravelInsights() {
-        return travelInsights;
-    }
-
-    public void setTravelInsights(String travelInsights) {
-        this.travelInsights = travelInsights;
-    }
-
-    public String getItinerarySummary() {
-        return itinerarySummary;
-    }
-
-    public void setItinerarySummary(String itinerarySummary) {
-        this.itinerarySummary = itinerarySummary;
-    }
-
-    public String getHotelInsights() {
-        return hotelInsights;
-    }
-
-    public void setHotelInsights(String hotelInsights) {
-        this.hotelInsights = hotelInsights;
-    }
-
-    public String getStatus() {
-        return status;
-    }
-
-    public void setStatus(String status) {
-        this.status = status;
-    }
 
     public String getThreadId() {
+
         return threadId;
+
     }
+
+
 
     public void setThreadId(String threadId) {
+
         this.threadId = threadId;
+
     }
+
+
+
+    public String getStatus() {
+
+        return status;
+
+    }
+
+
+
+    public void setStatus(String status) {
+
+        this.status = status;
+
+    }
+
+
 
     public boolean isAwaitingApproval() {
+
         return awaitingApproval;
+
     }
+
+
 
     public void setAwaitingApproval(boolean awaitingApproval) {
+
         this.awaitingApproval = awaitingApproval;
+
     }
 
-    public String getRouteSummary() {
-        return routeSummary;
+
+
+    public String getUserId() {
+
+        return userId;
+
     }
 
-    public void setRouteSummary(String routeSummary) {
-        this.routeSummary = routeSummary;
+
+
+    public void setUserId(String userId) {
+
+        this.userId = userId;
+
     }
 
-    public BudgetSummary getBudgetSummary() {
-        return budgetSummary;
+
+
+    public String getModel() {
+
+        return model;
+
     }
 
-    public void setBudgetSummary(BudgetSummary budgetSummary) {
-        this.budgetSummary = budgetSummary;
+
+
+    public void setModel(String model) {
+
+        this.model = model;
+
     }
 
-    public List<AgentStep> getPipeline() {
-        return pipeline;
+
+
+    public TripPlanResult getPlan() {
+
+        return plan;
+
     }
 
-    public void setPipeline(List<AgentStep> pipeline) {
-        this.pipeline = pipeline;
+
+
+    public void setPlan(TripPlanResult plan) {
+
+        this.plan = plan == null ? new TripPlanResult() : plan;
+
     }
 
-    public List<String> getValidationErrors() {
-        return validationErrors;
+
+
+    public AgentExecutionDetails getExecution() {
+
+        return execution;
+
     }
 
-    public void setValidationErrors(List<String> validationErrors) {
-        this.validationErrors = validationErrors;
+
+
+    public void setExecution(AgentExecutionDetails execution) {
+
+        this.execution = execution == null ? new AgentExecutionDetails() : execution;
+
     }
 
-    public List<String> getSources() {
-        return sources;
-    }
-
-    public void setSources(List<String> sources) {
-        this.sources = sources == null ? new ArrayList<>() : sources;
-    }
-
-    public PlanQualityScore getPlanQuality() {
-        return planQuality;
-    }
-
-    public void setPlanQuality(PlanQualityScore planQuality) {
-        this.planQuality = planQuality;
-    }
 }
+
+

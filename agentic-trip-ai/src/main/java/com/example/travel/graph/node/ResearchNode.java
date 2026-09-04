@@ -1,13 +1,14 @@
 package com.example.travel.graph.node;
 
 import com.example.travel.agent.TravelResearchAgentService;
+import com.example.travel.graph.GraphExecutionLogger;
 import com.example.travel.graph.NodeFailureSupport;
-import com.example.travel.support.ToolFailureClassifier;
 import com.example.travel.graph.TravelGraphNodes;
 import com.example.travel.graph.TravelState;
 import com.example.travel.graph.model.ResearchExtraction;
 import com.example.travel.model.ProvenanceEvent;
 import com.example.travel.model.SearchHit;
+import com.example.travel.support.ToolFailureClassifier;
 import org.bsc.langgraph4j.action.NodeAction;
 import org.springframework.stereotype.Component;
 
@@ -27,7 +28,7 @@ public class ResearchNode implements NodeAction<TravelState> {
 
     @Override
     public Map<String, Object> apply(TravelState state) {
-        if (!state.needsResearch()) {
+        if (!state.runResearch()) {
             Map<String, Object> skip = new LinkedHashMap<>();
             skip.putAll(TravelState.trace(TravelGraphNodes.RESEARCH, "skip", "not requested"));
             return skip;
@@ -39,6 +40,8 @@ public class ResearchNode implements NodeAction<TravelState> {
             updates.put(TravelState.RESEARCH, extraction.getResearch());
             updates.put(TravelState.ATTRACTIONS, extraction.getAttractions());
             updates.putAll(TravelState.trace(TravelGraphNodes.RESEARCH, "ok", "research complete"));
+            GraphExecutionLogger.specialistResult(TravelGraphNodes.RESEARCH, state, "ok",
+                    "topics=" + extraction.getResearch().size() + " attractions=" + extraction.getAttractions().size());
             List<ProvenanceEvent> events = new ArrayList<>();
             for (SearchHit hit : result.hits()) {
                 events.add(new ProvenanceEvent("research", "Tavily",
@@ -52,7 +55,7 @@ public class ResearchNode implements NodeAction<TravelState> {
             updates.put(TravelState.PROVENANCE, events);
             return updates;
         } catch (Exception ex) {
-            return NodeFailureSupport.record(TravelGraphNodes.RESEARCH, ex,
+            return NodeFailureSupport.record(TravelGraphNodes.RESEARCH, state, ex,
                     ToolFailureClassifier.fromException(ex).isRetryable(),
                     state.nodeFailure().getNodeRetryCount());
         }

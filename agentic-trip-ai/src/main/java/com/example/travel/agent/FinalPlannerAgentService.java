@@ -27,6 +27,14 @@ public class FinalPlannerAgentService {
      * Final Agent after Validator: facts are rendered from TravelState (no hallucination),
      * then a short Tips section is optionally polished by the LLM.
      */
+    public String buildTips(TravelState state) {
+        return polishTips(state);
+    }
+
+    /**
+     * @deprecated Use {@link TripPlanAssembler} + {@link com.example.travel.dto.TripPlanResult} for API responses.
+     */
+    @Deprecated
     public String compose(TravelState state) {
         log.info("Final agent composing validated report for destination={}", state.destination());
         String factual = buildFactualReport(state);
@@ -51,27 +59,23 @@ public class FinalPlannerAgentService {
         }
 
         sb.append("\n**Flights**\n");
-        if (!state.needsFlights()) {
+        if (!state.includeFlightsInReport()) {
             sb.append("Not requested for this query.\n");
+        } else if (!state.hasUsableFlights()) {
+            sb.append("No reliable flight options were returned for this route/date.\n");
         } else {
-            boolean flightsUnavailable = state.flights().isEmpty()
-                    || state.flights().stream().allMatch(f -> "unavailable".equalsIgnoreCase(f.getStatus()));
-            if (flightsUnavailable) {
-                sb.append("No reliable flight options were returned for this route/date.\n");
-            } else {
-                for (FlightOption flight : state.flights()) {
-                    if ("unavailable".equalsIgnoreCase(nullToEmpty(flight.getStatus()))) {
-                        continue;
-                    }
-                    sb.append("- ").append(flight.toDisplay()).append('\n');
+            for (FlightOption flight : state.flights()) {
+                if ("unavailable".equalsIgnoreCase(nullToEmpty(flight.getStatus()))) {
+                    continue;
                 }
+                sb.append("- ").append(flight.toDisplay()).append('\n');
             }
         }
 
         sb.append("\n**Hotels**\n");
-        if (!state.needsHotels()) {
+        if (!state.includeHotelsInReport()) {
             sb.append("Not requested for this query.\n");
-        } else if (state.hotels().isEmpty()) {
+        } else if (!state.hasHotelResults()) {
             sb.append("No hotel options extracted.\n");
         } else {
             for (HotelOption hotel : state.hotels()) {
@@ -80,7 +84,7 @@ public class FinalPlannerAgentService {
         }
 
         sb.append("\n**Day-by-day itinerary**\n");
-        if (!state.needsItinerary()) {
+        if (!state.includeItineraryInReport()) {
             sb.append("Not requested for this query.\n");
         } else if (state.itinerary() != null && state.itinerary().getDays() != null) {
             for (ItineraryDay day : state.itinerary().getDays()) {
@@ -89,14 +93,15 @@ public class FinalPlannerAgentService {
                     sb.append(" — ").append(day.getTitle());
                 }
                 sb.append('\n');
-                if (!TravelState.isBlank(day.getActivities())) {
-                    sb.append(day.getActivities()).append('\n');
+                String activities = day.activitiesText();
+                if (!TravelState.isBlank(activities)) {
+                    sb.append(activities).append('\n');
                 }
             }
         }
 
         sb.append("\n**Budget**\n");
-        if (!state.needsBudget()) {
+        if (!state.includeBudgetInReport()) {
             sb.append("Not requested for this query.\n");
         } else {
             BudgetSummary budget = state.budgetSummary();
@@ -118,7 +123,7 @@ public class FinalPlannerAgentService {
             }
         }
 
-        if (state.weather() != null && state.needsWeather()) {
+        if (state.includeWeatherInReport() && state.weather() != null) {
             sb.append("\n**Weather**\n").append(state.weather().toDisplay()).append('\n');
         }
         if (!state.semanticNotes().isEmpty()) {
@@ -129,8 +134,12 @@ public class FinalPlannerAgentService {
         }
         if (!state.provenance().isEmpty()) {
             sb.append("\n**Sources**\n");
+            java.util.LinkedHashSet<String> seen = new java.util.LinkedHashSet<>();
             for (var event : state.provenance()) {
-                sb.append("- ").append(event.toDisplay()).append('\n');
+                String line = event.toDisplay();
+                if (seen.add(line)) {
+                    sb.append("- ").append(line).append('\n');
+                }
             }
         }
         return sb.toString().trim();

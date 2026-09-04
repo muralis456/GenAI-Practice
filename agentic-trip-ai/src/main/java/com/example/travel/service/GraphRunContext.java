@@ -1,5 +1,6 @@
 package com.example.travel.service;
 
+import com.example.travel.graph.GraphExecutionLogger;
 import org.springframework.stereotype.Component;
 
 import java.util.concurrent.ConcurrentHashMap;
@@ -22,6 +23,7 @@ public class GraphRunContext {
             return;
         }
         active.put(threadId, new RunContext(budget, policy));
+        GraphExecutionLogger.runContext("open", threadId, policy);
     }
 
     public void attach(String threadId) {
@@ -43,6 +45,7 @@ public class GraphRunContext {
     public void close(String threadId) {
         if (threadId != null) {
             active.remove(threadId);
+            GraphExecutionLogger.runContext("close", threadId, "-");
         }
     }
 

@@ -2,11 +2,12 @@ package com.example.travel.graph;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Picks the next graph node so unused specialists are never scheduled.
  * Native LangGraph fan-out uses {@link TravelGraphNodes#FAN_OUT} with parallel executors;
- * each specialist node no-ops when its {@code needs*} flag is false.
+ * a single specialist bypasses fan-out entirely.
  */
 public final class SpecialistRouter {
 
@@ -14,48 +15,81 @@ public final class SpecialistRouter {
     }
 
     public static String afterPlanner(TravelState state) {
-        if (state.needsFlights()) {
-            return TravelGraphNodes.AIRPORT;
+        String next;
+        String reason;
+        if (state.runFlights()) {
+            next = TravelGraphNodes.AIRPORT;
+            reason = "needsFlights";
+        } else {
+            next = specialistEntry(state);
+            reason = TravelGraphNodes.FAN_OUT.equals(next) ? "parallelSpecialists" : "directSpecialist";
         }
-        if (anySpecialist(state)) {
-            return TravelGraphNodes.FAN_OUT;
-        }
-        return TravelGraphNodes.SUPERVISOR;
+        GraphExecutionLogger.route(TravelGraphNodes.ROUTER, next, state, reason);
+        return next;
     }
 
     public static String afterAirport(TravelState state) {
-        return anySpecialist(state) ? TravelGraphNodes.FAN_OUT : TravelGraphNodes.SUPERVISOR;
+        String next = specialistEntry(state);
+        GraphExecutionLogger.route(TravelGraphNodes.AIRPORT, next, state,
+                TravelGraphNodes.FAN_OUT.equals(next) ? "airportResolved" : "directSpecialist");
+        return next;
     }
 
     public static String afterSupervisor(TravelState state) {
+        String next;
+        String reason;
         if (TravelGraphNodes.ROUTE_RETRY.equalsIgnoreCase(state.supervisorDecision())) {
-            return TravelGraphNodes.REPLAN;
+            next = TravelGraphNodes.REPLAN;
+            reason = "supervisorRetry";
+        } else if (state.runBudget()) {
+            next = TravelGraphNodes.BUDGET;
+            reason = "needsBudget";
+        } else if (state.runItinerary()) {
+            next = TravelGraphNodes.ITINERARY;
+            reason = "needsItinerary";
+        } else {
+            next = TravelGraphNodes.VALIDATOR;
+            reason = "validateOnly";
         }
-        if (state.needsBudget()) {
-            return TravelGraphNodes.BUDGET;
+        GraphExecutionLogger.route(TravelGraphNodes.SUPERVISOR, next, state, reason);
+        return next;
+    }
+
+    /**
+     * When only one specialist is needed, route directly to it instead of scheduling all four fan-out branches.
+     */
+    public static String specialistEntry(TravelState state) {
+        List<String> specialists = plannedSpecialists(state);
+        if (specialists.isEmpty()) {
+            return TravelGraphNodes.SUPERVISOR;
         }
-        if (state.needsItinerary()) {
-            return TravelGraphNodes.ITINERARY;
+        if (specialists.size() == 1) {
+            return specialists.get(0);
         }
-        return TravelGraphNodes.VALIDATOR;
+        return TravelGraphNodes.FAN_OUT;
+    }
+
+    public static Optional<String> soleSpecialist(TravelState state) {
+        List<String> specialists = plannedSpecialists(state);
+        return specialists.size() == 1 ? Optional.of(specialists.get(0)) : Optional.empty();
     }
 
     public static boolean anySpecialist(TravelState state) {
-        return state.needsFlights() || state.needsHotels() || state.needsResearch() || state.needsWeather();
+        return state.runFlights() || state.runHotels() || state.runResearch() || state.runWeather();
     }
 
     public static List<String> plannedSpecialists(TravelState state) {
         List<String> nodes = new ArrayList<>();
-        if (state.needsFlights()) {
+        if (state.runFlights()) {
             nodes.add(TravelGraphNodes.FLIGHT);
         }
-        if (state.needsHotels()) {
+        if (state.runHotels()) {
             nodes.add(TravelGraphNodes.HOTEL);
         }
-        if (state.needsResearch()) {
+        if (state.runResearch()) {
             nodes.add(TravelGraphNodes.RESEARCH);
         }
-        if (state.needsWeather()) {
+        if (state.runWeather()) {
             nodes.add(TravelGraphNodes.WEATHER);
         }
         return nodes;

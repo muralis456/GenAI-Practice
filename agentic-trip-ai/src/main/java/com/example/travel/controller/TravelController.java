@@ -56,8 +56,7 @@ public class TravelController {
         try {
             TravelPlanResponse response = travelPlannerAgentService.createTravelPlan(request, historyContext);
             conversationMemoryService.saveUiMessage(userId, sessionId, "assistant",
-                    response.getFinalPlan() != null ? response.getFinalPlan()
-                            : (response.getRouteSummary() != null ? response.getRouteSummary() : "Plan ready"));
+                    responseMessage(response, "Plan ready"));
             return ResponseEntity.ok(response);
         } catch (RuntimeException ex) {
             conversationMemoryService.saveMessage(userId, sessionId, "assistant",
@@ -93,7 +92,7 @@ public class TravelController {
     public ResponseEntity<TravelPlanResponse> approve(@RequestBody PlanDecisionRequest request) {
         String userId = request.getUserId() != null ? request.getUserId() : "anonymous";
         TravelPlanResponse response = travelPlannerAgentService.approve(userId, request.getThreadId() != null ? request.getThreadId() : userId);
-        conversationMemoryService.saveUiMessage(userId, userId, "assistant", response.getFinalPlan());
+        conversationMemoryService.saveUiMessage(userId, userId, "assistant", responseMessage(response, "Plan approved"));
         return ResponseEntity.ok(response);
     }
 
@@ -109,7 +108,7 @@ public class TravelController {
                     request.getNotes() == null ? "Please adjust the plan" : request.getNotes(),
                     historyContext);
             conversationMemoryService.saveUiMessage(userId, userId, "assistant",
-                    response.getFinalPlan() != null ? response.getFinalPlan() : "Modified plan ready");
+                    responseMessage(response, "Modified plan ready"));
             return ResponseEntity.ok(response);
         } catch (RuntimeException ex) {
             conversationMemoryService.saveMessage(userId, userId, "assistant",
@@ -124,8 +123,23 @@ public class TravelController {
         TravelPlanResponse response = travelPlannerAgentService.reject(userId,
                 request.getThreadId() != null ? request.getThreadId() : userId);
         conversationMemoryService.saveUiMessage(userId, userId, "assistant",
-                response.getFinalPlan() != null ? response.getFinalPlan() : "Plan rejected");
+                responseMessage(response, "Plan rejected"));
         return ResponseEntity.ok(response);
+    }
+
+    private String responseMessage(TravelPlanResponse response, String fallback) {
+        if (response == null || response.getPlan() == null) {
+            return fallback;
+        }
+        String tips = response.getPlan().getTips();
+        if (tips != null && !tips.isBlank()) {
+            return tips;
+        }
+        if (response.getPlan().getItinerary() != null
+                && !response.getPlan().getItinerary().isEmpty()) {
+            return response.getPlan().getItinerary().toDisplay();
+        }
+        return fallback;
     }
 
     @GetMapping("/plan/{threadId}/history")

@@ -1,6 +1,7 @@
 package com.example.travel.graph.node;
 
 import com.example.travel.agent.WeatherAgentService;
+import com.example.travel.graph.GraphExecutionLogger;
 import com.example.travel.graph.NodeFailureSupport;
 import com.example.travel.support.ToolFailureClassifier;
 import com.example.travel.graph.TravelGraphNodes;
@@ -24,7 +25,7 @@ public class WeatherNode implements NodeAction<TravelState> {
 
     @Override
     public Map<String, Object> apply(TravelState state) {
-        if (!state.needsWeather()) {
+        if (!state.runWeather()) {
             Map<String, Object> skip = new LinkedHashMap<>();
             skip.putAll(TravelState.trace(TravelGraphNodes.WEATHER, "skip", "not requested"));
             return skip;
@@ -36,12 +37,15 @@ public class WeatherNode implements NodeAction<TravelState> {
             updates.putAll(TravelState.trace(TravelGraphNodes.WEATHER,
                     weather != null && weather.isRainLikely() ? "warn" : "ok",
                     weather == null ? "no forecast" : weather.toDisplay()));
+            GraphExecutionLogger.specialistResult(TravelGraphNodes.WEATHER, state,
+                    weather != null && weather.isRainLikely() ? "warn" : "ok",
+                    weather == null ? "no forecast" : "rainLikely=" + weather.isRainLikely());
             updates.putAll(TravelState.provenance(new ProvenanceEvent(
                     "weather", "Open-Meteo", "https://open-meteo.com/", 0,
                     state.destination())));
             return updates;
         } catch (Exception ex) {
-            return NodeFailureSupport.record(TravelGraphNodes.WEATHER, ex,
+            return NodeFailureSupport.record(TravelGraphNodes.WEATHER, state, ex,
                     ToolFailureClassifier.fromException(ex).isRetryable(),
                     state.nodeFailure().getNodeRetryCount());
         }

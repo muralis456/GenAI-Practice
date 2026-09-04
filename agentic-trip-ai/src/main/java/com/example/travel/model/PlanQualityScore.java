@@ -82,6 +82,35 @@ public class PlanQualityScore implements Serializable {
         overall = clamp((budget + flight + hotel + itinerary + preferences + weather) / 6.0);
     }
 
+    /**
+     * Requirement-aware weighted score when the user explicitly asked for family/food/local experiences.
+     */
+    public void recomputeWeighted(TripRequirements requirements) {
+        if (requirements == null || !requirements.hasExplicitPreferences()) {
+            recomputeOverall();
+            return;
+        }
+        double wFamily = requirements.isFamilyFriendly() ? 0.25 : 0.0;
+        double wLocal = requirements.isLocalExperiences() ? 0.20 : 0.0;
+        double wFood = requirements.isFoodExperiences() ? 0.15 : 0.0;
+        double wBudget = requirements.isBudgetConscious() ? 0.20 : 0.15;
+        double wItinerary = 0.10;
+        double wWeather = 0.10;
+        double wFlight = 0.10;
+        double wHotel = 0.10;
+        double prefWeight = wFamily + wLocal + wFood;
+        if (prefWeight <= 0.0) {
+            prefWeight = 0.15;
+        }
+        double weightSum = wBudget + wItinerary + wWeather + wFlight + wHotel + prefWeight;
+        overall = clamp((budget * wBudget
+                + flight * wFlight
+                + hotel * wHotel
+                + itinerary * wItinerary
+                + preferences * prefWeight
+                + weather * wWeather) / weightSum);
+    }
+
     private static double clamp(double value) {
         if (Double.isNaN(value) || Double.isInfinite(value)) {
             return 0.0;

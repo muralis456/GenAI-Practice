@@ -4,6 +4,7 @@ import com.example.travel.graph.TravelGraphNodes;
 import com.example.travel.graph.TravelState;
 import com.example.travel.model.ProvenanceEvent;
 import com.example.travel.agent.FlightAgentService;
+import com.example.travel.graph.GraphExecutionLogger;
 import com.example.travel.graph.NodeFailureSupport;
 import com.example.travel.support.ToolFailureClassifier;
 import org.bsc.langgraph4j.action.NodeAction;
@@ -24,7 +25,7 @@ public class FlightNode implements NodeAction<TravelState> {
 
     @Override
     public Map<String, Object> apply(TravelState state) {
-        if (!state.needsFlights()) {
+        if (!state.runFlights()) {
             Map<String, Object> skip = new LinkedHashMap<>();
             skip.put(TravelState.FLIGHTS, List.of());
             skip.putAll(TravelState.trace(TravelGraphNodes.FLIGHT, "skip", "not requested"));
@@ -42,11 +43,13 @@ public class FlightNode implements NodeAction<TravelState> {
             }
             updates.putAll(TravelState.trace(TravelGraphNodes.FLIGHT, "ok",
                     result.originIata() + " -> " + result.destinationIata() + " on " + state.departureDate()));
+            GraphExecutionLogger.specialistResult(TravelGraphNodes.FLIGHT, state, "ok",
+                    "count=" + result.flights().size());
             updates.putAll(TravelState.provenance(new ProvenanceEvent(
                     "flights", "AviationStack", "", 0, result.originIata() + "->" + result.destinationIata())));
             return updates;
         } catch (Exception ex) {
-            return NodeFailureSupport.record(TravelGraphNodes.FLIGHT, ex,
+            return NodeFailureSupport.record(TravelGraphNodes.FLIGHT, state, ex,
                     ToolFailureClassifier.fromException(ex).isRetryable(),
                     state.nodeFailure().getNodeRetryCount());
         }

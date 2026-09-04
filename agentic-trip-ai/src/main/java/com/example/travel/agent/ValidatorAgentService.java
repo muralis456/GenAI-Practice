@@ -78,7 +78,7 @@ public class ValidatorAgentService {
     }
 
     private boolean mentions(ItineraryDay day, String... keywords) {
-        String text = ((day.getTitle() == null ? "" : day.getTitle()) + " " + (day.getActivities() == null ? "" : day.getActivities()))
+        String text = ((day.getTitle() == null ? "" : day.getTitle()) + " " + day.activitiesText())
                 .toLowerCase(Locale.ROOT);
         for (String keyword : keywords) {
             if (text.contains(keyword)) {

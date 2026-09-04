@@ -26,7 +26,8 @@
 
         html, body {
             margin: 0;
-            min-height: 100%;
+            height: 100%;
+            overflow: hidden;
             font-family: Arial, Helvetica, sans-serif;
             background: radial-gradient(circle at top, rgba(52, 116, 196, 0.18), transparent 35%),
                         linear-gradient(120deg, var(--bg-1), var(--bg-2));
@@ -34,12 +35,14 @@
         }
 
         body {
-            min-height: 100vh;
+            height: 100%;
         }
 
         .layout {
             display: flex;
-            min-height: 100vh;
+            height: 100vh;
+            height: 100dvh;
+            overflow: hidden;
         }
 
         .sidebar {
@@ -48,6 +51,8 @@
             background: rgba(9, 17, 31, 0.75);
             border-right: 1px solid var(--border);
             backdrop-filter: blur(6px);
+            flex-shrink: 0;
+            overflow-y: auto;
         }
 
         .brand {
@@ -142,6 +147,8 @@
             flex-direction: column;
             flex: 1;
             min-width: 0;
+            min-height: 0;
+            overflow: hidden;
             padding: 0;
         }
 
@@ -150,10 +157,21 @@
             flex-direction: column;
             flex: 1;
             min-height: 0;
-            max-width: 920px;
+            max-width: 860px;
             width: 100%;
             margin: 0 auto;
             padding: 24px 24px 0;
+        }
+
+        .messages-pane {
+            flex: 1;
+            min-height: 0;
+            overflow-y: auto;
+            overflow-x: hidden;
+            display: flex;
+            flex-direction: column;
+            padding-bottom: 8px;
+            scroll-behavior: smooth;
         }
 
         .hero {
@@ -369,13 +387,12 @@
         }
 
         .chat-thread {
-            flex: 1;
-            overflow-y: auto;
-            padding: 8px 4px 20px;
+            flex: 1 0 auto;
+            padding: 8px 4px 12px;
             display: flex;
             flex-direction: column;
             gap: 16px;
-            min-height: 180px;
+            min-height: 0;
         }
 
         .chat-empty {
@@ -472,6 +489,229 @@
             font-size: 14px;
         }
 
+        .chat-msg.assistant .chat-bubble {
+            background: transparent;
+            border: none;
+            padding: 0;
+            max-width: 100%;
+        }
+
+        .chat-msg.assistant .chat-role {
+            margin-bottom: 10px;
+            padding-left: 4px;
+        }
+
+        .trip-plan-card {
+            background: linear-gradient(180deg, rgba(14, 28, 48, 0.96), rgba(9, 17, 31, 0.98));
+            border: 1px solid rgba(123, 180, 255, 0.22);
+            border-radius: 18px;
+            padding: 22px 22px 18px;
+            box-shadow: 0 18px 40px var(--shadow);
+        }
+
+        .trip-plan-card.error {
+            padding: 18px;
+            border-color: rgba(255, 120, 120, 0.35);
+        }
+
+        .trip-header {
+            margin-bottom: 6px;
+        }
+
+        .trip-title {
+            margin: 0 0 14px;
+            font-size: 1.55rem;
+            font-weight: 800;
+            letter-spacing: -0.02em;
+        }
+
+        .trip-rule {
+            height: 1px;
+            background: linear-gradient(90deg, rgba(123, 180, 255, 0.45), rgba(123, 180, 255, 0.08));
+            margin: 14px 0;
+        }
+
+        .trip-meta {
+            display: grid;
+            gap: 8px;
+            font-size: 15px;
+            color: #dce9fb;
+        }
+
+        .trip-status {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px 16px;
+            align-items: center;
+            margin-top: 14px;
+        }
+
+        .status-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 13px;
+            font-weight: 700;
+            letter-spacing: 0.03em;
+            padding: 7px 12px;
+            border-radius: 999px;
+            background: rgba(46, 204, 113, 0.14);
+            border: 1px solid rgba(46, 204, 113, 0.35);
+            color: #b8f5ce;
+        }
+
+        .status-pill.complete {
+            background: rgba(43, 140, 255, 0.14);
+            border-color: rgba(43, 140, 255, 0.35);
+            color: #cfe4ff;
+        }
+
+        .quality-pill {
+            font-size: 14px;
+            color: var(--muted);
+        }
+
+        .plan-section {
+            margin-top: 8px;
+        }
+
+        .plan-section-head {
+            font-size: 13px;
+            font-weight: 800;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: #9ec0ef;
+            padding: 12px 0 10px;
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .plan-section-body {
+            font-size: 15px;
+            line-height: 1.65;
+            color: var(--text);
+        }
+
+        .plan-muted {
+            color: var(--muted);
+            margin: 0;
+        }
+
+        .plan-list {
+            margin: 0;
+            padding-left: 18px;
+        }
+
+        .plan-list li {
+            margin-bottom: 8px;
+        }
+
+        .budget-table {
+            display: grid;
+            gap: 8px;
+            max-width: 360px;
+        }
+
+        .budget-row {
+            display: flex;
+            justify-content: space-between;
+            gap: 16px;
+            font-size: 15px;
+        }
+
+        .budget-row span:last-child {
+            font-variant-numeric: tabular-nums;
+            color: #e8f2ff;
+        }
+
+        .budget-divider {
+            height: 1px;
+            background: rgba(255, 255, 255, 0.12);
+            margin: 4px 0;
+        }
+
+        .budget-total {
+            font-weight: 700;
+            margin-top: 2px;
+        }
+
+        .budget-remaining {
+            color: var(--muted);
+            font-size: 14px;
+        }
+
+        .review-list {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+            display: grid;
+            gap: 8px;
+        }
+
+        .review-ok {
+            color: #b8f5ce;
+        }
+
+        .review-warn {
+            color: #ffd9a0;
+        }
+
+        .agent-details {
+            margin-top: 18px;
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+            padding-top: 12px;
+        }
+
+        .agent-details summary {
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--muted);
+            list-style: none;
+        }
+
+        .agent-details summary::-webkit-details-marker {
+            display: none;
+        }
+
+        .agent-details[open] summary {
+            color: #cfe4ff;
+            margin-bottom: 10px;
+        }
+
+        .agent-details-body {
+            display: grid;
+            gap: 10px;
+        }
+
+        .agent-pre {
+            margin: 0;
+            padding: 12px;
+            border-radius: 10px;
+            background: rgba(0, 0, 0, 0.22);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            font-size: 12px;
+            line-height: 1.5;
+            color: #b8cbe4;
+            white-space: pre-wrap;
+            word-break: break-word;
+            max-height: 220px;
+            overflow: auto;
+        }
+
+        .plan-legacy {
+            margin: 0;
+            white-space: pre-wrap;
+            font-family: inherit;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        .chat-actions.plan-actions {
+            justify-content: center;
+            margin-top: 16px;
+            padding-top: 4px;
+        }
+
         .chat-actions .ghost-button {
             background: transparent;
             border: 1px solid rgba(123, 180, 255, 0.35);
@@ -479,36 +719,161 @@
             color: #dfeeff;
         }
 
+        .chat-actions.plan-actions {
+            justify-content: center;
+            margin-top: 16px;
+            padding-top: 4px;
+        }
+
+        .chat-actions.plan-actions .submit-button {
+            min-width: 120px;
+        }
+
         .composer-wrap {
-            position: sticky;
-            bottom: 0;
-            padding: 12px 0 20px;
-            background: linear-gradient(180deg, transparent, rgba(2, 11, 24, 0.92) 28%);
-        }
-
-        .prompt-box {
-            max-width: none;
-            margin: 0;
-        }
-
-        .prompt-body textarea {
-            min-height: 72px;
-            max-height: 180px;
-        }
-
-        .composer-row {
-            display: flex;
-            gap: 10px;
-            align-items: flex-end;
-            margin-top: 10px;
-        }
-
-        .composer-row .submit-button {
-            width: auto;
-            margin-top: 0;
             flex-shrink: 0;
-            padding: 14px 18px;
-            font-size: 15px;
+            padding: 10px 0 max(18px, env(safe-area-inset-bottom));
+            background: linear-gradient(180deg, rgba(2, 11, 24, 0.55), var(--bg-1) 55%);
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .composer-bar {
+            display: flex;
+            align-items: flex-end;
+            gap: 6px;
+            width: 100%;
+            padding: 8px 10px 8px 8px;
+            background: rgba(22, 28, 38, 0.96);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 28px;
+            box-shadow: 0 8px 28px rgba(0, 0, 0, 0.28);
+        }
+
+        .composer-icon-btn {
+            width: 36px;
+            height: 36px;
+            margin-bottom: 2px;
+            border: none;
+            border-radius: 50%;
+            background: transparent;
+            color: #eef4ff;
+            font-size: 22px;
+            line-height: 1;
+            cursor: pointer;
+            flex-shrink: 0;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.15s ease;
+        }
+
+        .composer-icon-btn:hover {
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        .composer-input-wrap {
+            flex: 1;
+            min-width: 0;
+            padding: 6px 4px;
+        }
+
+        .composer-bar textarea {
+            width: 100%;
+            min-height: 26px;
+            max-height: 160px;
+            resize: none;
+            overflow-y: auto;
+            border: none;
+            background: transparent;
+            padding: 4px 6px;
+            color: var(--text);
+            font-size: 16px;
+            line-height: 1.45;
+            outline: none;
+            box-shadow: none;
+        }
+
+        .composer-bar textarea:focus {
+            border: none;
+            box-shadow: none;
+        }
+
+        .composer-bar textarea::placeholder {
+            color: rgba(198, 210, 228, 0.62);
+        }
+
+        .composer-actions {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            flex-shrink: 0;
+            margin-bottom: 2px;
+        }
+
+        .composer-chip {
+            appearance: none;
+            -webkit-appearance: none;
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 999px;
+            padding: 7px 12px;
+            color: #dfe8f5;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            outline: none;
+            max-width: 120px;
+        }
+
+        .composer-chip:focus {
+            border-color: rgba(126, 182, 255, 0.45);
+        }
+
+        .composer-send {
+            width: 38px;
+            height: 38px;
+            border: none;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #3b9bff, #1d6fff);
+            color: #fff;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            flex-shrink: 0;
+            box-shadow: 0 4px 14px rgba(43, 140, 255, 0.35);
+            transition: transform 0.15s ease, filter 0.15s ease;
+        }
+
+        .composer-send:hover:not(:disabled) {
+            filter: brightness(1.06);
+            transform: scale(1.03);
+        }
+
+        .composer-send:disabled {
+            opacity: 0.55;
+            cursor: wait;
+            transform: none;
+        }
+
+        .composer-send svg {
+            width: 18px;
+            height: 18px;
+            fill: currentColor;
+        }
+
+        .composer-foot {
+            display: flex;
+            justify-content: center;
+            min-height: 0;
+        }
+
+        .composer-foot .loading-shell {
+            margin-top: 10px;
+            justify-content: center;
+        }
+
+        .hidden-fields {
+            display: none;
         }
 
         .new-chat-btn {
@@ -600,19 +965,18 @@
             }
         }
 
-        .hidden-fields {
-            display: none;
-        }
-
         @media (max-width: 980px) {
             .layout {
                 flex-direction: column;
+                height: 100vh;
+                height: 100dvh;
             }
 
             .sidebar {
                 width: 100%;
                 border-right: none;
                 border-bottom: 1px solid var(--border);
+                max-height: 38vh;
             }
 
             .trip-suggestions,
@@ -633,6 +997,17 @@
 
             .chat-msg.user .chat-bubble {
                 max-width: 92%;
+            }
+
+            .composer-bar {
+                padding: 8px 8px 8px 6px;
+                border-radius: 24px;
+            }
+
+            .composer-chip {
+                max-width: 92px;
+                padding: 7px 10px;
+                font-size: 12px;
             }
         }
     </style>
@@ -685,13 +1060,14 @@
 
     <main class="main">
         <div class="content">
+            <div id="messagesPane" class="messages-pane">
             <div class="welcome-block">
                 <div class="hero">
-                    <div class="badge">Multi-agent AI system</div>
+                    <div class="badge">✈️ AgenticTripAI</div>
                     <h1 class="title">AgenticTripAI</h1>
-                    <p class="subtitle">An Agentic AI Travel Planning &amp; Orchestration Platform</p>
+                    <p class="subtitle">AI-Powered Travel Planner</p>
                     <div class="subtitle">
-                        Chat like ChatGPT — each plan stays in the thread. Parallel agents, budget check, then approve.
+                        Describe your trip — agents plan flights, hotels, itinerary, and budget, then you approve.
                     </div>
                     <div class="hero-visual"></div>
                 </div>
@@ -707,37 +1083,39 @@
             <div id="chatThread" class="chat-thread" aria-live="polite">
                 <div class="chat-empty">Your trip plans will appear here and stay as you chat.</div>
             </div>
+            </div>
 
             <div class="composer-wrap">
                 <form id="travelForm">
-                    <div class="prompt-box">
-                        <div class="prompt-header">
-                            <span class="tag">✦</span>
-                            <span>Message</span>
+                    <div class="composer-bar">
+                        <button type="button" id="composerNewChat" class="composer-icon-btn" title="New chat" aria-label="New chat">+</button>
+                        <div class="composer-input-wrap">
+                            <textarea id="tripPrompt" name="preferences" rows="1" placeholder="Ask anything">From Bengaluru to Japan for 7 days under ₹2 lakh — family-friendly with good food and local experiences.</textarea>
                         </div>
-                        <div class="prompt-body">
-                            <textarea id="tripPrompt" name="preferences" placeholder="e.g. From Bengaluru to Japan for 7 days under ₹2 lakh" rows="3">From Bengaluru to Japan for 7 days under ₹2 lakh — family-friendly with good food and local experiences.</textarea>
-
-                            <input type="hidden" name="userId" value="aaro_hi_user" />
-                            <select name="selectedModel" id="modelPolicy" aria-label="Model policy">
-                                <option value="FAST">FAST</option>
-                                <option value="BALANCED" selected>BALANCED</option>
-                                <option value="REASONING">REASONING</option>
+                        <div class="composer-actions">
+                            <select name="selectedModel" id="modelPolicy" class="composer-chip" aria-label="Model policy">
+                                <option value="FAST">Fast</option>
+                                <option value="BALANCED" selected>Balanced</option>
+                                <option value="REASONING">Think</option>
                             </select>
-                            <input type="hidden" name="departureCity" value="Bengaluru" />
-                            <input type="hidden" name="departureDate" value="" />
-                            <input type="hidden" name="returnDate" value="" />
-                            <input type="hidden" name="budget" value="2 lakh" />
-                            <input type="hidden" name="travelStyle" value="balanced" />
-                            <input type="hidden" name="destination" value="" />
-
-                            <div class="composer-row">
-                                <button type="submit" id="submitButton" class="submit-button">Send</button>
-                            </div>
-                            <div id="loadingState" class="loading-shell" aria-live="polite">
-                                <span class="spinner"></span>
-                                <span>Agents are planning…</span>
-                            </div>
+                            <button type="submit" id="submitButton" class="composer-send" aria-label="Send trip request">
+                                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4l-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8z" transform="rotate(-90 12 12)"/></svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="hidden-fields">
+                        <input type="hidden" name="userId" value="aaro_hi_user" />
+                        <input type="hidden" name="departureCity" value="Bengaluru" />
+                        <input type="hidden" name="departureDate" value="" />
+                        <input type="hidden" name="returnDate" value="" />
+                        <input type="hidden" name="budget" value="2 lakh" />
+                        <input type="hidden" name="travelStyle" value="balanced" />
+                        <input type="hidden" name="destination" value="" />
+                    </div>
+                    <div class="composer-foot">
+                        <div id="loadingState" class="loading-shell" aria-live="polite">
+                            <span class="spinner"></span>
+                            <span>Agents are planning…</span>
                         </div>
                     </div>
                 </form>
@@ -750,12 +1128,21 @@
     const layout = document.querySelector('.layout');
     const form = document.getElementById('travelForm');
     const chatThread = document.getElementById('chatThread');
+    const messagesPane = document.getElementById('messagesPane');
     const chatHistoryList = document.getElementById('chatHistoryList');
     const userIdField = document.getElementById('userId');
     const promptInput = document.getElementById('tripPrompt');
     const submitButton = document.getElementById('submitButton');
     const loadingState = document.getElementById('loadingState');
     const newChatBtn = document.getElementById('newChatBtn');
+    const composerNewChat = document.getElementById('composerNewChat');
+
+    const DEFAULT_PROMPT = 'From Bengaluru to Japan for 7 days under ₹2 lakh — family-friendly with good food and local experiences.';
+
+    const resizePrompt = () => {
+        promptInput.style.height = 'auto';
+        promptInput.style.height = Math.min(promptInput.scrollHeight, 160) + 'px';
+    };
 
     const storageKey = () => 'agentic-trip-ai-chats:' + (userIdField.value.trim() || 'aaro_hi_user');
     let currentChatId = null;
@@ -776,6 +1163,7 @@
     document.querySelectorAll('.city-card[data-prompt]').forEach(card => {
         card.addEventListener('click', () => {
             promptInput.value = card.getAttribute('data-prompt');
+            resizePrompt();
             promptInput.focus();
         });
     });
@@ -792,14 +1180,16 @@
         if (!planData) {
             return null;
         }
-        const finalPlan = planData.finalPlan ? String(planData.finalPlan).slice(0, 8000) : '';
         return {
             status: planData.status,
-            routeSummary: planData.routeSummary,
-            finalPlan,
             awaitingApproval: planData.awaitingApproval,
             threadId: planData.threadId,
-            pipeline: (planData.pipeline || []).slice(-12)
+            plan: planData.plan,
+            execution: planData.execution ? {
+                timeline: (planData.execution.timeline || []).slice(-16),
+                sources: (planData.execution.sources || []).slice(0, 12),
+                executionHistory: planData.execution.executionHistory || ''
+            } : null
         };
     };
 
@@ -894,10 +1284,9 @@
                 role: item.role === 'assistant' ? 'assistant' : 'user',
                 text: item.content || '',
                 planData: item.role === 'assistant' ? {
-                    status: '',
-                    finalPlan: item.content || '',
-                    awaitingApproval: false,
-                    pipeline: []
+                    status: 'COMPLETE',
+                    plan: { tips: item.content || '' },
+                    awaitingApproval: false
                 } : null
             }));
             const existing = store.chats.find(c => c.id === serverId);
@@ -975,8 +1364,10 @@
         currentChatId = chatId;
         startedFreshChat = String(chatId).startsWith('chat-');
         clearThreadDom();
+        let lastUser = '';
         (chat.messages || []).forEach(msg => {
             if (msg.role === 'user') {
+                lastUser = msg.text || '';
                 renderUserMessage(msg.text, false);
             } else {
                 renderAssistantMessage(msg.planData || {
@@ -984,7 +1375,7 @@
                     finalPlan: msg.text,
                     awaitingApproval: false,
                     pipeline: []
-                }, false);
+                }, false, lastUser);
             }
         });
         renderHistoryList();
@@ -997,9 +1388,18 @@
         ensureCurrentChat('New trip');
         clearThreadDom();
         renderHistoryList();
-        promptInput.value = '';
+        promptInput.value = DEFAULT_PROMPT;
+        resizePrompt();
         promptInput.focus();
     });
+
+    if (composerNewChat) {
+        composerNewChat.addEventListener('click', () => {
+            newChatBtn.click();
+        });
+    }
+
+    promptInput.addEventListener('input', resizePrompt);
 
     const markChatActive = () => {
         layout.classList.add('has-chat');
@@ -1010,7 +1410,352 @@
     };
 
     const scrollChat = () => {
-        chatThread.scrollTop = chatThread.scrollHeight;
+        const pane = messagesPane || chatThread;
+        pane.scrollTop = pane.scrollHeight;
+    };
+
+    const escapeHtml = (value) => String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+
+    const formatInr = (amount) => {
+        if (amount == null || amount === '') {
+            return '—';
+        }
+        const num = Number(amount);
+        if (Number.isNaN(num)) {
+            return String(amount);
+        }
+        return '₹' + num.toLocaleString('en-IN', { maximumFractionDigits: 0 });
+    };
+
+    const formatDateRange = (start, end) => {
+        const fmt = (iso) => {
+            if (!iso) {
+                return '';
+            }
+            const d = new Date(iso + 'T12:00:00');
+            return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        };
+        if (start && end) {
+            return fmt(start) + ' – ' + fmt(end);
+        }
+        return fmt(start || end) || 'Dates TBD';
+    };
+
+    const tripEmoji = (destination) => {
+        const d = (destination || '').toLowerCase();
+        if (d.includes('japan') || d.includes('tokyo')) return '🇯🇵';
+        if (d.includes('paris') || d.includes('france')) return '🇫🇷';
+        if (d.includes('bangkok') || d.includes('thailand')) return '🇹🇭';
+        if (d.includes('dubai')) return '🇦🇪';
+        return '✈️';
+    };
+
+    const tripTitle = (data) => {
+        const trip = data.plan && data.plan.trip;
+        if (trip && trip.title) {
+            return trip.title;
+        }
+        const dest = (data.destination || (trip && trip.destination) || 'Trip').trim();
+        if (dest.toLowerCase().includes('japan')) {
+            return 'Japan Trip';
+        }
+        return dest + ' Trip';
+    };
+
+    const audienceLabel = (data, userRequest) => {
+        const trip = data.plan && data.plan.trip;
+        if (trip && trip.audienceLabel) {
+            return trip.audienceLabel;
+        }
+        const text = ((userRequest || '') + ' ' + (data.travelStyle || '')).toLowerCase();
+        if (text.includes('family')) {
+            return '👨‍👩‍👧‍👦 Family';
+        }
+        if (text.includes('couple')) {
+            return '💑 Couple';
+        }
+        if (text.includes('solo')) {
+            return '🧳 Solo';
+        }
+        return data.travelers > 1 ? '👤 ' + data.travelers + ' travelers' : '👤 1 traveler';
+    };
+
+    const sectionBlock = (title, bodyHtml, emptyMessage) => {
+        const content = bodyHtml || '<p class="plan-muted">' + escapeHtml(emptyMessage || 'Not available.') + '</p>';
+        return '<section class="plan-section">'
+            + '<div class="plan-section-head">' + title + '</div>'
+            + '<div class="plan-section-body">' + content + '</div>'
+            + '</section>';
+    };
+
+    const linesToList = (text, emptyMessage) => {
+        if (!text || text.startsWith('Not requested') || text.startsWith('No ')) {
+            return '<p class="plan-muted">' + escapeHtml(emptyMessage || text || 'Not available.') + '</p>';
+        }
+        const items = text.split('\n').map(line => line.trim()).filter(Boolean);
+        if (!items.length) {
+            return '<p class="plan-muted">' + escapeHtml(emptyMessage || 'Not available.') + '</p>';
+        }
+        return '<ul class="plan-list">' + items.map(item => '<li>' + escapeHtml(item) + '</li>').join('') + '</ul>';
+    };
+
+    const buildBudgetTable = (budget) => {
+        if (!budget || !budget.lineItems || !budget.lineItems.length) {
+            return '<p class="plan-muted">Budget breakdown not available.</p>';
+        }
+        const rows = budget.lineItems.map(item =>
+            '<div class="budget-row"><span>' + escapeHtml(item.category || 'Item')
+            + '</span><span>' + formatInr(item.amountInr) + '</span></div>').join('');
+        const total = '<div class="budget-row budget-total"><span>Total</span><span>'
+            + formatInr(budget.estimatedCost) + '</span></div>';
+        let remaining = '';
+        if (budget.remaining != null) {
+            remaining = '<div class="budget-row budget-remaining"><span>Remaining vs ceiling</span><span>'
+                + formatInr(budget.remaining) + '</span></div>';
+        }
+        return '<div class="budget-table">' + rows
+            + '<div class="budget-divider"></div>' + total + remaining + '</div>';
+    };
+
+    const buildPlanReview = (data, userRequest) => {
+        const validation = data.plan && data.plan.validation;
+        if (validation && validation.reviewItems && validation.reviewItems.length) {
+            let html = '<ul class="review-list">';
+            validation.reviewItems.forEach(item => {
+                const cls = item.level === 'warn' ? 'review-warn' : 'review-ok';
+                const icon = item.level === 'warn' ? '⚠' : '✓';
+                html += '<li class="' + cls + '">' + icon + ' ' + escapeHtml(item.text || '') + '</li>';
+            });
+            html += '</ul>';
+            return html;
+        }
+        const positives = [];
+        const text = (userRequest || '').toLowerCase();
+        if (text.includes('family')) positives.push('Family-friendly');
+        if (text.includes('food')) positives.push('Good food');
+        if (text.includes('local')) positives.push('Local experiences');
+        if (text.includes('budget') || text.includes('lakh') || text.includes('₹')) {
+            positives.push('Budget considered');
+        }
+        if (data.budgetSummary && data.budgetSummary.withinBudget) {
+            positives.push('Within budget ceiling');
+        }
+        const warnings = (data.semanticNotes || []).concat(data.validationErrors || []);
+        let html = '<ul class="review-list">';
+        positives.forEach(item => {
+            html += '<li class="review-ok">✓ ' + escapeHtml(item) + '</li>';
+        });
+        warnings.forEach(item => {
+            html += '<li class="review-warn">⚠ ' + escapeHtml(item) + '</li>';
+        });
+        if (!positives.length && !warnings.length) {
+            html += '<li class="review-ok">✓ Plan validated</li>';
+        }
+        html += '</ul>';
+        return html;
+    };
+
+    const activityTags = (activity) => {
+        const tags = [];
+        if (activity.indoorOutdoor && activity.indoorOutdoor !== 'mixed') {
+            tags.push(activity.indoorOutdoor);
+        }
+        if (activity.familyFriendly) {
+            tags.push('family-friendly');
+        }
+        if (activity.foodExperience) {
+            tags.push('food');
+        }
+        if (activity.localExperience) {
+            tags.push('local');
+        }
+        return tags;
+    };
+
+    const buildFlightsSection = (flights) => {
+        if (!flights || !flights.length) {
+            return null;
+        }
+        const items = flights.map(f => {
+            const parts = [f.airline, f.flightNumber, (f.origin && f.destination) ? f.origin + ' → ' + f.destination : '', f.departureTime]
+                .filter(Boolean);
+            let line = '<li>' + escapeHtml(parts.join(' · '));
+            if (f.notes) {
+                line += ' <span class="plan-muted">(' + escapeHtml(f.notes) + ')</span>';
+            }
+            return line + '</li>';
+        }).join('');
+        return '<ul class="plan-list">' + items + '</ul>';
+    };
+
+    const buildHotelsSection = (hotels) => {
+        if (!hotels || !hotels.length) {
+            return null;
+        }
+        const items = hotels.map(h => {
+            const parts = [h.name, h.area, h.priceRange, h.rating].filter(Boolean);
+            let line = '<li>' + escapeHtml(parts.join(' · '));
+            if (h.notes) {
+                line += ' <span class="plan-muted">— ' + escapeHtml(h.notes) + '</span>';
+            }
+            return line + '</li>';
+        }).join('');
+        return '<ul class="plan-list">' + items + '</ul>';
+    };
+
+    const buildItinerarySection = (itinerary) => {
+        const days = itinerary && itinerary.days ? itinerary.days : [];
+        if (!days.length) {
+            return null;
+        }
+        let html = '';
+        if (itinerary.summary) {
+            html += '<p class="plan-muted">' + escapeHtml(itinerary.summary) + '</p>';
+        }
+        days.forEach(day => {
+            html += '<div class="itin-day"><div class="itin-day-head"><strong>Day ' + escapeHtml(String(day.day || ''));
+            if (day.title) {
+                html += ' — ' + escapeHtml(day.title);
+            }
+            html += '</strong></div><ul class="plan-list">';
+            (day.activities || []).forEach(activity => {
+                if (!activity || !activity.name) {
+                    return;
+                }
+                const tags = activityTags(activity);
+                html += '<li><span class="activity-name">' + escapeHtml(activity.name) + '</span>';
+                if (activity.type) {
+                    html += ' <span class="activity-type">[' + escapeHtml(activity.type) + ']</span>';
+                }
+                if (tags.length) {
+                    html += ' <span class="activity-tags">' + tags.map(t => escapeHtml(t)).join(' · ') + '</span>';
+                }
+                html += '</li>';
+            });
+            html += '</ul></div>';
+        });
+        return html;
+    };
+
+    const buildWeatherSection = (weather) => {
+        if (!weather || (!weather.summary && !weather.location)) {
+            return null;
+        }
+        const text = (weather.location ? weather.location + ': ' : '') + (weather.summary || '');
+        const rain = weather.rainLikely ? ' <span class="plan-muted">(rain likely)</span>' : '';
+        return '<p>' + escapeHtml(text) + rain + '</p>';
+    };
+
+    const buildAgentDetails = (data) => {
+        const exec = data.execution || {};
+        const rawSteps = exec.timeline || data.executionTimeline || data.pipeline || [];
+        const steps = dedupeSteps(rawSteps).slice(-16).map(formatStepLine).join('\n');
+        const sources = [...new Set(exec.sources || data.sources || [])].join('\n');
+        const history = exec.executionHistory || data.executionHistory || '';
+        if (!steps && !sources && !history) {
+            return '';
+        }
+        let body = '';
+        if (steps) {
+            body += '<div class="agent-subsection"><div class="agent-subtitle">Timeline</div>'
+                + '<pre class="agent-pre">' + escapeHtml(steps) + '</pre></div>';
+        }
+        if (sources) {
+            body += '<div class="agent-subsection"><div class="agent-subtitle">Provenance</div>'
+                + '<pre class="agent-pre">' + escapeHtml(sources) + '</pre></div>';
+        }
+        if (history) {
+            body += '<div class="agent-subsection"><div class="agent-subtitle">Execution History</div>'
+                + '<pre class="agent-pre">' + escapeHtml(history) + '</pre></div>';
+        }
+        return '<details class="agent-details"><summary>🔍 Agent Execution Details</summary><div class="agent-details-body">'
+            + body + '</div></details>';
+    };
+
+    const buildPlanCardHtml = (data, userRequest) => {
+        const plan = data.plan || {};
+        const trip = plan.trip || {};
+        const tips = plan.tips || '';
+        if (data.status === 'ERROR' || (tips && String(tips).startsWith('Error:'))) {
+            return '<div class="trip-plan-card error"><p>' + escapeHtml(tips || 'Something went wrong.') + '</p></div>';
+        }
+        const hasStructured = !!(trip.destination || (plan.flights && plan.flights.length)
+            || (plan.hotels && plan.hotels.length) || (plan.itinerary && plan.itinerary.days && plan.itinerary.days.length)
+            || (plan.budget && plan.budget.lineItems && plan.budget.lineItems.length));
+        if (!hasStructured && tips) {
+            return '<div class="trip-plan-card legacy"><pre class="plan-legacy">' + escapeHtml(tips) + '</pre></div>';
+        }
+        const quality = trip.qualityScore != null ? trip.qualityScore
+            : (plan.validation && plan.validation.quality && plan.validation.quality.overall > 0
+                ? Math.round(plan.validation.quality.overall * 100) : null);
+        const statusClass = (trip.awaitingApproval ?? data.awaitingApproval) ? 'ready'
+            : ((trip.status || data.status) === 'COMPLETE' ? 'complete' : 'pending');
+        const statusLabel = (trip.awaitingApproval ?? data.awaitingApproval) ? '🟢 PLAN READY FOR APPROVAL'
+            : (trip.status || data.status) === 'COMPLETE' ? '✅ PLAN CONFIRMED' : (trip.status || data.status || 'PLAN');
+        const origin = trip.origin;
+        const destination = trip.destination;
+        const route = origin && destination ? origin + ' → ' + destination : 'Route TBD';
+        const departureDate = trip.departureDate;
+        const returnDate = trip.returnDate;
+        const nights = trip.nights;
+        const budgetLabel = trip.budgetLabel;
+        let html = '<div class="trip-plan-card"><header class="trip-header">'
+            + '<h2 class="trip-title">' + tripEmoji(destination) + ' ' + escapeHtml(tripTitle(data)) + '</h2>'
+            + '<div class="trip-rule"></div>'
+            + '<div class="trip-meta">'
+            + '<div>📍 ' + escapeHtml(route || 'Route TBD') + '</div>'
+            + '<div>📅 ' + escapeHtml(formatDateRange(departureDate, returnDate)) + '</div>'
+            + '<div>🌙 ' + escapeHtml(String(nights || '—')) + ' nights · ' + escapeHtml(audienceLabel(data, userRequest)) + '</div>'
+            + '<div>💰 Budget: ' + escapeHtml(budgetLabel || '—') + '</div>'
+            + '</div>'
+            + '<div class="trip-status">'
+            + '<span class="status-pill ' + statusClass + '">' + escapeHtml(statusLabel) + '</span>';
+        if (quality != null) {
+            html += '<span class="quality-pill">Quality Score: ' + quality + '/100</span>';
+        }
+        html += '</div><div class="trip-rule"></div></header>';
+        const flightsHtml = buildFlightsSection(plan.flights);
+        html += sectionBlock('✈️ FLIGHTS', flightsHtml, 'No flight options available.');
+        const hotelsHtml = buildHotelsSection(plan.hotels);
+        html += sectionBlock('🏨 HOTELS', hotelsHtml, 'No hotel options available.');
+        const itineraryHtml = buildItinerarySection(plan.itinerary);
+        html += sectionBlock('🗺️ ITINERARY', itineraryHtml, 'Itinerary not available.');
+        html += sectionBlock('💰 BUDGET', buildBudgetTable(plan.budget), 'Budget breakdown not available.');
+        const weatherHtml = buildWeatherSection(plan.weather);
+        if (weatherHtml) {
+            html += sectionBlock('🌦️ WEATHER', weatherHtml);
+        }
+        html += sectionBlock('✅ VALIDATION', buildPlanReview(data, userRequest));
+        if (plan.tips) {
+            html += sectionBlock('💡 TIPS', '<p>' + escapeHtml(plan.tips) + '</p>');
+        }
+        html += buildAgentDetails(data);
+        html += '</div>';
+        return html;
+    };
+
+    const findUserRequestForPlan = (beforeNode) => {
+        const users = chatThread.querySelectorAll('.chat-msg.user .chat-body');
+        if (!users.length) {
+            return '';
+        }
+        if (!beforeNode) {
+            return users[users.length - 1].textContent || '';
+        }
+        let last = '';
+        for (const row of chatThread.querySelectorAll('.chat-msg')) {
+            if (row === beforeNode) {
+                break;
+            }
+            if (row.classList.contains('user')) {
+                last = row.querySelector('.chat-body')?.textContent || '';
+            }
+        }
+        return last;
     };
 
     const renderUserMessage = (text, persist) => {
@@ -1029,7 +1774,7 @@
         }
     };
 
-    const renderAssistantMessage = (data, persist) => {
+    const renderAssistantMessage = (data, persist, userRequestHint) => {
         markChatActive();
         const row = document.createElement('div');
         row.className = 'chat-msg assistant';
@@ -1040,22 +1785,24 @@
             '<div class="chat-body"></div>' +
             '<div class="chat-actions"></div>' +
             '</div>';
-        const bodyText = formatPlan(data);
-        row.querySelector('.chat-body').textContent = bodyText;
+        const userRequest = userRequestHint || findUserRequestForPlan(row);
+        const body = row.querySelector('.chat-body');
+        body.innerHTML = buildPlanCardHtml(data, userRequest);
         const actions = row.querySelector('.chat-actions');
         if (data.awaitingApproval && data.threadId) {
+            actions.classList.add('plan-actions');
             const approve = document.createElement('button');
             approve.type = 'button';
             approve.className = 'submit-button';
-            approve.textContent = 'Approve plan';
+            approve.textContent = '✓ Approve';
             const modify = document.createElement('button');
             modify.type = 'button';
             modify.className = 'submit-button ghost-button';
-            modify.textContent = 'Modify';
+            modify.textContent = '✏️ Modify';
             const reject = document.createElement('button');
             reject.type = 'button';
             reject.className = 'submit-button ghost-button';
-            reject.textContent = 'Reject';
+            reject.textContent = '✕ Reject';
             actions.appendChild(approve);
             actions.appendChild(modify);
             actions.appendChild(reject);
@@ -1071,8 +1818,8 @@
         chatThread.appendChild(row);
         scrollChat();
         if (persist) {
-            ensureCurrentChat(data.routeSummary || 'Trip plan');
-            persistMessage('assistant', bodyText, data);
+            ensureCurrentChat(data.destination || data.routeSummary || 'Trip plan');
+            persistMessage('assistant', formatPlanSummary(data), data);
         }
         return row;
     };
@@ -1080,86 +1827,47 @@
     const appendUserMessage = (text) => renderUserMessage(text, true);
     const appendAssistantMessage = (data) => renderAssistantMessage(data, true);
 
-    const formatPlan = (data) => {
+    const normalizeSteps = (steps) => (steps || []).filter(step => step && step.node);
+
+    const dedupeSteps = (steps) => {
         const seen = new Set();
-        const pipeline = (data.pipeline || []).filter(step => {
-            const key = step.node + '|' + (step.detail || '');
+        return normalizeSteps(steps).filter(step => {
+            const key = (step.attempt || 1) + '|' + step.node + '|' + (step.detail || '');
             if (seen.has(key)) {
                 return false;
             }
             seen.add(key);
             return true;
-        }).map(step => {
-            const status = (step.status || '').toUpperCase();
-            const icon = status === 'PARTIAL' || status === 'WARN' ? '⚠ '
-                : status === 'SKIPPED' || status === 'SKIP' ? '○ '
-                : status === 'RETRYING' ? '↻ '
-                : status === 'FAILED' ? '✕ '
-                : status === 'WAITING_HUMAN' ? '⏸ '
-                : '✓ ';
-            return icon + step.node
+        });
+    };
+
+    const formatStepLine = (step) => {
+        const status = (step.status || '').toUpperCase();
+        const icon = status === 'PARTIAL' || status === 'WARN' ? '⚠ '
+            : status === 'SKIPPED' || status === 'SKIP' ? '○ '
+            : status === 'RETRYING' ? '↻ '
+            : status === 'FAILED' ? '✕ '
+            : status === 'WAITING_HUMAN' ? '⏸ '
+            : '✓ ';
+        return icon + step.node
             + (step.durationMs ? ' (' + (step.durationMs / 1000).toFixed(1) + 's)' : '')
             + (step.model ? ' [' + step.model + ']' : '')
             + (step.toolCalls ? ' tools=' + step.toolCalls : '')
             + (step.inputTokens ? ' tok=' + step.inputTokens + '/' + (step.outputTokens || 0) : '')
             + (step.detail ? ' — ' + step.detail : '');
-        }).join('\n');
-        const sources = (data.sources || []).length
-            ? 'Sources\n' + data.sources.join('\n')
-            : '';
-        const history = data.executionHistory ? 'Execution history\n' + data.executionHistory : '';
-        const timeline = (data.executionTimeline || []).length
-            ? 'Timeline\n' + data.executionTimeline.map(step =>
-                (step.node || '?') + ' [' + (step.status || 'ok') + ']'
-                + (step.detail ? ' — ' + step.detail : '')).join('\n')
-            : '';
-        const quality = data.planQuality;
-        const qualityLine = quality && quality.overall > 0
-            ? 'Quality score: ' + (quality.overall * 100).toFixed(0) + '%'
-                + (quality.overall < 0.8 ? ' (below 80% threshold)' : '')
-            : '';
-        const failure = data.nodeFailure;
-        const failureLine = failure && failure.lastFailedNode
-            ? 'Node failure: ' + failure.lastFailedNode + ' — ' + (failure.lastError || failure.failureType)
-            : '';
-
-        if (data.finalPlan) {
-            return [
-                data.status || '',
-                data.routeSummary ? 'Route\n' + data.routeSummary : '',
-                qualityLine,
-                failureLine,
-                'Pipeline\n' + (pipeline || 'n/a'),
-                timeline,
-                sources,
-                history,
-                (data.awaitingApproval ? 'Final report (validated)\n' : 'Final plan\n') + data.finalPlan
-            ].filter(Boolean).join('\n\n');
-        }
-
-        const budget = data.budgetSummary && data.budgetSummary.lineItems
-            ? data.budgetSummary.lineItems.map(item => item.category + ': ₹' + item.amountInr).join('\n')
-                + '\nTotal: ₹' + data.budgetSummary.estimatedCost
-                + (data.budgetSummary.remaining != null ? '\nRemaining: ₹' + data.budgetSummary.remaining : '')
-            : '';
-        const validation = (data.validationErrors || []).length
-            ? 'Validation notes:\n' + data.validationErrors.join('\n')
-            : '';
-        return [
-            data.status || '',
-            data.routeSummary ? 'Route\n' + data.routeSummary : '',
-            qualityLine,
-            failureLine,
-            'Pipeline\n' + (pipeline || 'n/a'),
-            timeline,
-            budget ? 'Budget\n' + budget : '',
-            data.flightInsights ? 'Flights\n' + data.flightInsights : '',
-            data.hotelInsights ? 'Hotels\n' + data.hotelInsights : '',
-            data.travelInsights ? 'Research\n' + data.travelInsights : '',
-            data.itinerarySummary ? 'Itinerary\n' + data.itinerarySummary : '',
-            validation
-        ].filter(Boolean).join('\n\n');
     };
+
+    const formatPlanSummary = (data) => {
+        const title = tripTitle(data || {});
+        const route = data && data.origin && data.destination
+            ? data.origin + ' → ' + data.destination
+            : (data && data.routeSummary) || title;
+        const quality = data && data.planQuality && data.planQuality.overall > 0
+            ? ' · Quality ' + Math.round(data.planQuality.overall * 100) + '/100' : '';
+        return title + ' — ' + route + quality;
+    };
+
+    const formatPlan = (data) => formatPlanSummary(data);
 
     form.addEventListener('submit', async (event) => {
         event.preventDefault();
@@ -1208,18 +1916,30 @@
                     finished = true;
                     es.close();
                     try {
-                        const data = JSON.parse(evt.data);
-                        const plan = data.plan || data;
+                        const wrapper = JSON.parse(evt.data);
+                        const data = wrapper.plan || wrapper;
                         try {
                             const hist = await fetch('/api/plan/' + encodeURIComponent(threadId) + '/history').then(r => r.json());
-                            plan.executionHistory = (hist.snapshots || []).map(s =>
+                            if (!data.execution) {
+                                data.execution = {};
+                            }
+                            data.execution.executionHistory = (hist.snapshots || []).map(s =>
                                 (s.node || '?') + ' → ' + (s.next || 'end')
                                 + (s.planQuality != null ? ' q=' + (s.planQuality * 100).toFixed(0) + '%' : '')).join('\n');
-                            if (hist.planQuality) plan.planQuality = hist.planQuality;
-                            if (hist.nodeFailure) plan.nodeFailure = hist.nodeFailure;
-                            if (hist.executionTimeline) plan.executionTimeline = hist.executionTimeline;
+                            if (hist.planQuality) {
+                                data.planQuality = hist.planQuality;
+                            }
+                            if (hist.nodeFailure) {
+                                data.nodeFailure = hist.nodeFailure;
+                            }
+                            if (hist.semanticNotes) {
+                                data.semanticNotes = hist.semanticNotes;
+                            }
+                            if (hist.executionTimeline && hist.executionTimeline.length) {
+                                data.execution.timeline = hist.executionTimeline;
+                            }
                         } catch (ignored) {}
-                        appendAssistantMessage(plan);
+                        appendAssistantMessage(data);
                         resolve();
                     } catch (error) {
                         reject(error);
@@ -1307,6 +2027,7 @@
         }
     });
 
+    resizePrompt();
     renderHistoryList();
     const storeOnLoad = loadStore();
     if (storeOnLoad.chats.length) {

@@ -1,21 +1,21 @@
 package com.example.travel.agent;
 
 import com.example.travel.config.TravelModelsProperties;
+import com.example.travel.dto.AgentExecutionDetails;
+import com.example.travel.dto.TripPlanResult;
 import com.example.travel.dto.TravelPlanResponse;
 import com.example.travel.dto.TravelRequest;
 import com.example.travel.entity.UserPreference;
+import com.example.travel.graph.GraphExecutionLogger;
 import com.example.travel.graph.TravelGraphNodes;
 import com.example.travel.graph.TravelState;
-import com.example.travel.model.FlightOption;
-import com.example.travel.model.HotelOption;
-import com.example.travel.model.Itinerary;
 import com.example.travel.model.ModificationRequest;
-import com.example.travel.model.TravelResearch;
 import com.example.travel.service.AgentExecutionBudget;
 import com.example.travel.service.ConversationMemoryService;
 import com.example.travel.service.GraphProgressHub;
 import com.example.travel.service.GraphRunContext;
 import com.example.travel.service.ModelRoutingContext;
+import com.example.travel.service.TripPlanAssembler;
 import com.example.travel.service.UserPreferenceService;
 import org.bsc.langgraph4j.CompiledGraph;
 import org.bsc.langgraph4j.GraphInput;
@@ -34,7 +34,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
-import java.util.stream.Collectors;
 
 /**
  * Drives the LangGraph travel workflow. HITL approve/modify resume the same
@@ -57,6 +56,7 @@ public class TravelPlannerAgentService {
     private final GraphRunContext graphRunContext;
     private final ExecutorService travelPlanExecutor;
     private final ConversationMemoryService conversationMemoryService;
+    private final TripPlanAssembler tripPlanAssembler;
     private final int maxRetries;
 
     public TravelPlannerAgentService(CompiledGraph<TravelState> travelGraph,
@@ -71,6 +71,7 @@ public class TravelPlannerAgentService {
                                      GraphRunContext graphRunContext,
                                      @org.springframework.beans.factory.annotation.Qualifier("travelPlanExecutor") ExecutorService travelPlanExecutor,
                                      ConversationMemoryService conversationMemoryService,
+                                     TripPlanAssembler tripPlanAssembler,
                                      @Value("${travel.graph.max-retries:2}") int maxRetries) {
         this.travelGraph = travelGraph;
         this.travelRunnableConfig = travelRunnableConfig;
@@ -84,6 +85,7 @@ public class TravelPlannerAgentService {
         this.graphRunContext = graphRunContext;
         this.travelPlanExecutor = travelPlanExecutor;
         this.conversationMemoryService = conversationMemoryService;
+        this.tripPlanAssembler = tripPlanAssembler;
         this.maxRetries = maxRetries;
     }
 
@@ -131,6 +133,7 @@ public class TravelPlannerAgentService {
         userPreferenceService.find(userId).ifPresent(preference -> applyPreferences(input, preference));
         ensureOrigin(input);
         graphProgressHub.open(threadId);
+        GraphExecutionLogger.runContext("plan-start", threadId, policy);
         travelPlanExecutor.submit(() -> runStreaming(threadId, userId, policy, input));
         return threadId;
     }
@@ -143,6 +146,7 @@ public class TravelPlannerAgentService {
         try {
             graphProgressHub.emit(threadId, "started", Map.of("threadId", threadId, "node", "START"));
             for (NodeOutput<TravelState> output : travelGraph.stream(input, config)) {
+                GraphExecutionLogger.streamTransition(threadId, output.node(), output.isEND());
                 Map<String, Object> payload = new LinkedHashMap<>();
                 payload.put("node", output.node());
                 payload.put("end", output.isEND());
@@ -154,10 +158,11 @@ public class TravelPlannerAgentService {
             TravelState state = requireCheckpointState(threadId);
             userPreferenceService.remember(userId, state.originIata(), state.travelStyle(), state.destination());
             boolean pending = isAwaitingHitl(threadId);
-            TravelPlanResponse plan = toResponse(state, threadId, pending);
+            TravelPlanResponse plan = toResponse(state, threadId, pending, "");
             conversationMemoryService.saveUiMessage(userId, userId, "assistant",
-                    plan.getFinalPlan() != null ? plan.getFinalPlan()
-                            : (plan.getRouteSummary() != null ? plan.getRouteSummary() : "Plan ready"));
+                    plan.getPlan() != null && plan.getPlan().getTrip() != null
+                            ? TravelState.firstNonBlank(plan.getPlan().getTrip().getTitle(), "Plan ready")
+                            : "Plan ready");
             Map<String, Object> done = new LinkedHashMap<>();
             done.put("plan", plan);
             graphProgressHub.emit(threadId, "complete", done);
@@ -199,9 +204,9 @@ public class TravelPlannerAgentService {
             log.warn("Could not release checkpoint threadId={}", key, ex);
         }
 
-        String plan = TravelState.firstNonBlank(state.finalPlan(), finalPlannerAgentService.compose(state));
         TravelPlanResponse response = toResponse(state, key, false);
-        response.setFinalPlan(plan);
+        String tips = finalPlannerAgentService.buildTips(state);
+        response.getPlan().setTips(tips);
         response.setStatus("COMPLETE");
         response.setAwaitingApproval(false);
         return response;
@@ -304,6 +309,7 @@ public class TravelPlannerAgentService {
         if (state.nodeFailure() != null && !TravelState.isBlank(state.nodeFailure().getLastFailedNode())) {
             body.put("nodeFailure", state.nodeFailure());
         }
+        body.put("semanticNotes", state.semanticNotes());
         body.put("executionTimeline", state.pipeline());
         try {
             List<Map<String, Object>> snapshots = new ArrayList<>();
@@ -422,30 +428,24 @@ public class TravelPlannerAgentService {
     }
 
     private TravelPlanResponse toResponse(TravelState state, String threadId, boolean awaitingApproval) {
-        TravelPlanResponse response = new TravelPlanResponse(
-                state.userId(),
-                TravelState.firstNonBlank(state.destination(), "Destination from current request"),
-                TravelState.firstNonBlank(state.modelPolicy(), configuredModelsLabel()),
-                state.finalPlan(),
-                joinFlights(state),
-                joinResearch(state),
-                joinHotels(state),
-                joinItinerary(state)
-        );
+        return toResponse(state, threadId, awaitingApproval, "");
+    }
+
+    private TravelPlanResponse toResponse(TravelState state, String threadId, boolean awaitingApproval,
+                                          String executionHistory) {
+        String status = awaitingApproval ? "PENDING_APPROVAL" : "COMPLETE";
+        TripPlanResult plan = tripPlanAssembler.assemble(state, status, awaitingApproval);
+        plan.setTips(TravelState.firstNonBlank(state.finalTips(), ""));
+        AgentExecutionDetails execution = tripPlanAssembler.assembleExecution(state, executionHistory);
+
+        TravelPlanResponse response = new TravelPlanResponse();
+        response.setUserId(state.userId());
+        response.setModel(TravelState.firstNonBlank(state.modelPolicy(), configuredModelsLabel()));
         response.setThreadId(threadId);
         response.setAwaitingApproval(awaitingApproval);
-        response.setStatus(awaitingApproval ? "PENDING_APPROVAL" : "COMPLETE");
-        response.setRouteSummary(TravelState.firstNonBlank(state.origin(), "?")
-                + " (" + TravelState.firstNonBlank(state.originIata(), "?") + ") → "
-                + TravelState.firstNonBlank(state.destination(), "?")
-                + " (" + TravelState.firstNonBlank(state.destinationIata(), "?") + ")"
-                + " · " + state.departureDate() + " to " + state.returnDate()
-                + " · " + state.nights() + " nights");
-        response.setBudgetSummary(state.budgetSummary());
-        response.setPipeline(state.pipeline());
-        response.setValidationErrors(state.validationErrors());
-        response.setSources(state.provenance().stream().map(event -> event.toDisplay()).toList());
-        response.setPlanQuality(state.planQuality());
+        response.setStatus(status);
+        response.setPlan(plan);
+        response.setExecution(execution);
         return response;
     }
 
@@ -454,54 +454,5 @@ public class TravelPlannerAgentService {
                 + "; extract=" + travelModels.getExtraction()
                 + "; itinerary=" + travelModels.getItinerary()
                 + "; final=" + travelModels.getFinale();
-    }
-
-    private String joinFlights(TravelState state) {
-        if (!state.needsFlights()) {
-            return "Not requested for this query.";
-        }
-        if (state.flights().isEmpty()) {
-            return "Not requested for this trip.";
-        }
-        return state.flights().stream().map(FlightOption::toDisplay).collect(Collectors.joining("\n"));
-    }
-
-    private String joinResearch(TravelState state) {
-        StringBuilder sb = new StringBuilder();
-        if (!state.research().isEmpty()) {
-            sb.append(state.research().stream().map(TravelResearch::toDisplay).collect(Collectors.joining("\n")));
-        }
-        if (!state.attractions().isEmpty()) {
-            if (!sb.isEmpty()) {
-                sb.append("\n\nAttractions\n");
-            } else {
-                sb.append("Attractions\n");
-            }
-            sb.append(state.attractions().stream()
-                    .map(attraction -> attraction.toDisplay())
-                    .collect(Collectors.joining("\n")));
-        }
-        return sb.isEmpty() ? "Not requested for this trip." : sb.toString();
-    }
-
-    private String joinHotels(TravelState state) {
-        if (!state.needsHotels()) {
-            return "Not requested for this query.";
-        }
-        if (state.hotels().isEmpty()) {
-            return "Not requested for this trip.";
-        }
-        return state.hotels().stream().map(HotelOption::toDisplay).collect(Collectors.joining("\n"));
-    }
-
-    private String joinItinerary(TravelState state) {
-        if (!state.needsItinerary()) {
-            return "Not requested for this query.";
-        }
-        Itinerary itinerary = state.itinerary();
-        if (itinerary == null || itinerary.isEmpty()) {
-            return "Not requested for this trip.";
-        }
-        return itinerary.toDisplay();
     }
 }

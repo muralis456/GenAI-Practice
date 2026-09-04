@@ -37,8 +37,12 @@ public class ItineraryAgentService {
         try {
             content = routedLlm.complete(AgentRole.ITINERARY,
                     "You are the Itinerary Agent. Return JSON only with shape "
-                            + "{\"summary\":\"\",\"days\":[{\"day\":1,\"title\":\"\",\"activities\":\"morning... afternoon...\"}]}. "
+                            + "{\"summary\":\"\",\"days\":[{\"day\":1,\"title\":\"\","
+                            + "\"activities\":[{\"name\":\"\",\"type\":\"sightseeing\","
+                            + "\"indoorOutdoor\":\"indoor|outdoor|mixed\","
+                            + "\"familyFriendly\":true,\"foodExperience\":false,\"localExperience\":true}]}]}. "
                             + "CRITICAL: days MUST contain exactly " + expectedDays + " objects (day 1.." + expectedDays + "). "
+                            + "Each activity must have structured fields — never append '(indoor activity)' to names. "
                             + "Day 1 MUST mention arrival/check-in. Day " + expectedDays + " MUST mention departure/checkout. "
                             + "If rain is likely, move outdoor activities to drier days. "
                             + "Use flights, hotels, attractions, research, weather, and budget from shared state. "

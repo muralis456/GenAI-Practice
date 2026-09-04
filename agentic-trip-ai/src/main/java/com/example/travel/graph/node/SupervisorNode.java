@@ -21,7 +21,8 @@ public class SupervisorNode implements NodeAction<TravelState> {
     @Override
     public Map<String, Object> apply(TravelState state) {
         Map<String, Object> updates = new LinkedHashMap<>(supervisorAgentService.review(state));
-        String decision = supervisorAgentService.decide(state);
+        String decision = String.valueOf(updates.getOrDefault(TravelState.SUPERVISOR_DECISION,
+                TravelGraphNodes.ROUTE_PROCEED));
         updates.putAll(TravelState.trace(TravelGraphNodes.SUPERVISOR,
                 TravelGraphNodes.ROUTE_RETRY.equals(decision) ? "retry" : "ok",
                 "decision=" + decision));

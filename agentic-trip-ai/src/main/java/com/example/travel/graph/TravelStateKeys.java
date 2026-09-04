@@ -52,6 +52,7 @@ public final class TravelStateKeys {
         public static final String TRAVEL_STYLE = "travelStyle";
         public static final String HOTEL_CHEAPER = "hotelCheaper";
         public static final String FLIGHT_PREFERENCE = "flightPreference";
+        public static final String TRIP_REQUIREMENTS = "tripRequirements";
 
         private Preferences() {
         }
@@ -64,6 +65,9 @@ public final class TravelStateKeys {
         public static final String RESEARCH = "research";
         public static final String ITINERARY = "itinerary";
         public static final String WEATHER = "weather";
+        public static final String FINAL_TIPS = "finalTips";
+        /** @deprecated Use {@link #FINAL_TIPS}; kept for checkpoint migration. */
+        @Deprecated
         public static final String FINAL_PLAN = "finalPlan";
 
         private Results() {
@@ -79,6 +83,19 @@ public final class TravelStateKeys {
         public static final String NEEDS_ITINERARY = "needsItinerary";
 
         private Needs() {
+        }
+    }
+
+    /** Selective execution flags for the current graph pass (replan may narrow these). */
+    public static final class Run {
+        public static final String RUN_FLIGHTS = "runFlights";
+        public static final String RUN_HOTELS = "runHotels";
+        public static final String RUN_RESEARCH = "runResearch";
+        public static final String RUN_WEATHER = "runWeather";
+        public static final String RUN_BUDGET = "runBudget";
+        public static final String RUN_ITINERARY = "runItinerary";
+
+        private Run() {
         }
     }
 

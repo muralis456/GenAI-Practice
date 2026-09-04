@@ -3,14 +3,20 @@ package com.example.travel.service;
 import com.example.travel.graph.TravelState;
 import com.example.travel.model.PlanQualityScore;
 import com.example.travel.model.SemanticValidationResult;
+import com.example.travel.model.TripRequirements;
 import org.springframework.stereotype.Component;
-
-import java.util.Locale;
 
 @Component
 public class PlanQualityScorer {
 
+    private final RequirementEvaluator requirementEvaluator;
+
+    public PlanQualityScorer(RequirementEvaluator requirementEvaluator) {
+        this.requirementEvaluator = requirementEvaluator;
+    }
+
     public PlanQualityScore score(TravelState state, SemanticValidationResult semantic) {
+        TripRequirements requirements = state.tripRequirements();
         PlanQualityScore quality = new PlanQualityScore();
         if (state.budgetSummary() != null) {
             quality.setBudget(state.budgetSummary().isWithinBudget() ? 0.95 : 0.55);
@@ -45,10 +51,7 @@ public class PlanQualityScorer {
             quality.setItinerary(semantic == null || !semantic.failed() ? 0.9 : 0.65);
         }
 
-        double preference = 0.85;
-        if (semantic != null) {
-            preference = Math.max(0.35, semantic.getScore());
-        }
+        double preference = scorePreferences(state, requirements, semantic);
         quality.setPreferences(preference);
 
         if (!state.needsWeather() || state.weather() == null) {
@@ -59,15 +62,38 @@ public class PlanQualityScorer {
             quality.setWeather(0.9);
         }
 
-        quality.recomputeOverall();
+        quality.recomputeWeighted(requirements);
         return quality;
     }
 
-    public boolean requestLooksFamily(String request) {
-        if (request == null) {
-            return false;
+    private double scorePreferences(TravelState state,
+                                      TripRequirements requirements,
+                                      SemanticValidationResult semantic) {
+        if (requirements != null && requirements.hasExplicitPreferences()) {
+            double family = requirementEvaluator.familyScore(state, requirements);
+            double food = requirementEvaluator.foodScore(state, requirements);
+            double local = requirementEvaluator.localScore(state, requirements);
+            int active = 0;
+            double sum = 0.0;
+            if (requirements.isFamilyFriendly()) {
+                active++;
+                sum += family;
+            }
+            if (requirements.isFoodExperiences()) {
+                active++;
+                sum += food;
+            }
+            if (requirements.isLocalExperiences()) {
+                active++;
+                sum += local;
+            }
+            if (active > 0) {
+                return sum / active;
+            }
         }
-        String lower = request.toLowerCase(Locale.ROOT);
-        return lower.contains("family") || lower.contains("kid") || lower.contains("children");
+        if (semantic != null) {
+            return Math.max(0.35, semantic.getScore());
+        }
+        return 0.85;
     }
 }
