@@ -8,7 +8,6 @@ import org.bsc.langgraph4j.StateGraph;
 import org.bsc.langgraph4j.serializer.std.ObjectStreamStateSerializer;
 import org.junit.jupiter.api.Test;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;

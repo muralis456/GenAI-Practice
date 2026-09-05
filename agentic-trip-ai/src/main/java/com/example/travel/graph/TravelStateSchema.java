@@ -69,7 +69,6 @@ public final class TravelStateSchema {
         schema.put(Control.RETRY_COUNT, Channels.base(() -> 0));
         schema.put(Control.MAX_RETRIES, Channels.base(() -> 2));
         schema.put(Results.FINAL_TIPS, Channels.base(() -> ""));
-        schema.put(Results.FINAL_PLAN, Channels.base(() -> ""));
         schema.put(Planning.REPLAN_NOTES, Channels.base(() -> ""));
         schema.put(Budget.COST_FACTOR, Channels.base(() -> BigDecimal.ONE));
         schema.put(Results.WEATHER, Channels.base(() -> new WeatherForecast("", "", false)));

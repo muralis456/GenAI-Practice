@@ -134,10 +134,10 @@ public class SupervisorAgentService {
     private SupervisorAssessment parseAssessment(JsonNode tree) {
         SupervisorAssessment assessment = new SupervisorAssessment();
         if (tree.hasNonNull("decision")) {
-            assessment.setDecision(tree.get("decision").asText());
+            assessment.setDecision(tree.get("decision").asString());
         }
         if (tree.hasNonNull("reason")) {
-            assessment.setReason(tree.get("reason").asText());
+            assessment.setReason(tree.get("reason").asString());
         }
         if (tree.has("qualityHint")) {
             assessment.setQualityHint(tree.get("qualityHint").asDouble());
@@ -146,7 +146,7 @@ public class SupervisorAgentService {
             assessment.setConfidence(tree.get("confidence").asDouble());
         }
         if (tree.hasNonNull("suggestedStrategy")) {
-            assessment.setSuggestedStrategy(tree.get("suggestedStrategy").asText());
+            assessment.setSuggestedStrategy(tree.get("suggestedStrategy").asString());
             ReplanAction.fromToken(assessment.getSuggestedStrategy()).ifPresent(assessment::setRecommendedAction);
         }
         return assessment;

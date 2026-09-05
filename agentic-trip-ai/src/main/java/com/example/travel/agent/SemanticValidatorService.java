@@ -94,7 +94,7 @@ public class SemanticValidatorService {
     private void mergeLlmResult(SemanticValidationResult result, JsonNode tree) {
         if (tree.hasNonNull("status")) {
             try {
-                result.setStatus(ValidationStatus.valueOf(tree.get("status").asText().toUpperCase(Locale.ROOT)));
+                result.setStatus(ValidationStatus.valueOf(tree.get("status").asString().toUpperCase(Locale.ROOT)));
             } catch (IllegalArgumentException ignored) {
                 // keep existing status
             }
@@ -104,7 +104,7 @@ public class SemanticValidatorService {
         }
         if (tree.has("issues") && tree.get("issues").isArray()) {
             for (JsonNode issue : tree.get("issues")) {
-                String text = issue.asText("");
+                String text = issue.asString("");
                 if (!TravelState.isBlank(text) && !result.getIssues().contains(text)) {
                     result.getIssues().add(text);
                 }
@@ -113,7 +113,7 @@ public class SemanticValidatorService {
         if (tree.has("recommendedActions") && tree.get("recommendedActions").isArray()) {
             List<ReplanAction> actions = new ArrayList<>();
             for (JsonNode token : tree.get("recommendedActions")) {
-                ReplanAction.fromToken(token.asText("")).ifPresent(action -> {
+                ReplanAction.fromToken(token.asString("")).ifPresent(action -> {
                     if (!actions.contains(action)) {
                         actions.add(action);
                     }
