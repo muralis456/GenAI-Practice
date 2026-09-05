@@ -6,7 +6,8 @@ import java.util.Optional;
 
 /**
  * Picks the next graph node so unused specialists are never scheduled.
- * Native LangGraph fan-out uses {@link TravelGraphNodes#FAN_OUT} with parallel executors;
+ * Native LangGraph fan-out uses {@link TravelGraphNodes#FAN_OUT} with parallel
+ * executors;
  * a single specialist bypasses fan-out entirely.
  */
 public final class SpecialistRouter {
@@ -56,7 +57,8 @@ public final class SpecialistRouter {
     }
 
     /**
-     * When only one specialist is needed, route directly to it instead of scheduling all four fan-out branches.
+     * When only one specialist is needed, route directly to it instead of
+     * scheduling all four fan-out branches.
      */
     public static String specialistEntry(TravelState state) {
         List<String> specialists = plannedSpecialists(state);
@@ -75,7 +77,7 @@ public final class SpecialistRouter {
     }
 
     public static boolean anySpecialist(TravelState state) {
-        return state.runFlights() || state.runHotels() || state.runResearch() || state.runWeather();
+        return state.runFlights() || state.runHotels() || state.runResearch() || state.runWeather() || state.runBudget() || state.runItinerary();
     }
 
     public static List<String> plannedSpecialists(TravelState state) {
@@ -91,6 +93,12 @@ public final class SpecialistRouter {
         }
         if (state.runWeather()) {
             nodes.add(TravelGraphNodes.WEATHER);
+        }
+        if (state.runBudget()) {
+            nodes.add(TravelGraphNodes.BUDGET);
+        }
+        if (state.runItinerary()) {
+            nodes.add(TravelGraphNodes.ITINERARY);
         }
         return nodes;
     }
