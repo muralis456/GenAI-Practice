@@ -18,6 +18,7 @@ import com.example.travel.model.TravelAttraction;
 import com.example.travel.model.TravelResearch;
 import com.example.travel.model.TripRequirements;
 import com.example.travel.model.WeatherForecast;
+import lombok.extern.slf4j.Slf4j;
 import org.bsc.langgraph4j.state.AgentState;
 import org.bsc.langgraph4j.state.Channel;
 
@@ -29,6 +30,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+@Slf4j
 public class TravelState extends AgentState {
 
     /** Sentinel for "no numeric budget ceiling" — LangGraph schema defaults cannot be null. */
