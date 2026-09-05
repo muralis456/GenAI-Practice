@@ -6,7 +6,7 @@ import com.example.travel.model.LlmExecutionResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.openai.OpenAiChatOptions;
+import org.springframework.ai.ollama.api.OllamaChatOptions;
 import org.springframework.stereotype.Component;
 
 import java.util.Arrays;
@@ -44,17 +44,14 @@ public class RoutedLlm {
         String model = models.resolve(role, ModelRoutingContext.get());
         String toolNames = tools == null || tools.length == 0 ? ""
                 : Arrays.stream(tools).map(tool -> tool.getClass().getSimpleName()).collect(Collectors.joining(","));
-        log.info("Routing {} to Groq model={} policy={} tools={}", role, model, ModelRoutingContext.get(), toolNames);
+        log.info("Routing {} to Ollama model={} policy={} tools={}", role, model, ModelRoutingContext.get(), toolNames);
         long started = System.currentTimeMillis();
-       var prompt = chatClient.prompt()
-        .options(OpenAiChatOptions.builder()
+        var prompt = chatClient.prompt()
+            .options(OllamaChatOptions.builder()
                 .model(model)
-                .temperature(models.temperature(role))
-                .extraBody(java.util.Map.of(
-                        "include_reasoning", false
-                )))
-        .system(system)
-        .user(user);
+                .temperature(models.temperature(role)))
+            .system(system)
+            .user(user);
         if (tools != null && tools.length > 0) {
             prompt = prompt.tools(tools);
         }

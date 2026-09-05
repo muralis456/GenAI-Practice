@@ -1,19 +1,10 @@
 server:
   port: 8081
 
-llm:
-  default-model: openai/gpt-oss-120b
 spring:
   application:
     name: agentic-trip-ai
   ai:
-    openai:
-      # Spring AI appends /v1/chat/completions to this base URL.
-      base-url: https://api.groq.com/openai/v1
-      api-key: ${GROQ_API_KEY:${GROK_API_KEY:}}
-      chat:
-        model: ${llm.default-model}
-        temperature: 0.2
     ollama:
       base-url: http://localhost:11434
       chat:
@@ -54,13 +45,13 @@ travel:
     max-tavily-calls: 8
     max-iterations: 25
   models:
-    extraction: ${TRAVEL_MODEL_FAST:${llm.default-model}}
-    planner: ${TRAVEL_MODEL_PLANNER:${llm.default-model}}
-    itinerary: ${TRAVEL_MODEL_ITINERARY:${llm.default-model}}
-    finale: ${TRAVEL_MODEL_FINAL:${llm.default-model}}
-    fast: ${TRAVEL_MODEL_FAST:${llm.default-model}}
-    balanced: ${TRAVEL_MODEL_BALANCED:${llm.default-model}}
-    reasoning: ${TRAVEL_MODEL_REASONING:${llm.default-model}}
+    extraction: ${TRAVEL_MODEL_FAST:llama3.2:3b}
+    planner: ${TRAVEL_MODEL_PLANNER:llama3.2:3b}
+    itinerary: ${TRAVEL_MODEL_ITINERARY:llama3.2:3b}
+    finale: ${TRAVEL_MODEL_FINAL:llama3.2:3b}
+    fast: ${TRAVEL_MODEL_FAST:llama3.2:3b}
+    balanced: ${TRAVEL_MODEL_BALANCED:}
+    reasoning: ${TRAVEL_MODEL_REASONING:}
   tavily:
     api-url: https://api.tavily.com/search
     api-key: ${TAVILY_API_KEY:}
