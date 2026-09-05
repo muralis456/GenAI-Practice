@@ -27,6 +27,7 @@ import org.bsc.langgraph4j.RunnableConfig;
 import org.bsc.langgraph4j.StateGraph;
 import org.bsc.langgraph4j.action.AsyncNodeAction;
 import org.bsc.langgraph4j.action.Command;
+import org.bsc.langgraph4j.action.NodeAction;
 import org.bsc.langgraph4j.checkpoint.PostgresSaver;
 import org.bsc.langgraph4j.serializer.std.ObjectStreamStateSerializer;
 import org.bsc.langgraph4j.utils.EdgeMappings;
@@ -86,7 +87,7 @@ public class TravelGraphConfig {
 
     @Bean
     public PostgresSaver travelCheckpointSaver(DataSource dataSource,
-                                               ObjectStreamStateSerializer<TravelState> travelStateSerializer)
+            ObjectStreamStateSerializer<TravelState> travelStateSerializer)
             throws SQLException {
         return PostgresSaver.builder()
                 .datasource(dataSource)
@@ -97,24 +98,24 @@ public class TravelGraphConfig {
 
     @Bean
     public StateGraph<TravelState> travelStateGraph(IntentNode intentNode,
-                                                     PlannerNode plannerNode,
-                                                     RouterNode routerNode,
-                                                     AirportResolverNode airportResolverNode,
-                                                     FanOutNode fanOutNode,
-                                                     FlightNode flightNode,
-                                                     HotelNode hotelNode,
-                                                     ResearchNode researchNode,
-                                                     WeatherNode weatherNode,
-                                                     SupervisorNode supervisorNode,
-                                                     BudgetNode budgetNode,
-                                                     ItineraryNode itineraryNode,
-                                                     ValidatorNode validatorNode,
-                                                     ReplanNode replanNode,
-                                                     FinalizationNode finalizationNode,
-                                                     HitlNode hitlNode,
-                                                     CompleteNode completeNode,
-                                                     CancelNode cancelNode,
-                                                     ObjectStreamStateSerializer<TravelState> travelStateSerializer)
+            PlannerNode plannerNode,
+            RouterNode routerNode,
+            AirportResolverNode airportResolverNode,
+            FanOutNode fanOutNode,
+            FlightNode flightNode,
+            HotelNode hotelNode,
+            ResearchNode researchNode,
+            WeatherNode weatherNode,
+            SupervisorNode supervisorNode,
+            BudgetNode budgetNode,
+            ItineraryNode itineraryNode,
+            ValidatorNode validatorNode,
+            ReplanNode replanNode,
+            FinalizationNode finalizationNode,
+            HitlNode hitlNode,
+            CompleteNode completeNode,
+            CancelNode cancelNode,
+            ObjectStreamStateSerializer<TravelState> travelStateSerializer)
             throws GraphStateException {
         return new StateGraph<>(TravelState.SCHEMA, travelStateSerializer)
                 .addNode(TravelGraphNodes.INTENT, async(TravelGraphNodes.INTENT, intentNode))
@@ -128,7 +129,8 @@ public class TravelGraphConfig {
                         GraphExecutionLogger.nodeComplete(TravelGraphNodes.ROUTER, state, elapsedMs(started));
                         return new Command(next, updates);
                     } catch (Exception ex) {
-                        GraphExecutionLogger.nodeFailed(TravelGraphNodes.ROUTER, state, elapsedMs(started), ex.getMessage());
+                        GraphExecutionLogger.nodeFailed(TravelGraphNodes.ROUTER, state, elapsedMs(started),
+                                ex.getMessage());
                         throw new RuntimeException(ex);
                     }
                 }), Map.of(
@@ -161,6 +163,10 @@ public class TravelGraphConfig {
                         edge_async(SpecialistRouter::afterAirport),
                         EdgeMappings.builder()
                                 .to(TravelGraphNodes.FAN_OUT, TravelGraphNodes.FAN_OUT)
+                                .to(TravelGraphNodes.FLIGHT, TravelGraphNodes.FLIGHT)
+                                .to(TravelGraphNodes.HOTEL, TravelGraphNodes.HOTEL)
+                                .to(TravelGraphNodes.RESEARCH, TravelGraphNodes.RESEARCH)
+                                .to(TravelGraphNodes.WEATHER, TravelGraphNodes.WEATHER)
                                 .to(TravelGraphNodes.SUPERVISOR, TravelGraphNodes.SUPERVISOR)
                                 .build())
                 .addEdge(TravelGraphNodes.FAN_OUT, TravelGraphNodes.FLIGHT)
@@ -196,7 +202,7 @@ public class TravelGraphConfig {
                             GraphExecutionLogger.route(TravelGraphNodes.BUDGET,
                                     route.equals(TravelGraphNodes.ROUTE_OVER) ? TravelGraphNodes.REPLAN
                                             : route.equals(TravelGraphNodes.ROUTE_UNDER) ? TravelGraphNodes.ITINERARY
-                                            : TravelGraphNodes.VALIDATOR,
+                                                    : TravelGraphNodes.VALIDATOR,
                                     state, reason);
                             return route;
                         }),
@@ -236,7 +242,7 @@ public class TravelGraphConfig {
                             GraphExecutionLogger.route(TravelGraphNodes.HITL,
                                     "modify".equals(decision) ? TravelGraphNodes.REPLAN
                                             : "reject".equals(decision) ? TravelGraphNodes.CANCEL
-                                            : TravelGraphNodes.COMPLETE,
+                                                    : TravelGraphNodes.COMPLETE,
                                     state, "hitlDecision=" + decision);
                             return route;
                         }),
@@ -251,8 +257,8 @@ public class TravelGraphConfig {
 
     @Bean
     public CompiledGraph<TravelState> travelCompiledGraph(StateGraph<TravelState> travelStateGraph,
-                                                          PostgresSaver travelCheckpointSaver,
-                                                          @Value("${travel.graph.max-iterations:25}") int maxIterations)
+            PostgresSaver travelCheckpointSaver,
+            @Value("${travel.graph.max-iterations:25}") int maxIterations)
             throws GraphStateException {
         return travelStateGraph.compile(CompileConfig.builder()
                 .checkpointSaver(travelCheckpointSaver)
@@ -269,7 +275,8 @@ public class TravelGraphConfig {
                 .build();
     }
 
-    private AsyncNodeAction<TravelState> async(String nodeName, org.bsc.langgraph4j.action.NodeAction<TravelState> node) {
+    private AsyncNodeAction<TravelState> async(String nodeName,
+            NodeAction<TravelState> node) {
         return node_async(state -> {
             GraphExecutionLogger.nodeStart(nodeName, state);
             long started = System.nanoTime();

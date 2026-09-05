@@ -6,6 +6,7 @@ import com.example.travel.graph.NodeFailureRouting;
 import com.example.travel.graph.TravelGraphNodes;
 import com.example.travel.graph.TravelState;
 import com.example.travel.model.AgentDecision;
+import com.example.travel.model.NodeFailureInfo;
 import com.example.travel.model.ReplanAction;
 import com.example.travel.model.ReplanStrategy;
 import com.example.travel.model.SupervisorAssessment;
@@ -70,7 +71,8 @@ public class SupervisorAgentService {
             return TravelGraphNodes.ROUTE_PROCEED;
         }
         if (NodeFailureRouting.hasRetryableFailure(state)) {
-            log.info("Supervisor retrying after node failure on {}", state.nodeFailure().getLastFailedNode());
+            NodeFailureInfo failure = state.nodeFailure();
+            log.error("Supervisor retrying after node failure on {} error={}", failure.getLastFailedNode(), failure.getLastError());
             return TravelGraphNodes.ROUTE_RETRY;
         }
         if (state.needsFlights() && flightsUnusable(state)) {

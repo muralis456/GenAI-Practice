@@ -3,6 +3,9 @@ package com.example.travel.graph;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.example.travel.model.AgentDecision;
+import com.example.travel.model.NodeFailureInfo;
+
 import java.util.List;
 import java.util.Map;
 
@@ -17,17 +20,30 @@ public final class GraphExecutionLogger {
     }
 
     public static void nodeStart(String node, TravelState state) {
-        log.info("[graph] node={} phase=start threadId={} retry={}/{} needs=[flight={},hotel={},research={},weather={},budget={},itinerary={}]",
-                node,
-                threadId(state),
-                state.retryCount(),
-                state.maxRetries(),
-                state.needsFlights(),
-                state.needsHotels(),
-                state.needsResearch(),
-                state.needsWeather(),
-                state.needsBudget(),
-                state.needsItinerary());
+        String retryReason = null;
+        if (state.retryCount() > 0) {
+            NodeFailureInfo failure = state.nodeFailure();
+            if (!TravelState.isBlank(failure.getLastError())) {
+                retryReason = failure.getLastFailedNode() + ":" + failure.getLastError();
+            } else {
+                AgentDecision lastDecision = state.lastDecision();
+                if (!TravelState.isBlank(lastDecision.getReason())) {
+                    retryReason = lastDecision.getReason();
+                }
+            }
+        }
+
+        if (retryReason != null) {
+            log.info("[graph] node={} phase=start threadId={} retry={}/{} retryReason={} needs=[flight={},hotel={},research={},weather={},budget={},itinerary={}]",
+                    node, threadId(state), state.retryCount(), state.maxRetries(), retryReason,
+                    state.needsFlights(), state.needsHotels(), state.needsResearch(),
+                    state.needsWeather(), state.needsBudget(), state.needsItinerary());
+        } else {
+            log.info("[graph] node={} phase=start threadId={} retry={}/{} needs=[flight={},hotel={},research={},weather={},budget={},itinerary={}]",
+                    node, threadId(state), state.retryCount(), state.maxRetries(),
+                    state.needsFlights(), state.needsHotels(), state.needsResearch(),
+                    state.needsWeather(), state.needsBudget(), state.needsItinerary());
+        }
     }
 
     public static void nodeComplete(String node, TravelState state, long durationMs) {
@@ -36,8 +52,8 @@ public final class GraphExecutionLogger {
     }
 
     public static void nodeFailed(String node, TravelState state, long durationMs, String error) {
-        log.warn("[graph] node={} phase=failed threadId={} durationMs={} error={}",
-                node, threadId(state), durationMs, error);
+        log.warn("[graph] node={} phase=failed threadId={} retry={}/{} durationMs={} error={}",
+                node, threadId(state), state.retryCount(), state.maxRetries(), durationMs, error);
     }
 
     public static void route(String from, String to, TravelState state, String reason) {
