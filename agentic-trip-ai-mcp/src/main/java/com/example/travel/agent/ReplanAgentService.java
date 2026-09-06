@@ -111,7 +111,8 @@ public class ReplanAgentService {
         }
 
         // Supervisor retry: never reinterpret the previous user request.
-        return preserveCurrentRun(state);
+        // Rerun only specialists that failed in the current pass.
+        return rerunFailedCurrentSpecialists(state);
     }
 
     private Map<String, Object> classifyLatestUserRequest(TravelState state) {
@@ -150,6 +151,44 @@ public class ReplanAgentService {
 
         return updates;
     }
+
+        private Map<String, Object> rerunFailedCurrentSpecialists(TravelState state) {
+        Map<String, Object> updates = new LinkedHashMap<>();
+
+        updates.put(TravelState.NEEDS_FLIGHTS, state.needsFlights());
+        updates.put(TravelState.NEEDS_HOTELS, state.needsHotels());
+        updates.put(TravelState.NEEDS_RESEARCH, state.needsResearch());
+        updates.put(TravelState.NEEDS_WEATHER, state.needsWeather());
+        updates.put(TravelState.NEEDS_BUDGET, state.needsBudget());
+        updates.put(TravelState.NEEDS_ITINERARY, state.needsItinerary());
+
+        updates.put(TravelState.RUN_FLIGHTS, state.runFlights()
+            && !state.hasUsableFlights()
+            && !hasPermanentFlightFailure(state));
+        updates.put(TravelState.RUN_HOTELS, state.runHotels() && state.hotels().isEmpty());
+        updates.put(TravelState.RUN_RESEARCH, state.runResearch()
+            && state.research().isEmpty() && state.attractions().isEmpty());
+        updates.put(TravelState.RUN_WEATHER, state.runWeather()
+            && (state.weather() == null || TravelState.isBlank(state.weather().getSummary())));
+        updates.put(TravelState.RUN_BUDGET, state.runBudget());
+        updates.put(TravelState.RUN_ITINERARY, state.runItinerary());
+
+        log.info("Replanner current-pass recovery flights={} hotels={} research={} weather={} budget={} itinerary={}",
+            updates.get(TravelState.RUN_FLIGHTS), updates.get(TravelState.RUN_HOTELS),
+            updates.get(TravelState.RUN_RESEARCH), updates.get(TravelState.RUN_WEATHER),
+            updates.get(TravelState.RUN_BUDGET), updates.get(TravelState.RUN_ITINERARY));
+        return updates;
+        }
+
+        private boolean hasPermanentFlightFailure(TravelState state) {
+        return state.flights().stream()
+            .filter(flight -> flight != null && "unavailable".equalsIgnoreCase(flight.getStatus()))
+            .map(flight -> flight.getNotes() == null ? "" : flight.getNotes().toLowerCase())
+            .anyMatch(notes -> notes.contains("not configured")
+                || notes.contains("invalid")
+                || notes.contains("not allowed")
+                || notes.contains("does not expose"));
+        }
 
     private boolean isUserModification(TravelState state) {
         return state != null

@@ -11,6 +11,8 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.util.UriComponentsBuilder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
@@ -22,6 +24,8 @@ import java.util.Map;
 
 @Service
 public class TravelMcpServices {
+
+    private static final Logger log = LoggerFactory.getLogger(TravelMcpServices.class);
 
     private final RestClient restClient;
     private final ObjectMapper objectMapper;
@@ -87,6 +91,7 @@ public class TravelMcpServices {
                     : "Mostly dry conditions expected. Outdoor sightseeing is viable.";
             return new WeatherResult(true, destination, summary, rain);
         } catch (Exception exception) {
+            log.warn("mcp.provider.weather failed destination={} error={}", destination, exception.getMessage());
             return new WeatherResult(false, destination, "Weather lookup failed.", false);
         }
     }
@@ -132,6 +137,7 @@ public class TravelMcpServices {
             }
             return ResearchResult.success(hits, "Travel research completed.");
         } catch (Exception exception) {
+            log.warn("mcp.provider.tavily failed queryLength={} error={}", query.length(), exception.getMessage());
             return ResearchResult.failure("Travel research provider is unavailable.");
         }
     }

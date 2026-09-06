@@ -11,6 +11,26 @@
       "envFile": "${workspaceFolder}/.env",
       "preLaunchTask": "agentic-trip-ai: mvn compile",
       "shortenCommandLine": "argfile"
+    },
+    {
+      "type": "java",
+      "name": "Spring Boot-TravelMcpServerApplication<agentic-trip-ai-mcp-server>",
+      "request": "launch",
+      "cwd": "${workspaceFolder}",
+      "mainClass": "com.example.travel.mcp.TravelMcpServerApplication",
+      "projectName": "agentic-trip-ai-mcp-server",
+      "args": "",
+      "envFile": "${workspaceFolder}/.env"
+    },
+    {
+      "type": "java",
+      "name": "Spring Boot-AgenticTripAiApplication<agentic-trip-ai-mcp>",
+      "request": "launch",
+      "cwd": "${workspaceFolder}",
+      "mainClass": "com.example.travel.AgenticTripAiApplication",
+      "projectName": "agentic-trip-ai-mcp",
+      "args": "",
+      "envFile": "${workspaceFolder}/.env"
     }
   ]
 }

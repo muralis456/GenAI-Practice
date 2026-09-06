@@ -42,10 +42,10 @@ public final class NodeFailureRouting {
                     : ReplanAction.REDUCE_HOTEL_BUDGET.wireName());
         } else if (TravelGraphNodes.RESEARCH.equals(node)) {
             strategy.setPriority("research");
-            actions.add(ReplanAction.ADJUST_ITINERARY.wireName());
+            actions.add(ReplanAction.REMOVE_EXPENSIVE_ATTRACTIONS.wireName());
         } else if (TravelGraphNodes.WEATHER.equals(node)) {
-            strategy.setPriority("itinerary");
-            actions.add(ReplanAction.ADJUST_ITINERARY.wireName());
+            strategy.setPriority("weather");
+            actions.add(ReplanAction.GET_WEATHER_DETAILS.wireName());
         }
         strategy.setActions(actions);
         GraphExecutionLogger.replan(state, actions, Map.of("failedNode", node));

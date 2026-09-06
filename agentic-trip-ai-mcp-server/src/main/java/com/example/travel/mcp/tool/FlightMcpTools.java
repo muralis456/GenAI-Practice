@@ -32,8 +32,11 @@ public class FlightMcpTools {
             @McpToolParam(description = "Number of passengers, from 1 to 9", required = false) Integer passengers) {
         governance.check("search_flights");
         long started = System.nanoTime();
+        log.info("mcp.tool.request name=search_flights origin={} destination={} departureDate={} returnDate={} passengers={}",
+            origin, destination, departureDate, returnDate, passengers);
         log.info("mcp.tool.start name=search_flights origin={} destination={}", origin, destination);
         SearchFlightsResponse response = flightService.search(new SearchFlightsRequest(origin, destination, departureDate, returnDate, passengers));
+        log.info("mcp.tool.response name=search_flights response={}", response);
         log.info("mcp.tool.complete name=search_flights success={} results={} durationMs={}", response.success(), response.flights().size(), elapsedMs(started));
         return response;
     }

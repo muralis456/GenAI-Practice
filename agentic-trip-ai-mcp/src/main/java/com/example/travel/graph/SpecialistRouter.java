@@ -18,7 +18,10 @@ public final class SpecialistRouter {
     public static String afterPlanner(TravelState state) {
         String next;
         String reason;
-        if (state.runFlights()) {
+        if (state.retryCount() >= state.maxRetries()) {
+            next = TravelGraphNodes.SUPERVISOR;
+            reason = "maxRetriesReached";
+        } else if (state.runFlights()) {
             next = TravelGraphNodes.AIRPORT;
             reason = "needsFlights";
         } else {

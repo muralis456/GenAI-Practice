@@ -51,7 +51,7 @@ public class FlightAgentService {
                 ? flightSearchTool.search(originIata, destinationIata, state.departureDate())
                 : mcpClient.search(originIata, destinationIata, state.departureDate(), state.travelers());
         if (flights == null || flights.isEmpty()) {
-            return FlightSearchResult.unavailable(originIata, destinationIata, "No flights were returned.");
+            return new FlightSearchResult(originIata, destinationIata, List.of());
         }
         return new FlightSearchResult(originIata, destinationIata, flights);
     }

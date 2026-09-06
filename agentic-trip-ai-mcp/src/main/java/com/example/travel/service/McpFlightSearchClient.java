@@ -64,7 +64,7 @@ public class McpFlightSearchClient {
             option.setNotes(flight.path("notes").asString(""));
             flights.add(option);
         }
-        return flights.isEmpty() ? List.of(unavailable(root.path("message").asString("No flights were returned."))) : flights;
+        return flights;
     }
 
     private FlightOption unavailable(String message) {

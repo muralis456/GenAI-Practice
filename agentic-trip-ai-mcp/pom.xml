@@ -11,9 +11,9 @@
     </parent>
 
     <groupId>com.example</groupId>
-    <artifactId>agentic-trip-ai</artifactId>
+    <artifactId>agentic-trip-ai-mcp</artifactId>
     <version>0.0.1-SNAPSHOT</version>
-    <name>agentic-trip-ai</name>
+    <name>agentic-trip-ai-mcp</name>
     <description>AgenticTripAI — An Agentic AI Travel Planning &amp; Orchestration Platform</description>
 
     <properties>

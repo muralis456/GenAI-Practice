@@ -34,9 +34,12 @@ public class TravelMcpTools {
             @McpToolParam(description = "Prefer budget hotels", required = false) Boolean cheaper) {
         governance.check("search_hotels");
         long started = System.nanoTime();
+        log.info("mcp.tool.request name=search_hotels destination={} travelStyle={} cheaper={}",
+            destination, travelStyle, cheaper);
         log.info("mcp.tool.start name=search_hotels destination={}", destination);
         SearchHotelsResponse response = services.searchHotels(destination, travelStyle == null ? "balanced" : travelStyle,
                 Boolean.TRUE.equals(cheaper));
+        log.info("mcp.tool.response name=search_hotels response={}", response);
         log.info("mcp.tool.complete name=search_hotels success={} results={} durationMs={}", response.success(), response.hotels().size(), elapsedMs(started));
         return response;
     }
@@ -49,7 +52,10 @@ public class TravelMcpTools {
         governance.check("get_weather");
         long started = System.nanoTime();
         LocalDate start = parse(startDate, LocalDate.now());
-        WeatherResult response = services.weather(destination, start, parse(endDate, start.plusDays(5)));
+        LocalDate end = parse(endDate, start.plusDays(5));
+        log.info("mcp.tool.request name=get_weather destination={} startDate={} endDate={}", destination, start, end);
+        WeatherResult response = services.weather(destination, start, end);
+        log.info("mcp.tool.response name=get_weather response={}", response);
         log.info("mcp.tool.complete name=get_weather success={} durationMs={}", response.success(), elapsedMs(started));
         return response;
     }
@@ -58,14 +64,28 @@ public class TravelMcpTools {
     public AirportResult resolveAirport(
             @McpToolParam(description = "City, country, or airport code", required = true) String cityOrCode) {
         governance.check("resolve_airport");
-        return services.resolveAirport(cityOrCode);
+        long started = System.nanoTime();
+        log.info("mcp.tool.request name=resolve_airport query={}", cityOrCode);
+        log.info("mcp.tool.start name=resolve_airport query={}", cityOrCode);
+        AirportResult response = services.resolveAirport(cityOrCode);
+        log.info("mcp.tool.response name=resolve_airport response={}", response);
+        log.info("mcp.tool.complete name=resolve_airport success={} iata={} durationMs={}",
+            response.success(), response.iata(), elapsedMs(started));
+        return response;
     }
 
     @McpTool(name = "search_travel_research", description = "Search live destination, attraction, food, and local travel information.")
     public ResearchResult searchTravelResearch(
             @McpToolParam(description = "Concrete non-empty travel research query", required = true) String query) {
         governance.check("search_travel_research");
-        return services.research(query);
+        long started = System.nanoTime();
+        log.info("mcp.tool.request name=search_travel_research query={}", query);
+        log.info("mcp.tool.start name=search_travel_research queryLength={}", query == null ? 0 : query.length());
+        ResearchResult response = services.research(query);
+        log.info("mcp.tool.response name=search_travel_research response={}", response);
+        log.info("mcp.tool.complete name=search_travel_research success={} results={} durationMs={}",
+            response.success(), response.hits().size(), elapsedMs(started));
+        return response;
     }
 
     private long elapsedMs(long started) {

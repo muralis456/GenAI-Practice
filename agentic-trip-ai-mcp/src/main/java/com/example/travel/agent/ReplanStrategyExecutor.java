@@ -219,10 +219,6 @@ public class ReplanStrategyExecutor {
                         : 0.8);
 
         updates.put(
-                TravelState.RETRY_COUNT,
-                state.retryCount() + 1);
-
-        updates.put(
                 TravelState.COST_FACTOR,
                 factor);
 

@@ -26,12 +26,28 @@ public class ReplanNode implements NodeAction<TravelState> {
             // retries; a new user modification is not a failed retry.
             updates.put(TravelState.SUPERVISOR_DECISION, TravelGraphNodes.ROUTE_PROCEED);
             updates.put(TravelState.RETRY_COUNT, state.retryCount());
+            updates.put(TravelState.RUN_FLIGHTS, Boolean.FALSE);
+            updates.put(TravelState.RUN_HOTELS, Boolean.FALSE);
+            updates.put(TravelState.RUN_RESEARCH, Boolean.FALSE);
+            updates.put(TravelState.RUN_WEATHER, Boolean.FALSE);
+            updates.put(TravelState.RUN_BUDGET, Boolean.FALSE);
+            updates.put(TravelState.RUN_ITINERARY, Boolean.FALSE);
             updates.putAll(TravelState.trace(TravelGraphNodes.REPLAN, "skipped",
                     "maxRetriesReached=" + state.maxRetries()));
             return updates;
         }
 
         Map<String, Object> updates = new LinkedHashMap<>(replanAgentService.decide(state));
+        if (!"modify".equalsIgnoreCase(state.hitlDecision())) {
+            int nextRetry = state.retryCount() + 1;
+            updates.put(TravelState.RETRY_COUNT, nextRetry);
+            if (nextRetry >= state.maxRetries()) {
+                updates.put(TravelState.RUN_FLIGHTS, Boolean.FALSE);
+                updates.put(TravelState.RUN_HOTELS, Boolean.FALSE);
+                updates.put(TravelState.RUN_RESEARCH, Boolean.FALSE);
+                updates.put(TravelState.RUN_WEATHER, Boolean.FALSE);
+            }
+        }
         updates.putAll(TravelState.trace(TravelGraphNodes.REPLAN, "retry",
                 String.valueOf(updates.get(TravelState.REPLAN_NOTES))));
         return updates;

@@ -41,9 +41,11 @@ public class FlightNode implements NodeAction<TravelState> {
             if (!TravelState.isBlank(result.destinationIata())) {
                 updates.put(TravelState.DESTINATION_IATA, result.destinationIata());
             }
+                boolean usable = result.flights().stream().anyMatch(flight ->
+                    flight != null && !"unavailable".equalsIgnoreCase(flight.getStatus()));
             updates.putAll(TravelState.trace(TravelGraphNodes.FLIGHT, "ok",
                     result.originIata() + " -> " + result.destinationIata() + " on " + state.departureDate()));
-            GraphExecutionLogger.specialistResult(TravelGraphNodes.FLIGHT, state, "ok",
+                GraphExecutionLogger.specialistResult(TravelGraphNodes.FLIGHT, state, usable ? "ok" : "warn",
                     "count=" + result.flights().size());
             updates.putAll(TravelState.provenance(new ProvenanceEvent(
                     "flights", "AviationStack", "", 0, result.originIata() + "->" + result.destinationIata())));
