@@ -1,0 +1,84 @@
+server:
+  port: 8081
+
+spring:
+  application:
+    name: agentic-trip-ai
+  ai:
+    ollama:
+      base-url: http://localhost:11434
+      chat:
+        model: llama3.2:3b
+        temperature: 0.2
+        num-predict: 600
+  datasource:
+    url: jdbc:postgresql://localhost:5432/travel_agent
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:postgres}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      pool-name: AgenticTripAiHikariPool
+      maximum-pool-size: 10
+      minimum-idle: 2
+      connection-timeout: 30000
+      validation-timeout: 5000
+      keepalive-time: 120000
+      max-lifetime: 1800000
+      leak-detection-threshold: 60000
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        # Keep the JDBC connection for the whole Spring transaction.
+        # RELEASE_AFTER_STATEMENT returns the connection to Hikari mid-tx;
+        # the pool rolls it back → sequence advances but rows never persist.
+        connection:
+          handling_mode: DELAYED_ACQUISITION_AND_RELEASE_AFTER_TRANSACTION
+travel:
+  graph:
+    max-retries: 5
+    max-llm-calls: 20
+    max-tavily-calls: 8
+    # A budget replan traverses router, specialists, supervisor, and budget
+    # before consuming one retry. Leave enough graph steps to reach the hard
+    # max-retries guard and complete the final pass.
+    max-iterations: 60
+  models:
+    extraction: ${TRAVEL_MODEL_FAST:llama3.2:3b}
+    planner: ${TRAVEL_MODEL_PLANNER:llama3.2:3b}
+    itinerary: ${TRAVEL_MODEL_ITINERARY:llama3.2:3b}
+    finale: ${TRAVEL_MODEL_FINAL:llama3.2:3b}
+    fast: ${TRAVEL_MODEL_FAST:llama3.2:3b}
+    balanced: ${TRAVEL_MODEL_BALANCED:}
+    reasoning: ${TRAVEL_MODEL_REASONING:}
+  tavily:
+    api-url: https://api.tavily.com/search
+    api-key: ${TAVILY_API_KEY:}
+  aviation:
+    api-url: https://api.aviationstack.com/v1
+    api-key: ${AVIATIONSTACK_API_KEY:}
+    # Free plans reject flight_date with 403 function_access_restricted.
+    include-flight-date: false
+  weather:
+    geocode-url: https://geocoding-api.open-meteo.com/v1/search
+    forecast-url: https://api.open-meteo.com/v1/forecast
+  currency:
+    rates-url: https://api.frankfurter.app/latest
+
+app:
+  browser:
+    enabled: true
+    use-chrome: true
+    # chrome-path: "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"
+
+logging:
+  level:
+    com.example.travel.graph.GraphExecutionLogger: INFO
+    com.example.travel: INFO
+    org.springframework.ai: INFO
+    org.hibernate.SQL: INFO
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
