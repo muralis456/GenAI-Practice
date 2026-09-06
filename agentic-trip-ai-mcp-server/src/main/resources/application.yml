@@ -1,0 +1,37 @@
+server:
+  port: ${MCP_SERVER_PORT:8090}
+
+spring:
+  application:
+    name: agentic-trip-ai-mcp-server
+  ai:
+    mcp:
+      server:
+        name: agentic-trip-ai-mcp-server
+        version: 0.0.1
+        protocol: STREAMABLE
+        type: SYNC
+        streamable-http:
+          mcp-endpoint: /mcp
+
+travel:
+  aviation:
+    api-url: ${AVIATIONSTACK_API_URL:https://api.aviationstack.com/v1}
+    api-key: ${AVIATIONSTACK_API_KEY:}
+    include-flight-date: ${AVIATIONSTACK_INCLUDE_FLIGHT_DATE:false}
+    connect-timeout: ${AVIATIONSTACK_CONNECT_TIMEOUT:5s}
+    read-timeout: ${AVIATIONSTACK_READ_TIMEOUT:15s}
+  tavily:
+    api-url: ${TAVILY_API_URL:https://api.tavily.com/search}
+    api-key: ${TAVILY_API_KEY:}
+  weather:
+    geocode-url: ${WEATHER_GEOCODE_URL:https://geocoding-api.open-meteo.com/v1/search}
+    forecast-url: ${WEATHER_FORECAST_URL:https://api.open-meteo.com/v1/forecast}
+  mcp:
+    allowed-tools: ${MCP_ALLOWED_TOOLS:search_flights,search_hotels,get_weather,resolve_airport,search_travel_research}
+    security:
+      enabled: ${MCP_SECURITY_ENABLED:false}
+      api-key: ${MCP_API_KEY:}
+    provider:
+      connect-timeout: ${MCP_PROVIDER_CONNECT_TIMEOUT:5s}
+      read-timeout: ${MCP_PROVIDER_READ_TIMEOUT:15s}

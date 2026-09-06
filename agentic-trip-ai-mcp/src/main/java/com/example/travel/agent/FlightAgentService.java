@@ -4,8 +4,10 @@ import com.example.travel.graph.TravelState;
 import com.example.travel.model.FlightOption;
 import com.example.travel.tool.AirportLookupTool;
 import com.example.travel.tool.FlightSearchTool;
+import com.example.travel.service.McpFlightSearchClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -17,10 +19,14 @@ public class FlightAgentService {
 
     private final FlightSearchTool flightSearchTool;
     private final AirportLookupTool airportLookupTool;
+    private final ObjectProvider<McpFlightSearchClient> mcpFlightSearchClient;
 
-    public FlightAgentService(FlightSearchTool flightSearchTool, AirportLookupTool airportLookupTool) {
+    public FlightAgentService(FlightSearchTool flightSearchTool,
+                              AirportLookupTool airportLookupTool,
+                              ObjectProvider<McpFlightSearchClient> mcpFlightSearchClient) {
         this.flightSearchTool = flightSearchTool;
         this.airportLookupTool = airportLookupTool;
+        this.mcpFlightSearchClient = mcpFlightSearchClient;
     }
 
     public FlightSearchResult search(TravelState state) {
@@ -40,7 +46,10 @@ public class FlightAgentService {
         }
 
         log.info("Flight agent searching {} -> {} on {}", originIata, destinationIata, state.departureDate());
-        List<FlightOption> flights = flightSearchTool.search(originIata, destinationIata, state.departureDate());
+        McpFlightSearchClient mcpClient = mcpFlightSearchClient.getIfAvailable();
+        List<FlightOption> flights = mcpClient == null
+                ? flightSearchTool.search(originIata, destinationIata, state.departureDate())
+                : mcpClient.search(originIata, destinationIata, state.departureDate(), state.travelers());
         if (flights == null || flights.isEmpty()) {
             return FlightSearchResult.unavailable(originIata, destinationIata, "No flights were returned.");
         }

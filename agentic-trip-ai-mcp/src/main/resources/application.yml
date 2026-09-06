@@ -5,6 +5,17 @@ spring:
   application:
     name: agentic-trip-ai
   ai:
+    mcp:
+      client:
+        enabled: ${TRAVEL_MCP_CLIENT_ENABLED:false}
+        type: SYNC
+        streamable-http:
+          connections:
+            travel:
+              url: ${TRAVEL_MCP_SERVER_URL:http://localhost:8090}
+              endpoint: ${TRAVEL_MCP_SERVER_ENDPOINT:/mcp}
+              headers:
+                X-MCP-API-KEY: ${MCP_API_KEY:}
     ollama:
       base-url: http://localhost:11434
       chat:
@@ -39,6 +50,11 @@ spring:
         connection:
           handling_mode: DELAYED_ACQUISITION_AND_RELEASE_AFTER_TRANSACTION
 travel:
+  mcp:
+    client:
+      enabled: ${TRAVEL_MCP_CLIENT_ENABLED:false}
+      max-attempts: ${TRAVEL_MCP_CLIENT_MAX_ATTEMPTS:2}
+      allowed-tools: ${TRAVEL_MCP_CLIENT_ALLOWED_TOOLS:search_flights,search_hotels,get_weather,resolve_airport,search_travel_research}
   graph:
     max-retries: 5
     max-llm-calls: 20

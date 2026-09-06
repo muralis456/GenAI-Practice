@@ -2,6 +2,8 @@ package com.example.travel.tool;
 
 import com.example.travel.entity.AirportLocation;
 import com.example.travel.service.AirportLookupService;
+import com.example.travel.service.McpAirportClient;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
 import org.springframework.stereotype.Component;
@@ -12,9 +14,12 @@ import java.util.Optional;
 public class AirportLookupTool {
 
     private final AirportLookupService airportLookupService;
+    private final ObjectProvider<McpAirportClient> mcpAirportClient;
 
-    public AirportLookupTool(AirportLookupService airportLookupService) {
+    public AirportLookupTool(AirportLookupService airportLookupService,
+                             ObjectProvider<McpAirportClient> mcpAirportClient) {
         this.airportLookupService = airportLookupService;
+        this.mcpAirportClient = mcpAirportClient;
     }
 
     public Optional<AirportLocation> resolve(String cityOrCode) {
@@ -25,6 +30,13 @@ public class AirportLookupTool {
             + "Examples: Bengaluru→BLR, Japan→NRT, Mumbai→BOM. Never invent codes.")
     public String resolveIata(
             @ToolParam(description = "City, country, or airport name/code to resolve") String cityOrCode) {
+        McpAirportClient client = mcpAirportClient.getIfAvailable();
+        if (client != null) {
+            String iata = client.resolve(cityOrCode);
+            if (!iata.isBlank()) {
+                return iata;
+            }
+        }
         String fromDb = resolve(cityOrCode).map(AirportLocation::getIataCode).orElse("");
         if (!fromDb.isBlank()) {
             return fromDb;

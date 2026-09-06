@@ -109,44 +109,18 @@ public enum ReplanAction {
         }
 
         return switch (this) {
-
-            case GET_FLIGHT_DETAILS,
-                    CHEAPER_FLIGHT ->
-                hasTripRoute(state);
-
-            case REDUCE_HOTEL_BUDGET,
-                    HOTEL_UPGRADE ->
-                hasDestination(state);
-
-            case REMOVE_EXPENSIVE_ATTRACTIONS ->
-                !state.attractions().isEmpty();
-            case GET_HOTEL_DETAILS -> hasDestination(state);
-
-            case GET_WEATHER_DETAILS -> hasDestination(state);
-            case GET_BUDGET_BREAKDOWN -> true;
+            case GET_FLIGHT_DETAILS, CHEAPER_FLIGHT,
+                    REDUCE_HOTEL_BUDGET, HOTEL_UPGRADE,
+                    REMOVE_EXPENSIVE_ATTRACTIONS, GET_HOTEL_DETAILS,
+                    GET_WEATHER_DETAILS, GET_BUDGET_BREAKDOWN,
+                    ADJUST_ITINERARY -> true;
 
             case ADD_DESTINATION ->
                 state.modification() != null
                         && !TravelState.isBlank(
                                 state.modification().getDestination());
 
-            case ADJUST_ITINERARY ->
-                hasTripContext(state);
         };
-    }
-
-    private boolean hasTripRoute(TravelState state) {
-        return !TravelState.isBlank(state.origin())
-                && !TravelState.isBlank(state.destination());
-    }
-
-    private boolean hasDestination(TravelState state) {
-        return !TravelState.isBlank(state.destination());
-    }
-
-    private boolean hasTripContext(TravelState state) {
-        return !TravelState.isBlank(state.destination())
-                || !TravelState.isBlank(state.origin());
     }
 
     public String wireName() {

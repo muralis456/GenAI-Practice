@@ -1,7 +1,6 @@
 package com.example.travel.agent;
 
 import com.example.travel.graph.NodeFailureRouting;
-import com.example.travel.graph.TravelGraphNodes;
 import com.example.travel.graph.TravelState;
 import com.example.travel.model.ModificationRequest;
 import com.example.travel.model.ReplanAction;
@@ -154,8 +153,9 @@ public class ReplanAgentService {
 
     private boolean isUserModification(TravelState state) {
         return state != null
-                && "modify".equalsIgnoreCase(state.hitlDecision())
-                && state.modification() != null;
+                && state.modification() != null
+                && ("modify".equalsIgnoreCase(state.hitlDecision())
+                || hasStructuredModificationAction(state.modification()));
     }
 
     private boolean hasRunAction(Map<String, Object> updates) {

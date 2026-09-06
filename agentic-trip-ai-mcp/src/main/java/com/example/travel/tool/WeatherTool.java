@@ -9,6 +9,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
+import org.springframework.beans.factory.ObjectProvider;
+import com.example.travel.service.McpWeatherClient;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
@@ -23,18 +25,25 @@ public class WeatherTool {
     private final ObjectMapper objectMapper;
     private final String geocodeUrl;
     private final String forecastUrl;
+    private final ObjectProvider<McpWeatherClient> mcpWeatherClient;
 
     public WeatherTool(RestTemplate restTemplate,
                        ObjectMapper objectMapper,
                        @Value("${travel.weather.geocode-url:https://geocoding-api.open-meteo.com/v1/search}") String geocodeUrl,
-                       @Value("${travel.weather.forecast-url:https://api.open-meteo.com/v1/forecast}") String forecastUrl) {
+                       @Value("${travel.weather.forecast-url:https://api.open-meteo.com/v1/forecast}") String forecastUrl,
+                       ObjectProvider<McpWeatherClient> mcpWeatherClient) {
         this.restTemplate = restTemplate;
         this.objectMapper = objectMapper;
         this.geocodeUrl = geocodeUrl;
         this.forecastUrl = forecastUrl;
+        this.mcpWeatherClient = mcpWeatherClient;
     }
 
     public WeatherForecast forecast(String destination, LocalDate start, LocalDate end) {
+        McpWeatherClient client = mcpWeatherClient.getIfAvailable();
+        if (client != null) {
+            return client.forecast(destination, start, end);
+        }
         LocalDate from = start == null ? LocalDate.now() : start;
         LocalDate to = end == null ? from.plusDays(5) : end;
         DateWindow window = clampToOpenMeteo(from, to);
