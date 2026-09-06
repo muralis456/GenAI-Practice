@@ -134,7 +134,7 @@ class GraphTransitionTest {
         data.put(TravelState.MODIFICATION, modification);
         TravelState state = state(data);
 
-        Map<String, Object> updates = new ReplanAgentService(null, null, replanExecutor).decide(state);
+        Map<String, Object> updates = new ReplanAgentService(null, replanExecutor).decide(state);
         ReplanStrategy strategy = (ReplanStrategy) updates.get(TravelState.REPLAN_STRATEGY);
 
         assertEquals(List.of(com.example.travel.model.ReplanAction.REDUCE_HOTEL_BUDGET),

@@ -136,6 +136,21 @@ public class TravelState extends AgentState {
         input.put(COST_FACTOR, BigDecimal.ONE);
         input.put(HOTEL_CHEAPER, Boolean.FALSE);
         input.put(FLIGHT_PREFERENCE, "balanced");
+
+        // Every routing flag is explicitly initialized. Missing flags must never
+        // default to true because that can accidentally execute old specialists.
+        input.put(NEEDS_FLIGHTS, false);
+        input.put(NEEDS_HOTELS, false);
+        input.put(NEEDS_RESEARCH, false);
+        input.put(NEEDS_WEATHER, false);
+        input.put(NEEDS_BUDGET, false);
+        input.put(NEEDS_ITINERARY, false);
+        input.put(RUN_FLIGHTS, false);
+        input.put(RUN_HOTELS, false);
+        input.put(RUN_RESEARCH, false);
+        input.put(RUN_WEATHER, false);
+        input.put(RUN_BUDGET, false);
+        input.put(RUN_ITINERARY, false);
         input.put(MODEL_POLICY, com.example.travel.service.ModelRoutingContext.normalize(request.getSelectedModel()));
         input.put(VALIDATION_ERRORS, new ArrayList<String>());
         input.put(PIPELINE, new ArrayList<AgentStep>());
@@ -440,7 +455,7 @@ public class TravelState extends AgentState {
     }
 
     private boolean flag(String key) {
-        return Boolean.TRUE.equals(this.<Boolean>value(key).orElse(Boolean.TRUE));
+        return Boolean.TRUE.equals(this.<Boolean>value(key).orElse(Boolean.FALSE));
     }
 
     public long nights() {

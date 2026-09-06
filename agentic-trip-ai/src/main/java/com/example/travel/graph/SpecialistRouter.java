@@ -82,6 +82,10 @@ public final class SpecialistRouter {
 
     public static List<String> plannedSpecialists(TravelState state) {
         List<String> nodes = new ArrayList<>();
+
+        // These are the specialist nodes that execute BEFORE Supervisor.
+        // Budget and Itinerary are downstream of Supervisor and must never
+        // be selected as fan-out/entry specialists here.
         if (state.runFlights()) {
             nodes.add(TravelGraphNodes.FLIGHT);
         }
@@ -93,12 +97,6 @@ public final class SpecialistRouter {
         }
         if (state.runWeather()) {
             nodes.add(TravelGraphNodes.WEATHER);
-        }
-        if (state.runBudget()) {
-            nodes.add(TravelGraphNodes.BUDGET);
-        }
-        if (state.runItinerary()) {
-            nodes.add(TravelGraphNodes.ITINERARY);
         }
         return nodes;
     }

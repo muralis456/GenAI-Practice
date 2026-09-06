@@ -66,7 +66,7 @@ public final class NodeFailureRouting {
         } else if (TravelGraphNodes.WEATHER.equals(node)) {
             updates.put(TravelState.RUN_WEATHER, Boolean.TRUE);
         }
-        if (state.needsBudget()) {
+        if (state.runBudget()) {
             updates.put(TravelState.RUN_BUDGET, Boolean.TRUE);
         }
     }

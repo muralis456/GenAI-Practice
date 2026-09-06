@@ -304,6 +304,15 @@ public class ReplanStrategyExecutor {
             List<ReplanAction> actions,
             TravelState state) {
 
+        // NEEDS_* is cumulative across the conversation.
+        boolean needsFlights = state.needsFlights();
+        boolean needsHotels = state.needsHotels();
+        boolean needsResearch = state.needsResearch();
+        boolean needsWeather = state.needsWeather();
+        boolean needsBudget = state.needsBudget();
+        boolean needsItinerary = state.needsItinerary();
+
+        // RUN_* is only for the current graph pass.
         boolean runFlights = false;
         boolean runHotels = false;
         boolean runResearch = false;
@@ -311,85 +320,57 @@ public class ReplanStrategyExecutor {
         boolean runBudget = false;
         boolean runItinerary = false;
 
-        boolean needsFlights = false;
-        boolean needsHotels = false;
-        boolean needsResearch = false;
-        boolean needsWeather = false;
-        boolean needsBudget = false;
-        boolean needsItinerary = false;
-
-        if (actions == null || actions.isEmpty()) {
-            updates.put(TravelState.RUN_FLIGHTS, false);
-            updates.put(TravelState.RUN_HOTELS, false);
-            updates.put(TravelState.RUN_RESEARCH, false);
-            updates.put(TravelState.RUN_WEATHER, false);
-            updates.put(TravelState.RUN_BUDGET, false);
-            updates.put(TravelState.RUN_ITINERARY, false);
-
-            updates.put(TravelState.NEEDS_FLIGHTS, false);
-            updates.put(TravelState.NEEDS_HOTELS, false);
-            updates.put(TravelState.NEEDS_RESEARCH, false);
-            updates.put(TravelState.NEEDS_WEATHER, false);
-            updates.put(TravelState.NEEDS_BUDGET, false);
-            updates.put(TravelState.NEEDS_ITINERARY, false);
-
-            return;
-        }
-
-        for (ReplanAction action : actions) {
-
-            switch (action) {
-
-                case GET_FLIGHT_DETAILS, CHEAPER_FLIGHT -> {
-                    runFlights = true;
-                    needsFlights = true;
+        if (actions != null) {
+            for (ReplanAction action : actions) {
+                if (action == null) {
+                    continue;
                 }
 
-                case GET_WEATHER_DETAILS -> {
-                    runWeather = true;
-                    needsWeather = true;
-                }
-
-                case GET_BUDGET_BREAKDOWN -> {
-                    runBudget = true;
-                    needsBudget = true;
-                }
-
-                case REDUCE_HOTEL_BUDGET -> {
-                    runHotels = true;
-                    runBudget = true;
-                    runItinerary = true;
-
-                    needsHotels = true;
-                    needsBudget = true;
-                    needsItinerary = true;
-                }
-
-                case HOTEL_UPGRADE -> {
-                    runHotels = true;
-                    needsHotels = true;
-                }
-
-                case REMOVE_EXPENSIVE_ATTRACTIONS -> {
-                    runResearch = true;
-                    needsResearch = true;
-                }
-
-                case ADD_DESTINATION -> {
-                    runResearch = true;
-                    runItinerary = true;
-
-                    needsResearch = true;
-                    needsItinerary = true;
-                }
-
-                case ADJUST_ITINERARY -> {
-                    runItinerary = true;
-                    needsItinerary = true;
-                }
-                case GET_HOTEL_DETAILS -> {
-                    runHotels = true;
-                    needsHotels = true;
+                switch (action) {
+                    case GET_FLIGHT_DETAILS -> {
+                        runFlights = true;
+                        needsFlights = true;
+                    }
+                    case CHEAPER_FLIGHT -> {
+                        runFlights = true;
+                        runBudget = true;
+                        needsFlights = true;
+                        needsBudget = true;
+                    }
+                    case GET_HOTEL_DETAILS, HOTEL_UPGRADE -> {
+                        runHotels = true;
+                        needsHotels = true;
+                    }
+                    case GET_WEATHER_DETAILS -> {
+                        runWeather = true;
+                        needsWeather = true;
+                    }
+                    case GET_BUDGET_BREAKDOWN -> {
+                        runBudget = true;
+                        needsBudget = true;
+                    }
+                    case REDUCE_HOTEL_BUDGET -> {
+                        runHotels = true;
+                        runBudget = true;
+                        runItinerary = true;
+                        needsHotels = true;
+                        needsBudget = true;
+                        needsItinerary = true;
+                    }
+                    case REMOVE_EXPENSIVE_ATTRACTIONS -> {
+                        runResearch = true;
+                        needsResearch = true;
+                    }
+                    case ADD_DESTINATION -> {
+                        runResearch = true;
+                        runItinerary = true;
+                        needsResearch = true;
+                        needsItinerary = true;
+                    }
+                    case ADJUST_ITINERARY -> {
+                        runItinerary = true;
+                        needsItinerary = true;
+                    }
                 }
             }
         }
@@ -408,4 +389,5 @@ public class ReplanStrategyExecutor {
         updates.put(TravelState.NEEDS_BUDGET, needsBudget);
         updates.put(TravelState.NEEDS_ITINERARY, needsItinerary);
     }
+
 }
