@@ -40,10 +40,13 @@ spring:
           handling_mode: DELAYED_ACQUISITION_AND_RELEASE_AFTER_TRANSACTION
 travel:
   graph:
-    max-retries: 2
+    max-retries: 5
     max-llm-calls: 20
     max-tavily-calls: 8
-    max-iterations: 25
+    # A budget replan traverses router, specialists, supervisor, and budget
+    # before consuming one retry. Leave enough graph steps to reach the hard
+    # max-retries guard and complete the final pass.
+    max-iterations: 60
   models:
     extraction: ${TRAVEL_MODEL_FAST:llama3.2:3b}
     planner: ${TRAVEL_MODEL_PLANNER:llama3.2:3b}

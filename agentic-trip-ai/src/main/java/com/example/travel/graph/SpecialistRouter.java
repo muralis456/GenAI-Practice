@@ -39,21 +39,32 @@ public final class SpecialistRouter {
     public static String afterSupervisor(TravelState state) {
         String next;
         String reason;
-        if (TravelGraphNodes.ROUTE_RETRY.equalsIgnoreCase(state.supervisorDecision())) {
+        if (TravelGraphNodes.ROUTE_RETRY.equalsIgnoreCase(state.supervisorDecision())
+                && state.retryCount() < state.maxRetries()) {
             next = TravelGraphNodes.REPLAN;
             reason = "supervisorRetry";
-        } else if (state.runBudget()) {
-            next = TravelGraphNodes.BUDGET;
-            reason = "needsBudget";
-        } else if (state.runItinerary()) {
-            next = TravelGraphNodes.ITINERARY;
-            reason = "needsItinerary";
+        } else if (TravelGraphNodes.ROUTE_RETRY.equalsIgnoreCase(state.supervisorDecision())) {
+            // This protects the graph edge even if a stale or faulty supervisor
+            // decision asks for another retry after the retry budget is spent.
+            next = nextAfterSupervisor(state);
+            reason = "maxRetriesReached";
         } else {
-            next = TravelGraphNodes.VALIDATOR;
-            reason = "validateOnly";
+            next = nextAfterSupervisor(state);
+            reason = next == TravelGraphNodes.BUDGET ? "needsBudget"
+                    : next == TravelGraphNodes.ITINERARY ? "needsItinerary" : "validateOnly";
         }
         GraphExecutionLogger.route(TravelGraphNodes.SUPERVISOR, next, state, reason);
         return next;
+    }
+
+    private static String nextAfterSupervisor(TravelState state) {
+        if (state.runBudget()) {
+            return TravelGraphNodes.BUDGET;
+        }
+        if (state.runItinerary()) {
+            return TravelGraphNodes.ITINERARY;
+        }
+        return TravelGraphNodes.VALIDATOR;
     }
 
     /**

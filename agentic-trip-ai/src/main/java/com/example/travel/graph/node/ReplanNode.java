@@ -20,9 +20,25 @@ public class ReplanNode implements NodeAction<TravelState> {
 
     @Override
     public Map<String, Object> apply(TravelState state) {
+        if (retriesExhausted(state)) {
+            Map<String, Object> updates = new LinkedHashMap<>();
+            // Replan is also entered from HITL.  Only block internal recovery
+            // retries; a new user modification is not a failed retry.
+            updates.put(TravelState.SUPERVISOR_DECISION, TravelGraphNodes.ROUTE_PROCEED);
+            updates.put(TravelState.RETRY_COUNT, state.retryCount());
+            updates.putAll(TravelState.trace(TravelGraphNodes.REPLAN, "skipped",
+                    "maxRetriesReached=" + state.maxRetries()));
+            return updates;
+        }
+
         Map<String, Object> updates = new LinkedHashMap<>(replanAgentService.decide(state));
         updates.putAll(TravelState.trace(TravelGraphNodes.REPLAN, "retry",
                 String.valueOf(updates.get(TravelState.REPLAN_NOTES))));
         return updates;
+    }
+
+    private boolean retriesExhausted(TravelState state) {
+        return state.retryCount() >= state.maxRetries()
+                && !"modify".equalsIgnoreCase(state.hitlDecision());
     }
 }

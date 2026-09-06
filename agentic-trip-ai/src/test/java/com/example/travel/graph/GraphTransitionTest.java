@@ -3,6 +3,7 @@ package com.example.travel.graph;
 import com.example.travel.agent.ReplanStrategyExecutor;
 import com.example.travel.agent.ReplanAgentService;
 import com.example.travel.agent.SupervisorAgentService;
+import com.example.travel.graph.node.ReplanNode;
 import com.example.travel.model.PlanQualityScore;
 import com.example.travel.model.ReplanStrategy;
 import com.example.travel.service.ReplanActionValidator;
@@ -71,6 +72,30 @@ class GraphTransitionTest {
         TravelState state = state(Map.of(
                 TravelState.SUPERVISOR_DECISION, TravelGraphNodes.ROUTE_RETRY));
         assertEquals(TravelGraphNodes.REPLAN, SpecialistRouter.afterSupervisor(state));
+    }
+
+    @Test
+    void supervisorRetryAtMaxRetriesContinuesToDownstreamWork() {
+        TravelState state = state(Map.of(
+                TravelState.SUPERVISOR_DECISION, TravelGraphNodes.ROUTE_RETRY,
+                TravelState.RETRY_COUNT, 2,
+                TravelState.MAX_RETRIES, 2,
+                TravelState.RUN_BUDGET, Boolean.TRUE));
+
+        assertEquals(TravelGraphNodes.BUDGET, SpecialistRouter.afterSupervisor(state));
+    }
+
+    @Test
+    void replanNodeSkipsInternalRecoveryAtMaxRetries() {
+        TravelState state = state(Map.of(
+                TravelState.RETRY_COUNT, 2,
+                TravelState.MAX_RETRIES, 2,
+                TravelState.SUPERVISOR_DECISION, TravelGraphNodes.ROUTE_RETRY));
+
+        Map<String, Object> updates = new ReplanNode(null).apply(state);
+
+        assertEquals(2, updates.get(TravelState.RETRY_COUNT));
+        assertEquals(TravelGraphNodes.ROUTE_PROCEED, updates.get(TravelState.SUPERVISOR_DECISION));
     }
 
     @Test
