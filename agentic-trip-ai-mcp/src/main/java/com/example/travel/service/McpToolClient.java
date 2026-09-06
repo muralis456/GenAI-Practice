@@ -70,7 +70,7 @@ public class McpToolClient {
 
     private JsonNode responseTree(String response) throws Exception {
         JsonNode result = objectMapper.readTree(response);
-        if (result.isTextual()) {
+        if (result.isString()) {
             result = objectMapper.readTree(result.asString());
         }
         if (result.isArray() && !result.isEmpty() && result.get(0).has("text")) {

@@ -6,7 +6,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.ObjectMapper;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -24,11 +23,8 @@ public class McpFlightSearchClient {
     private static final Logger log = LoggerFactory.getLogger(McpFlightSearchClient.class);
 
     private final McpToolClient mcpToolClient;
-    private final ObjectMapper objectMapper;
-
-    public McpFlightSearchClient(McpToolClient mcpToolClient, ObjectMapper objectMapper) {
+    public McpFlightSearchClient(McpToolClient mcpToolClient) {
         this.mcpToolClient = mcpToolClient;
-        this.objectMapper = objectMapper;
     }
 
     public List<FlightOption> search(String origin, String destination, LocalDate departureDate, int passengers) {
