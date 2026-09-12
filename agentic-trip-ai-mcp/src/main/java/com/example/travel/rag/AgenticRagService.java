@@ -395,6 +395,8 @@ public class AgenticRagService {
     }
 
     private static final Map<String, List<String>> DESTINATION_ALIASES = Map.ofEntries(
+            Map.entry("bangalore", List.of("bangalore", "bengaluru")),
+            Map.entry("bengaluru", List.of("bangalore", "bengaluru")),
             Map.entry("japan", List.of("japan", "tokyo", "osaka")),
             Map.entry("tokyo", List.of("japan", "tokyo")),
             Map.entry("singapore", List.of("singapore")),
@@ -498,16 +500,20 @@ public class AgenticRagService {
     }
 
     private String requestContext(TravelState state) {
-        return """
-                User request: %s
-                Origin: %s
-                Destination: %s
-                Dates: %s to %s
-                Travelers: %s
-                Travel style: %s
-                Budget: %s
-                """.formatted(state.userRequest(), state.origin(), state.destination(),
-                state.departureDate(), state.returnDate(), state.travelers(), state.travelStyle(), state.budgetLabel());
+        // Knowledge routing must reason from the actual user request. The initial
+        // TravelState contains UI-safe defaults (dates, traveler count, budget label,
+        // travel style). Feeding those defaults to the RAG router pollutes semantic
+        // retrieval and can make a simple knowledge request look like a trip plan.
+        StringBuilder context = new StringBuilder("USER REQUEST:\n")
+                .append(state.userRequest().trim());
+
+        if (!TravelState.isBlank(state.origin())) {
+            context.append("\nKNOWN ORIGIN: ").append(state.origin().trim());
+        }
+        if (!TravelState.isBlank(state.destination())) {
+            context.append("\nKNOWN DESTINATION: ").append(state.destination().trim());
+        }
+        return context.toString();
     }
 
     private String formatEvidence(List<Document> documents) {

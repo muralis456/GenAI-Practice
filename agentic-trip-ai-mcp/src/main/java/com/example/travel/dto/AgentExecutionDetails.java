@@ -18,6 +18,16 @@ public class AgentExecutionDetails implements Serializable {
     private List<AgentStep> timeline = new ArrayList<>();
     private List<String> sources = new ArrayList<>();
     private String executionHistory = "";
+    private boolean ragUsed;
+    private String ragDecision = "";
+    private String ragQuery = "";
+    private String ragAnswer = "";
+    private List<String> ragSources = new ArrayList<>();
+    private double ragEvidenceScore;
+    private int ragCandidateCount;
+    private int ragRerankedCount;
+    private int ragIterations;
+    private String ragRetrievalMethod = "none";
 
     public List<AgentStep> getTimeline() {
         return timeline;
@@ -42,4 +52,35 @@ public class AgentExecutionDetails implements Serializable {
     public void setExecutionHistory(String executionHistory) {
         this.executionHistory = executionHistory == null ? "" : executionHistory;
     }
+
+    public boolean isRagUsed() { return ragUsed; }
+    public void setRagUsed(boolean ragUsed) { this.ragUsed = ragUsed; }
+
+    public String getRagDecision() { return ragDecision; }
+    public void setRagDecision(String ragDecision) { this.ragDecision = ragDecision == null ? "" : ragDecision; }
+
+    public String getRagQuery() { return ragQuery; }
+    public void setRagQuery(String ragQuery) { this.ragQuery = ragQuery == null ? "" : ragQuery; }
+
+    public String getRagAnswer() { return ragAnswer; }
+    public void setRagAnswer(String ragAnswer) { this.ragAnswer = ragAnswer == null ? "" : ragAnswer; }
+
+    public List<String> getRagSources() { return ragSources; }
+    public void setRagSources(List<String> ragSources) { this.ragSources = ragSources == null ? new ArrayList<>() : ragSources; }
+
+    public double getRagEvidenceScore() { return ragEvidenceScore; }
+    public void setRagEvidenceScore(double ragEvidenceScore) { this.ragEvidenceScore = ragEvidenceScore; }
+
+    public int getRagCandidateCount() { return ragCandidateCount; }
+    public void setRagCandidateCount(int ragCandidateCount) { this.ragCandidateCount = ragCandidateCount; }
+
+    public int getRagRerankedCount() { return ragRerankedCount; }
+    public void setRagRerankedCount(int ragRerankedCount) { this.ragRerankedCount = ragRerankedCount; }
+
+    public int getRagIterations() { return ragIterations; }
+    public void setRagIterations(int ragIterations) { this.ragIterations = ragIterations; }
+
+    public String getRagRetrievalMethod() { return ragRetrievalMethod; }
+    public void setRagRetrievalMethod(String ragRetrievalMethod) { this.ragRetrievalMethod = ragRetrievalMethod == null ? "none" : ragRetrievalMethod; }
+
 }

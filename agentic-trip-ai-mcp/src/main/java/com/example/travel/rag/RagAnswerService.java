@@ -25,13 +25,28 @@ public class RagAnswerService {
     }
 
     public String answer(TravelState state) {
-        if (!state.ragSufficient() || state.ragContext().isBlank()) {
+        return answer(state, state.ragQuery(), state.ragContext(),
+                state.ragSufficient(), state.ragEvidenceScore(), state.ragSources());
+    }
+
+    /**
+     * Generates the answer from the result produced by the same RAG node.
+     * LangGraph node updates are applied after NodeAction returns, so calling
+     * answer(state) immediately after retrieval would read the PRE-RAG state.
+     */
+    public String answer(TravelState state, String query, String context,
+                         boolean sufficient, double evidenceScore, java.util.List<String> sources) {
+        if (!sufficient || context == null || context.isBlank()) {
             log.info("RAG answer blocked because evidence is insufficient. query={} score={} sources={}",
-                    state.ragQuery(), state.ragEvidenceScore(), state.ragSources());
+                    query, evidenceScore, sources);
             return "I couldn't find enough relevant information in the travel knowledge base to answer that reliably.";
         }
 
-        String groundedContext = sanitizeForAnswer(state.ragContext());
+        String groundedContext = sanitizeForAnswer(context);
+        if (groundedContext.isBlank()) {
+            return "I found relevant travel knowledge, but it could not be converted into a reliable answer right now.";
+        }
+
         String prompt = """
                 You are the final answer writer for a travel knowledge assistant.
 
@@ -51,9 +66,7 @@ public class RagAnswerService {
 
                 GROUNDED FACTS:
                 %s
-                """.formatted(
-                state.userRequest(),
-                groundedContext);
+                """.formatted(state.userRequest(), groundedContext);
 
         try {
             String answer = routedLlm.complete(AgentRole.FINAL, prompt, "Produce the final grounded answer.");
@@ -61,17 +74,12 @@ public class RagAnswerService {
                 return answer.trim();
             }
         } catch (Exception ex) {
-            log.warn("RAG answer generation failed; returning safe fallback", ex);
+            log.warn("RAG answer generation failed; preserving grounded retrieval context", ex);
         }
 
-        // Retrieval already produced grounded evidence. If the answer LLM is
-        // unavailable (for example because the graph LLM budget is exhausted),
-        // preserve the grounded evidence rather than returning an empty answer.
-        String fallback = sanitizeForAnswer(state.ragContext());
-        if (!fallback.isBlank()) {
-            return fallback;
-        }
-        return "I found relevant travel knowledge, but I couldn't generate a reliable answer from it right now.";
+        // Preserve useful grounded evidence even when the answer model is
+        // unavailable or the graph LLM budget has been reached.
+        return groundedContext;
     }
 
     /**

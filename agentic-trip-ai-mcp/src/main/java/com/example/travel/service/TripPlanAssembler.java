@@ -123,6 +123,16 @@ public class TripPlanAssembler {
         details.setSources(dedupeSources(state.provenance()));
 
         details.setExecutionHistory(executionHistory == null ? "" : executionHistory);
+        details.setRagUsed(state.ragSufficient() || !state.ragContext().isBlank());
+        details.setRagDecision(state.ragDecision());
+        details.setRagQuery(state.ragQuery());
+        details.setRagAnswer(state.ragAnswer());
+        details.setRagSources(new ArrayList<>(state.ragSources()));
+        details.setRagEvidenceScore(state.ragEvidenceScore());
+        details.setRagCandidateCount(state.ragCandidateCount());
+        details.setRagRerankedCount(state.ragRerankedCount());
+        details.setRagIterations(state.ragIterations());
+        details.setRagRetrievalMethod(state.ragRetrievalMethod());
 
         return details;
 

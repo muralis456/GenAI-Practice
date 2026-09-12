@@ -258,7 +258,27 @@ public class TravelGraphConfig {
                                 .to(TravelGraphNodes.REPLAN, TravelGraphNodes.ROUTE_INVALID)
                                 .build())
                 .addEdge(TravelGraphNodes.REPLAN, TravelGraphNodes.ROUTER)
-                .addEdge(TravelGraphNodes.FINAL, TravelGraphNodes.HITL)
+                .addConditionalEdges(TravelGraphNodes.FINAL,
+                        edge_async(state -> {
+                            boolean informationalOnly = state != null
+                                    && !state.runFlights()
+                                    && !state.runHotels()
+                                    && !state.runWeather()
+                                    && !state.runBudget()
+                                    && !state.runItinerary()
+                                    && state.ragSufficient()
+                                    && !state.ragAnswer().isBlank();
+                            String next = informationalOnly
+                                    ? TravelGraphNodes.COMPLETE
+                                    : TravelGraphNodes.HITL;
+                            GraphExecutionLogger.route(TravelGraphNodes.FINAL, next, state,
+                                    informationalOnly ? "informationalResponseAutoComplete" : "requiresApproval");
+                            return next;
+                        }),
+                        EdgeMappings.builder()
+                                .to(TravelGraphNodes.COMPLETE, TravelGraphNodes.COMPLETE)
+                                .to(TravelGraphNodes.HITL, TravelGraphNodes.HITL)
+                                .build())
                 .addConditionalEdges(TravelGraphNodes.HITL,
                         edge_async(state -> {
                             String decision = state.hitlDecision() == null ? "" : state.hitlDecision().toLowerCase();

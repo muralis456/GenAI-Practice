@@ -1111,7 +1111,296 @@
                 font-size: 12px;
             }
         }
-    </style>
+    
+
+        .rag-observability {
+            border: 1px solid rgba(91, 140, 255, 0.22);
+            border-radius: 14px;
+            padding: 14px;
+            background: rgba(50, 75, 125, 0.10);
+        }
+        .rag-answer-preview {
+            margin-top: 8px;
+            line-height: 1.55;
+            color: #e7edf9;
+        }
+        .rag-answer-preview p { margin: 0 0 8px; }
+        .rag-answer-preview ul { margin: 6px 0 8px 20px; }
+        .rag-empty { color: #f0c674; margin-top: 8px; }
+        .rag-query {
+            margin-top: 9px;
+            font-size: 12px;
+            color: #9eabc2;
+            word-break: break-word;
+        }
+        .rag-sources-title { margin-top: 12px; }
+        .rag-evidence-card {
+            border-color: rgba(94, 211, 145, 0.22);
+        }
+        .rag-evidence-meta {
+            color: #9eabc2;
+            font-size: 13px;
+            margin-bottom: 9px;
+        }
+        .rag-source-chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 7px;
+        }
+
+        /* ---------- ChatGPT-style shell / scrolling ---------- */
+        html, body {
+            scrollbar-width: thin;
+            scrollbar-color: rgba(148, 163, 184, 0.34) transparent;
+        }
+
+        body::-webkit-scrollbar,
+        .messages-pane::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        body::-webkit-scrollbar-track,
+        .messages-pane::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        body::-webkit-scrollbar-thumb,
+        .messages-pane::-webkit-scrollbar-thumb {
+            background: transparent;
+            border-radius: 999px;
+            border: 2px solid transparent;
+            background-clip: padding-box;
+        }
+
+        body:hover::-webkit-scrollbar-thumb,
+        .messages-pane:hover::-webkit-scrollbar-thumb {
+            background: rgba(148, 163, 184, 0.34);
+            background-clip: padding-box;
+        }
+
+        body::-webkit-scrollbar-thumb:hover,
+        .messages-pane::-webkit-scrollbar-thumb:hover {
+            background: rgba(203, 213, 225, 0.52);
+            background-clip: padding-box;
+        }
+
+        body::-webkit-scrollbar-button,
+        .messages-pane::-webkit-scrollbar-button,
+        .sidebar::-webkit-scrollbar-button,
+        .chat-history-list::-webkit-scrollbar-button,
+        .agent-pre::-webkit-scrollbar-button {
+            display: none;
+            width: 0;
+            height: 0;
+        }
+
+        .messages-pane {
+            scrollbar-width: thin;
+            scrollbar-color: rgba(148, 163, 184, 0.30) transparent;
+            padding-right: 2px;
+            overscroll-behavior: contain;
+        }
+
+        .sidebar,
+        .chat-history-list {
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+        }
+
+        .sidebar::-webkit-scrollbar,
+        .chat-history-list::-webkit-scrollbar {
+            width: 0;
+            height: 0;
+        }
+
+        /* More breathing room and a calmer ChatGPT-like conversation width. */
+        .content {
+            max-width: 920px;
+            padding-left: 28px;
+            padding-right: 28px;
+        }
+
+        .messages-pane {
+            padding-bottom: 28px;
+        }
+
+        .chat-thread {
+            gap: 22px;
+        }
+
+        .chat-msg.user .chat-bubble {
+            border-radius: 20px;
+            padding: 12px 16px;
+            box-shadow: 0 8px 24px rgba(0,0,0,.12);
+        }
+
+        .chat-msg.assistant .chat-bubble {
+            width: 100%;
+        }
+
+        /* ---------- Live agent response ---------- */
+        .live-response {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            animation: msg-in .25s ease;
+        }
+
+        .live-response-card {
+            width: min(100%, 760px);
+            padding: 14px 16px;
+            border: 1px solid rgba(255,255,255,.075);
+            border-radius: 18px;
+            background: rgba(255,255,255,.025);
+            box-shadow: 0 10px 32px rgba(0,0,0,.14);
+        }
+
+        .live-head {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .live-title {
+            color: #edf5ff;
+            font-size: 14px;
+            font-weight: 750;
+            letter-spacing: .01em;
+        }
+
+        .live-state {
+            color: #9fb5d1;
+            font-size: 12px;
+        }
+
+        .live-dots {
+            display: inline-flex;
+            gap: 3px;
+            margin-left: 4px;
+            vertical-align: middle;
+        }
+
+        .live-dots i {
+            width: 4px;
+            height: 4px;
+            border-radius: 50%;
+            background: #8fb9ef;
+            animation: live-dot 1.1s infinite ease-in-out;
+        }
+        .live-dots i:nth-child(2) { animation-delay: .14s; }
+        .live-dots i:nth-child(3) { animation-delay: .28s; }
+
+        @keyframes live-dot {
+            0%, 70%, 100% { opacity: .28; transform: translateY(0); }
+            35% { opacity: 1; transform: translateY(-2px); }
+        }
+
+        .live-steps {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 11px;
+        }
+
+        .live-step {
+            padding: 5px 8px;
+            border-radius: 999px;
+            border: 1px solid rgba(255,255,255,.07);
+            background: rgba(255,255,255,.035);
+            color: #8299b6;
+            font-size: 11px;
+            transition: all .18s ease;
+        }
+
+        .live-step.active {
+            color: #d9e9ff;
+            border-color: rgba(91,155,255,.26);
+            background: rgba(59,139,255,.10);
+        }
+
+        /* ---------- More polished welcome screen ---------- */
+        .welcome-block {
+            padding-bottom: 34px;
+        }
+
+        .hero {
+            min-height: min(72vh, 680px);
+            justify-content: center;
+            padding: 44px 0 24px;
+        }
+
+        .hero .badge {
+            box-shadow: 0 8px 28px rgba(43,140,255,.10);
+        }
+
+        .title {
+            font-size: clamp(2.5rem, 5vw, 4.6rem);
+            text-wrap: balance;
+        }
+
+        .hero-visual {
+            border-radius: 28px;
+            opacity: .72;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,.08), 0 20px 50px rgba(0,0,0,.16);
+        }
+
+        .city-grid {
+            gap: 12px;
+        }
+
+        .city-card {
+            min-height: 116px;
+            border-radius: 18px;
+            transition: transform .18s ease, border-color .18s ease, filter .18s ease;
+        }
+
+        .city-card:hover {
+            transform: translateY(-3px);
+            filter: brightness(1.08);
+        }
+
+        /* ---------- Composer polish ---------- */
+        .composer-wrap {
+            position: sticky;
+            bottom: 0;
+            z-index: 20;
+            padding: 12px 0 max(18px, env(safe-area-inset-bottom));
+            background: linear-gradient(180deg, rgba(2,11,24,0), rgba(2,11,24,.82) 28%, var(--bg-1) 72%);
+            border-top: 0;
+        }
+
+        .composer-bar {
+            padding: 9px 10px 9px 8px;
+            background: rgba(20, 24, 32, .92);
+            border-color: rgba(255,255,255,.12);
+            box-shadow: 0 12px 38px rgba(0,0,0,.28), 0 0 0 1px rgba(0,0,0,.10);
+            backdrop-filter: blur(18px);
+        }
+
+        .composer-bar:focus-within {
+            border-color: rgba(126,182,255,.30);
+            box-shadow: 0 12px 38px rgba(0,0,0,.30), 0 0 0 3px rgba(59,139,255,.06);
+        }
+
+        .composer-hint {
+            opacity: .7;
+        }
+
+        @media (max-width: 980px) {
+            .content { max-width: 860px; }
+            .hero { min-height: 58vh; }
+        }
+
+        @media (max-width: 560px) {
+            .content { padding-left: 14px; padding-right: 14px; }
+            .hero { min-height: 55vh; padding-top: 28px; }
+            .title { font-size: 2.65rem; }
+            .subtitle { font-size: 17px; }
+            .composer-hint { display: none; }
+        }
+
+</style>
 </head>
 <body>
 <div class="layout">
@@ -1504,7 +1793,7 @@
         ensureCurrentChat('New trip');
         clearThreadDom();
         renderHistoryList();
-        promptInput.value = DEFAULT_PROMPT;
+        promptInput.value = '';
         resizePrompt();
         updateComposerState();
         promptInput.focus();
@@ -1707,8 +1996,37 @@
         const stepsArr = dedupeSteps(rawSteps).slice(-16);
         const sourcesArr = [...new Set(exec.sources || data.sources || [])];
         const history = exec.executionHistory || data.executionHistory || '';
-        if (!stepsArr.length && !sourcesArr.length && !history) return '';
+        const ragUsed = !!(exec.ragUsed || data.ragUsed);
+        const ragAnswer = exec.ragAnswer || data.ragAnswer || '';
+        const ragSources = exec.ragSources || data.ragSources || [];
+        const ragQuery = exec.ragQuery || data.ragQuery || '';
+        const ragDecision = exec.ragDecision || data.ragDecision || '';
+        const ragMethod = exec.ragRetrievalMethod || data.ragRetrievalMethod || '';
+        const ragScore = exec.ragEvidenceScore ?? data.ragEvidenceScore;
+        const ragCandidates = exec.ragCandidateCount ?? data.ragCandidateCount;
+        const ragReranked = exec.ragRerankedCount ?? data.ragRerankedCount;
+        const ragIterations = exec.ragIterations ?? data.ragIterations;
+        if (!stepsArr.length && !sourcesArr.length && !history && !ragUsed) return '';
         let body = '<div class="agent-details-body">';
+        if (ragUsed) {
+            body += '<div class="agent-subsection rag-observability"><div class="agent-subtitle">🧠 RAG result</div>';
+            if (ragAnswer) {
+                body += '<div class="rag-answer-preview">' + formatKnowledgeText(ragAnswer) + '</div>';
+            } else {
+                body += '<div class="rag-empty">RAG retrieval completed, but no answer was generated.</div>';
+            }
+            const meta = [];
+            if (ragDecision) meta.push(ragDecision);
+            if (ragMethod) meta.push(ragMethod);
+            if (Number.isFinite(Number(ragScore))) meta.push('evidence ' + Number(ragScore).toFixed(2));
+            if (Number.isFinite(Number(ragCandidates))) meta.push('candidates ' + ragCandidates);
+            if (Number.isFinite(Number(ragReranked))) meta.push('reranked ' + ragReranked);
+            if (Number.isFinite(Number(ragIterations))) meta.push('iteration ' + ragIterations);
+            if (meta.length) body += '<div class="item-meta">' + escapeHtml(meta.join(' · ')) + '</div>';
+            if (ragQuery) body += '<div class="rag-query">Query: ' + escapeHtml(ragQuery) + '</div>';
+            if (ragSources.length) body += '<div class="agent-subtitle rag-sources-title">Sources</div><pre class="agent-pre">' + escapeHtml(ragSources.join('\n')) + '</pre>';
+            body += '</div>';
+        }
         if (stepsArr.length) {
             body += '<div class="agent-subsection"><div class="agent-subtitle">Execution</div><div class="execution-mini">'
                 + stepsArr.map(step => '<span class="execution-pill">' + escapeHtml(formatStepLine(step)) + '</span>').join('') + '</div></div>';
@@ -1734,11 +2052,20 @@
         const hasWeather = !!(plan.weather && (plan.weather.summary || plan.weather.location));
         const hasTrip = !!(trip.destination || trip.origin || trip.departureDate || trip.returnDate);
 
-        // Knowledge/research answer: do not force it into an empty trip template.
-        if (!hasTrip && !hasFlights && !hasHotels && !hasItinerary && !hasBudget && !hasWeather && tips) {
-            const title = tripTitle(data);
+        // Pure knowledge response: do not render synthetic trip defaults
+        // (today+5 days, 1 traveler, medium budget) as if the user requested
+        // a trip. RAG observability is the authoritative signal here.
+        const ragOnlyResponse = !!(tips && data.execution && data.execution.ragUsed
+            && !hasFlights && !hasHotels && !hasItinerary && !hasBudget && !hasWeather
+            && !(data.execution.ragDecision || '').includes('live'));
+        if (ragOnlyResponse) {
             const dest = data.destination || trip.destination || '';
+            const title = dest ? dest + ' Travel Guidance' : 'Travel Guidance';
             let html = '<div class="result-card"><div class="result-hero"><div class="result-eyebrow">Travel guidance' + (dest ? ' · ' + escapeHtml(dest) : '') + '</div><h2 class="result-title">' + escapeHtml(title || 'Travel information') + '</h2><div class="result-chips"><span class="result-chip success">✓ Knowledge answer</span></div></div><div class="result-body"><div class="result-panel full"><div class="knowledge-answer">' + formatKnowledgeText(tips) + '</div></div>';
+            const execRag = data.execution && data.execution.ragUsed;
+            if (execRag && data.execution.ragSources && data.execution.ragSources.length) {
+                html += '<section class="result-panel full rag-evidence-card"><div class="result-panel-title">🧠 Knowledge evidence</div><div class="rag-evidence-meta">Retrieved from the travel knowledge base</div><div class="rag-source-chips">' + data.execution.ragSources.map(x => '<span class="result-chip">' + escapeHtml(x) + '</span>').join('') + '</div></section>';
+            }
             html += buildAgentDetails(data) + '</div></div>';
             return html;
         }
@@ -1899,6 +2226,45 @@
 
     const formatPlan = (data) => formatPlanSummary(data);
 
+
+    const createLiveResponse = () => {
+        const row = document.createElement('div');
+        row.className = 'live-response';
+        row.innerHTML = '<div class="chat-avatar">AI</div><div class="live-response-card">'
+            + '<div class="live-head"><div class="live-title">AgenticTripAI <span class="live-dots"><i></i><i></i><i></i></span></div><div class="live-state">Understanding request…</div></div>'
+            + '<div class="live-steps"></div></div>';
+        chatThread.appendChild(row);
+        scrollChat();
+        return {
+            row,
+            state: row.querySelector('.live-state'),
+            steps: row.querySelector('.live-steps'),
+            seen: new Set()
+        };
+    };
+
+    const updateLiveResponse = (live, node) => {
+        if (!live || !node) return;
+        const normalized = String(node).replace(/^__+|__+$/g, '').replace(/[-_]+/g, ' ');
+        live.state.textContent = normalized ? 'Running ' + normalized + '…' : 'Working…';
+        const key = normalized.toLowerCase();
+        if (!live.seen.has(key)) {
+            live.seen.add(key);
+            const pill = document.createElement('span');
+            pill.className = 'live-step active';
+            pill.textContent = '✓ ' + normalized;
+            live.steps.appendChild(pill);
+        }
+        live.steps.querySelectorAll('.live-step').forEach(p => p.classList.remove('active'));
+        const last = live.steps.lastElementChild;
+        if (last) last.classList.add('active');
+        scrollChat();
+    };
+
+    const removeLiveResponse = (live) => {
+        if (live && live.row && live.row.isConnected) live.row.remove();
+    };
+
     form.addEventListener('submit', async (event) => {
         event.preventDefault();
         syncUserIdField();
@@ -1917,6 +2283,7 @@
         promptInput.value = '';
         submitButton.disabled = true;
         loadingState.classList.add('visible');
+        const liveResponse = createLiveResponse();
 
         try {
             const startRes = await fetch('/api/plan/start', {
@@ -1939,6 +2306,7 @@
                         const data = JSON.parse(evt.data);
                         if (statusSpan && data.node) {
                             statusSpan.textContent = 'Running ' + data.node + '…';
+                            updateLiveResponse(liveResponse, data.node);
                         }
                     } catch (ignored) {}
                 });
@@ -1969,6 +2337,7 @@
                                 data.execution.timeline = hist.executionTimeline;
                             }
                         } catch (ignored) {}
+                        removeLiveResponse(liveResponse);
                         appendAssistantMessage(data);
                         resolve();
                     } catch (error) {
@@ -1978,6 +2347,7 @@
                 es.addEventListener('failed', (evt) => {
                     finished = true;
                     es.close();
+                    removeLiveResponse(liveResponse);
                     try {
                         const data = JSON.parse(evt.data);
                         reject(new Error(data.error || 'Plan failed'));
@@ -1994,6 +2364,7 @@
                 };
             });
         } catch (error) {
+            removeLiveResponse(liveResponse);
             appendAssistantMessage({
                 status: 'ERROR',
                 finalPlan: 'Error: ' + error.message,

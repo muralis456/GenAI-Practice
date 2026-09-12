@@ -183,6 +183,13 @@ public class IntentAgentService {
             // merge it rather than forcing the request through Planner.
             IntentPlan recovered =
                     semanticIntentArbiter.recover(state.userRequest(), parsed);
+            log.info(
+                    "Intent semantic arbitration result request={} capabilities=[flights={},hotels={},research={},weather={},budget={},itinerary={},knowledge={}] confidence={}",
+                    state.userRequest(),
+                    recovered.isNeedsFlights(), recovered.isNeedsHotels(),
+                    recovered.isNeedsResearch(), recovered.isNeedsWeather(),
+                    recovered.isNeedsBudget(), recovered.isNeedsItinerary(),
+                    recovered.isNeedsKnowledge(), recovered.getConfidence());
             IntentPlan merged = mergeSemanticSignals(parsed, recovered);
             return sanitizeSemanticPlan(merged);
         } catch (Exception ex) {
@@ -280,6 +287,25 @@ public class IntentAgentService {
         // budget, or flight request.
         if (semantic.isNeedsKnowledge()) {
             llm.setNeedsKnowledge(true);
+        }
+
+        // Semantic arbitration may also veto a weaker live-research capability.
+        // This is especially important with small local LLMs: they can label a
+        // general "precautions/advice" question as both knowledge and research.
+        // If the independent semantic model clearly prefers durable knowledge,
+        // preserve the user's intent as knowledge-only and avoid an unnecessary
+        // MCP/web call.
+        if (llm.isNeedsKnowledge()
+                && llm.isNeedsResearch()
+                && !semantic.isNeedsResearch()
+                && semantic.isNeedsKnowledge()
+                && semantic.getConfidence() >= 0.60) {
+            llm.setNeedsResearch(false);
+            llm.setRequestType("TRAVEL_INFORMATION");
+            llm.setStrategy("rag_only");
+            llm.setPriority("knowledge");
+            log.info("Intent semantic arbitration vetoed research for knowledge-dominant request confidence={}",
+                    semantic.getConfidence());
         }
 
         // For non-knowledge capabilities, only merge when the semantic model is

@@ -27,7 +27,7 @@ public class SemanticIntentArbiter {
     private static final Logger log =
             LoggerFactory.getLogger(SemanticIntentArbiter.class);
 
-    private static final double CAPABILITY_THRESHOLD = 0.55;
+    private static final double CAPABILITY_THRESHOLD = 0.50;
 
     private static final Map<String, String> CAPABILITY_MEANINGS =
             new LinkedHashMap<>();
@@ -129,6 +129,22 @@ public class SemanticIntentArbiter {
             result.setNeedsBudget(score(scores, "budget") >= CAPABILITY_THRESHOLD);
             result.setNeedsItinerary(score(scores, "itinerary") >= CAPABILITY_THRESHOLD);
             result.setNeedsKnowledge(score(scores, "knowledge") >= CAPABILITY_THRESHOLD);
+
+            // Resolve semantic source conflicts dynamically. The embedding model
+            // is a second semantic opinion. Importantly, evaluate knowledge AFTER
+            // setting it; the previous implementation checked result.isNeedsKnowledge()
+            // before assigning the knowledge capability, so the veto could never
+            // fire for knowledge-dominant requests.
+            double knowledgeScore = score(scores, "knowledge");
+            double researchScore = score(scores, "research");
+            if (result.isNeedsKnowledge()
+                    && result.isNeedsResearch()
+                    && knowledgeScore > researchScore
+                    && knowledgeScore - researchScore >= 0.07d) {
+                result.setNeedsResearch(false);
+                log.info("Semantic capability conflict resolved: knowledge={} research={} margin={} -> research=false",
+                        knowledgeScore, researchScore, knowledgeScore - researchScore);
+            }
 
             // The embedding classifier is deliberately conservative about
             // multi-capability activation. It is primarily a recovery signal.

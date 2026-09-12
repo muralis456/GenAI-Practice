@@ -32,7 +32,10 @@ public class RagNode implements NodeAction<TravelState> {
             updates.put(TravelState.RAG_DECISION, result.decision());
             updates.put(TravelState.RAG_QUERY, result.query());
             updates.put(TravelState.RAG_CONTEXT, result.context());
-            String ragAnswer = result.sufficient() ? ragAnswerService.answer(state) : "";
+            String ragAnswer = result.sufficient()
+                    ? ragAnswerService.answer(state, result.query(), result.context(),
+                            result.sufficient(), result.evidenceScore(), result.sources())
+                    : "";
             updates.put(TravelState.RAG_ANSWER, ragAnswer);
             if (TravelState.isBlank(state.destination()) && !TravelState.isBlank(result.destination())) {
                 updates.put(TravelState.DESTINATION, result.destination());
