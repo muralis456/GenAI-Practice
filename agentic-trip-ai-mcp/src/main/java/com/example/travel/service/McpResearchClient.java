@@ -8,11 +8,14 @@ import tools.jackson.databind.JsonNode;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Service
 @ConditionalOnProperty(prefix = "travel.mcp.client", name = "enabled", havingValue = "true")
 public class McpResearchClient {
 
+    private static final Logger log = LoggerFactory.getLogger(McpResearchClient.class);
     private final McpToolClient client;
 
     public McpResearchClient(McpToolClient client) {
@@ -30,6 +33,7 @@ public class McpResearchClient {
             }
             return hits;
         } catch (Exception exception) {
+            log.warn("MCP research lookup failed query={} error={}", query, exception.getMessage());
             return List.of();
         }
     }

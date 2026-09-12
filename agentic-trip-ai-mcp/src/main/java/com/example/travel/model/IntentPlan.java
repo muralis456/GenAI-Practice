@@ -18,19 +18,29 @@ public class IntentPlan implements Serializable {
     public static final String WEATHER = "WEATHER";
 
     private String requestType = TRIP_PLANNING;
-    private boolean needsFlights = true;
-    private boolean needsHotels = true;
-    private boolean needsResearch = true;
-    private boolean needsWeather = true;
-    private boolean needsBudget = true;
-    private boolean needsItinerary = true;
-    private boolean needsKnowledge = true;
+    private boolean needsFlights = false;
+    private boolean needsHotels = false;
+    private boolean needsResearch = false;
+    private boolean needsWeather = false;
+    private boolean needsBudget = false;
+    private boolean needsItinerary = false;
+    private boolean needsKnowledge = false;
     private String strategy = "parallel_search";
     private String priority = "balanced";
     private double confidence = 0.5;
 
     public static IntentPlan fullTrip() {
         IntentPlan plan = new IntentPlan();
+        plan.requestType = TRIP_PLANNING;
+        plan.needsFlights = true;
+        plan.needsHotels = true;
+        plan.needsResearch = true;
+        plan.needsWeather = true;
+        plan.needsBudget = true;
+        plan.needsItinerary = true;
+        plan.needsKnowledge = true;
+        plan.strategy = "parallel_search";
+        plan.priority = "balanced";
         plan.confidence = 0.85;
         return plan;
     }
@@ -73,10 +83,11 @@ public class IntentPlan implements Serializable {
         plan.needsFlights = false;
         plan.needsHotels = false;
         plan.needsResearch = true;
-        plan.needsWeather = true;
+        plan.needsWeather = false;
         plan.needsBudget = false;
         plan.needsItinerary = false;
-        plan.strategy = "research_weather";
+        plan.needsKnowledge = false;
+        plan.strategy = "research_only";
         plan.priority = "research";
         plan.confidence = 0.9;
         return plan;

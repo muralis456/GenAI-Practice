@@ -1,15 +1,40 @@
 # Melbourne Travel Knowledge
 
-- Country: Australia
-- Airport: Melbourne Airport
+- Country: Country: Australia
+- Airport: Airport: Melbourne Airport
 - IATA: MEL
 - ICAO: YMML
-- Knowledge type: destination-city / airport-directory
+- Knowledge type: destination-city / durable-travel-knowledge
+## Stable destination knowledge
 
-## RAG usage
+Melbourne is a major city in Victoria, Australia. This document contains durable destination context for RAG;
+it is not a source of live operational information.
 
-Use this document to recognize `Melbourne` and its airport identifiers when planning a trip. The IATA/ICAO values come from the project's seeded airport directory.
+### Core attractions and areas
+- Federation Square
+- National Gallery of Victoria
+- laneways
+- Queen Victoria Market
+- Great Ocean Road gateway
 
-## Live-data boundary
+### Culture and heritage
+Arts, sport, coffee culture, multicultural neighborhoods and Victorian architecture are major themes.
 
-Do not use this document for current flight schedules, ticket prices, hotel availability, weather, visa requirements, airport closures, or travel advisories. Those should be retrieved from live/authoritative sources through the project's MCP or research capabilities.
+### Food and local experiences
+- coffee
+- Australian brunch
+- multicultural cuisine
+
+### Airport grounding
+- Country: Country: Australia
+- Common airport record in the bundled directory: Airport: Melbourne Airport
+- IATA: MEL
+- ICAO: YMML
+- For authoritative airport/city resolution, the `airport_location` database record remains the application source of truth.
+- A destination can have multiple airports; do not infer airport choice solely from this document.
+
+### Retrieval and live-data boundary
+Use this document for stable destination recognition, history, culture, major attractions and general planning context.
+Do not use it for current flight schedules, fares, hotel availability/prices, weather forecasts, attraction opening hours,
+transport schedules, visa/entry rules, closures, strikes or travel advisories. Those require live/authoritative sources
+through MCP or other approved live integrations.

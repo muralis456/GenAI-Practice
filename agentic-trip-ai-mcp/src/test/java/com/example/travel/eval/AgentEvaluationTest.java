@@ -47,7 +47,7 @@ class AgentEvaluationTest {
         IntentPlan plan = IntentClassifier.classify("What are the best places to visit in Paris?");
         assertEquals(IntentPlan.RESEARCH, plan.getRequestType());
         assertTrue(plan.isNeedsResearch());
-        assertTrue(plan.isNeedsWeather());
+        assertFalse(plan.isNeedsWeather());
         assertFalse(plan.isNeedsFlights());
         assertFalse(plan.isNeedsHotels());
     }

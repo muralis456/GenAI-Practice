@@ -15,6 +15,37 @@ public final class SpecialistRouter {
     private SpecialistRouter() {
     }
 
+
+    /** Route immediately to RAG for a pure knowledge query; trip planning still uses Planner. */
+    public static String afterIntent(TravelState state) {
+        boolean pureKnowledge = state.needsKnowledge()
+                && !state.needsFlights()
+                && !state.needsHotels()
+                && !state.needsResearch()
+                && !state.needsWeather()
+                && !state.needsBudget()
+                && !state.needsItinerary();
+        String next = pureKnowledge ? TravelGraphNodes.RAG : TravelGraphNodes.PLANNER;
+        GraphExecutionLogger.route(TravelGraphNodes.INTENT, next, state,
+                pureKnowledge ? "knowledgeOnly" : "tripOrSpecialistRequest");
+        return next;
+    }
+
+    /** After RAG, knowledge-only requests end at final response; trip requests continue to specialists. */
+    public static String afterRag(TravelState state) {
+        boolean pureKnowledge = state.needsKnowledge()
+                && !state.needsFlights()
+                && !state.needsHotels()
+                && !state.needsResearch()
+                && !state.needsWeather()
+                && !state.needsBudget()
+                && !state.needsItinerary();
+        String next = pureKnowledge ? TravelGraphNodes.FINAL : TravelGraphNodes.ROUTER;
+        GraphExecutionLogger.route(TravelGraphNodes.RAG, next, state,
+                pureKnowledge ? "knowledgeOnly" : "knowledgePlusTripPlanning");
+        return next;
+    }
+
     public static String afterPlanner(TravelState state) {
         String next;
         String reason;

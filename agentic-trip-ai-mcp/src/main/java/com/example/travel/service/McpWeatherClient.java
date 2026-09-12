@@ -7,11 +7,14 @@ import tools.jackson.databind.JsonNode;
 
 import java.time.LocalDate;
 import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Service
 @ConditionalOnProperty(prefix = "travel.mcp.client", name = "enabled", havingValue = "true")
 public class McpWeatherClient {
 
+    private static final Logger log = LoggerFactory.getLogger(McpWeatherClient.class);
     private final McpToolClient client;
 
     public McpWeatherClient(McpToolClient client) {
@@ -32,6 +35,8 @@ public class McpWeatherClient {
                     root.path("summary").asString("Weather unavailable."),
                     root.path("rainLikely").asBoolean(false));
         } catch (Exception exception) {
+            log.warn("MCP weather lookup failed destination={} start={} end={} error={}",
+                    destination, start, end, exception.getMessage());
             return new WeatherForecast(destination, "Weather lookup failed through MCP.", false);
         }
     }

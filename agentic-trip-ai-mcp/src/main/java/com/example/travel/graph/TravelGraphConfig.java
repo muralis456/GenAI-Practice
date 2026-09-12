@@ -160,14 +160,24 @@ public class TravelGraphConfig {
                 .addNode(TravelGraphNodes.COMPLETE, async(TravelGraphNodes.COMPLETE, completeNode))
                 .addNode(TravelGraphNodes.CANCEL, async(TravelGraphNodes.CANCEL, cancelNode))
                 .addEdge(START, TravelGraphNodes.INTENT)
-                .addEdge(TravelGraphNodes.INTENT, TravelGraphNodes.PLANNER)
+                .addConditionalEdges(TravelGraphNodes.INTENT,
+                        edge_async(SpecialistRouter::afterIntent),
+                        EdgeMappings.builder()
+                                .to(TravelGraphNodes.RAG, TravelGraphNodes.RAG)
+                                .to(TravelGraphNodes.PLANNER, TravelGraphNodes.PLANNER)
+                                .build())
                 .addConditionalEdges(TravelGraphNodes.PLANNER,
                         edge_async(state -> state.needsKnowledge() ? TravelGraphNodes.RAG : TravelGraphNodes.ROUTER),
                         EdgeMappings.builder()
                                 .to(TravelGraphNodes.RAG, TravelGraphNodes.RAG)
                                 .to(TravelGraphNodes.ROUTER, TravelGraphNodes.ROUTER)
                                 .build())
-                .addEdge(TravelGraphNodes.RAG, TravelGraphNodes.ROUTER)
+                .addConditionalEdges(TravelGraphNodes.RAG,
+                        edge_async(SpecialistRouter::afterRag),
+                        EdgeMappings.builder()
+                                .to(TravelGraphNodes.FINAL, TravelGraphNodes.FINAL)
+                                .to(TravelGraphNodes.ROUTER, TravelGraphNodes.ROUTER)
+                                .build())
                 .addConditionalEdges(TravelGraphNodes.AIRPORT,
                         edge_async(SpecialistRouter::afterAirport),
                         EdgeMappings.builder()
@@ -178,10 +188,7 @@ public class TravelGraphConfig {
                                 .to(TravelGraphNodes.WEATHER, TravelGraphNodes.WEATHER)
                                 .to(TravelGraphNodes.SUPERVISOR, TravelGraphNodes.SUPERVISOR)
                                 .build())
-                .addEdge(TravelGraphNodes.FAN_OUT, TravelGraphNodes.FLIGHT)
-                .addEdge(TravelGraphNodes.FAN_OUT, TravelGraphNodes.HOTEL)
-                .addEdge(TravelGraphNodes.FAN_OUT, TravelGraphNodes.RESEARCH)
-                .addEdge(TravelGraphNodes.FAN_OUT, TravelGraphNodes.WEATHER)
+                .addEdge(TravelGraphNodes.FAN_OUT, TravelGraphNodes.SUPERVISOR)
                 .addEdge(TravelGraphNodes.FLIGHT, TravelGraphNodes.SUPERVISOR)
                 .addEdge(TravelGraphNodes.HOTEL, TravelGraphNodes.SUPERVISOR)
                 .addEdge(TravelGraphNodes.RESEARCH, TravelGraphNodes.SUPERVISOR)
@@ -235,7 +242,16 @@ public class TravelGraphConfig {
                                 .to(TravelGraphNodes.REPLAN, TravelGraphNodes.ROUTE_INVALID)
                                 .build())
                 .addEdge(TravelGraphNodes.REPLAN, TravelGraphNodes.ROUTER)
-                .addEdge(TravelGraphNodes.FINAL, TravelGraphNodes.HITL)
+                .addConditionalEdges(TravelGraphNodes.FINAL,
+                        edge_async(state -> state.needsKnowledge()
+                                && !state.needsFlights() && !state.needsHotels()
+                                && !state.needsResearch() && !state.needsWeather()
+                                && !state.needsBudget() && !state.needsItinerary()
+                                ? TravelGraphNodes.COMPLETE : TravelGraphNodes.HITL),
+                        EdgeMappings.builder()
+                                .to(TravelGraphNodes.COMPLETE, TravelGraphNodes.COMPLETE)
+                                .to(TravelGraphNodes.HITL, TravelGraphNodes.HITL)
+                                .build())
                 .addConditionalEdges(TravelGraphNodes.HITL,
                         edge_async(state -> {
                             String decision = state.hitlDecision() == null ? "" : state.hitlDecision().toLowerCase();

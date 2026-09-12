@@ -1,15 +1,40 @@
 # San Francisco Travel Knowledge
 
-- Country: United States
-- Airport: San Francisco International Airport
+- Country: Country: United States
+- Airport: Airport: San Francisco International Airport
 - IATA: SFO
 - ICAO: KSFO
-- Knowledge type: destination-city / airport-directory
+- Knowledge type: destination-city / durable-travel-knowledge
+## Stable destination knowledge
 
-## RAG usage
+San Francisco is a coastal city in California, United States. This document contains durable destination context for RAG;
+it is not a source of live operational information.
 
-Use this document to recognize `San Francisco` and its airport identifiers when planning a trip. The IATA/ICAO values come from the project's seeded airport directory.
+### Core attractions and areas
+- Golden Gate Bridge
+- Alcatraz
+- Fisherman's Wharf
+- Chinatown
+- Golden Gate Park
 
-## Live-data boundary
+### Culture and heritage
+Pacific geography, immigrant neighborhoods, technology history and distinctive Victorian architecture shape San Francisco.
 
-Do not use this document for current flight schedules, ticket prices, hotel availability, weather, visa requirements, airport closures, or travel advisories. Those should be retrieved from live/authoritative sources through the project's MCP or research capabilities.
+### Food and local experiences
+- sourdough
+- seafood
+- Mission-style burritos
+
+### Airport grounding
+- Country: Country: United States
+- Common airport record in the bundled directory: Airport: San Francisco International Airport
+- IATA: SFO
+- ICAO: KSFO
+- For authoritative airport/city resolution, the `airport_location` database record remains the application source of truth.
+- A destination can have multiple airports; do not infer airport choice solely from this document.
+
+### Retrieval and live-data boundary
+Use this document for stable destination recognition, history, culture, major attractions and general planning context.
+Do not use it for current flight schedules, fares, hotel availability/prices, weather forecasts, attraction opening hours,
+transport schedules, visa/entry rules, closures, strikes or travel advisories. Those require live/authoritative sources
+through MCP or other approved live integrations.

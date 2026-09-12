@@ -42,6 +42,11 @@ public class RagNode implements NodeAction<TravelState> {
             updates.putAll(TravelState.trace(TravelGraphNodes.RAG, "ok", result.decision()));
             GraphExecutionLogger.specialistResult(TravelGraphNodes.RAG, state, "ok",
                     "decision=" + result.decision() + " method=" + result.retrievalMethod() + " candidates=" + result.candidateCount() + " reranked=" + result.rerankedCount() + " iterations=" + result.iterations() + " sources=" + result.sources().size());
+            org.slf4j.LoggerFactory.getLogger(RagNode.class).info(
+                    "RAG node result query={} decision={} sufficient={} candidates={} reranked={} contextChars={} evidenceScore={} sources={} destination={} country={} topics={}",
+                    result.query(), result.decision(), result.sufficient(), result.candidateCount(),
+                    result.rerankedCount(), result.contextChars(), result.evidenceScore(), result.sources(),
+                    result.destination(), result.country(), result.topics());
             return updates;
         } catch (Exception ex) {
             return NodeFailureSupport.record(TravelGraphNodes.RAG, state, ex, true,

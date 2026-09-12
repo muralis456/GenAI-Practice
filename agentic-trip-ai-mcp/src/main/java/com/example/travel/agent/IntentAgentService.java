@@ -49,10 +49,10 @@ public class IntentAgentService {
         }
 
         log.info(
-                "Intent agent requestType={} confidence={} for query={}",
-                plan.getRequestType(),
-                plan.getConfidence(),
-                state.userRequest());
+                "Intent agent requestType={} confidence={} capabilities=[flights={},hotels={},research={},weather={},budget={},itinerary={},knowledge={}] strategy={} priority={} query={}",
+                plan.getRequestType(), plan.getConfidence(), plan.isNeedsFlights(), plan.isNeedsHotels(),
+                plan.isNeedsResearch(), plan.isNeedsWeather(), plan.isNeedsBudget(), plan.isNeedsItinerary(),
+                plan.isNeedsKnowledge(), plan.getStrategy(), plan.getPriority(), state.userRequest());
 
         return toUpdates(state, plan);
     }
@@ -397,6 +397,8 @@ public class IntentAgentService {
                     parsed.isNeedsBudget(),
                     parsed.isNeedsItinerary(),
                     parsed.getConfidence());
+            log.info("Intent capability decision requestType={} knowledge={} strategy={} priority={}",
+                    parsed.getRequestType(), parsed.isNeedsKnowledge(), parsed.getStrategy(), parsed.getPriority());
 
             return parsed;
 

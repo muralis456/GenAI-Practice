@@ -38,6 +38,7 @@ public class AgenticRagService {
     private static final int MAX_CANDIDATES = 10;
     private static final int MAX_RERANK_INPUT_CHARS = 1100;
     private static final int MAX_CONTEXT_CHARS = 6500;
+    private static final double MIN_RERANK_SCORE = 0.45;
 
     private final VectorStore vectorStore;
     private final JdbcTemplate jdbcTemplate;
@@ -81,7 +82,13 @@ public class AgenticRagService {
             return RagResult.skipped("disabled");
         }
 
+        long ragStarted = System.nanoTime();
+        log.info("RAG start requestType={} needsKnowledge={} destination={} enabled={} topK={} threshold={} maxIterations={} hybrid={} rerank={} compression={}",
+                state.requestType(), state.needsKnowledge(), state.destination(), enabled, topK,
+                similarityThreshold, maxIterations, hybridEnabled, rerankEnabled, compressionEnabled);
         Decision decision = decideRetrieval(state);
+        log.info("RAG decision retrieve={} reason={} query={} destination={} country={} topics={}",
+                decision.retrieve(), decision.reason(), decision.query(), decision.destination(), decision.country(), decision.topics());
         if (!decision.retrieve() || decision.query().isBlank()) {
             log.info("Agentic RAG decision=skip reason={} destination={}", decision.reason(), state.destination());
             return RagResult.skipped("llm_decided_no_retrieval");
@@ -99,14 +106,21 @@ public class AgenticRagService {
 
         while (iterations < maxIterations) {
             iterations++;
+            log.info("RAG retrieval-start iteration={} query={} destinationKeys={}",
+                    iterations, activeQuery, destinationKeys(decision));
             Retrieval retrieval = hybridRetrieve(state, decision, activeQuery);
             evidence = retrieval.documents();
             candidateCount = retrieval.candidateCount();
+            log.info("RAG retrieval-complete iteration={} rawCandidates={} uniqueDocuments={} sources={}",
+                    iterations, retrieval.candidateCount(), evidence.size(), sourceNames(evidence));
             sources.addAll(sourceNames(evidence));
 
             if (rerankEnabled && !evidence.isEmpty()) {
+                int beforeRerank = evidence.size();
                 evidence = rerank(state, activeQuery, evidence);
                 rerankedCount = evidence.size();
+                log.info("RAG rerank-complete iteration={} before={} after={} sources={}",
+                        iterations, beforeRerank, rerankedCount, sourceNames(evidence));
                 sources.addAll(sourceNames(evidence));
             }
 
@@ -128,6 +142,8 @@ public class AgenticRagService {
 
             Evaluation evaluation = evaluateEvidence(state, activeQuery, compressedContext, evidence);
             sufficient = evaluation.sufficient();
+            log.info("RAG evidence-evaluation iteration={} sufficient={} reason={} evidenceScore={} groundedContextChars={}",
+                    iterations, sufficient, evaluation.reason(), evidenceScore(activeQuery, compressedContext, sources), compressedContext.length());
             if (sufficient) {
                 break;
             }
@@ -141,6 +157,12 @@ public class AgenticRagService {
             }
             activeQuery = nextQuery.trim();
         }
+
+        log.info("RAG complete iterations={} sufficient={} decision={} method={} candidates={} reranked={} sources={} contextChars={} evidenceScore={} durationMs={}",
+                iterations, sufficient, sufficient ? "sufficient" : "best_effort", retrievalMethod,
+                candidateCount, rerankedCount, sources, compressedContext.length(),
+                evidenceScore(activeQuery, compressedContext, sources),
+                (System.nanoTime() - ragStarted) / 1_000_000L);
 
         String decisionName = sufficient ? "hybrid_reranked_compressed_sufficient"
                 : "hybrid_reranked_compressed_best_effort";
@@ -180,6 +202,7 @@ public class AgenticRagService {
 
     private Retrieval hybridRetrieve(TravelState state, Decision decision, String query) {
         List<String> queries = multiQueries(state, decision, query);
+        log.info("RAG multi-query generated count={} queries={}", queries.size(), queries);
         Map<String, RankedDocument> merged = new LinkedHashMap<>();
         int rawCandidates = 0;
         int rankBase = 1;
@@ -188,11 +211,13 @@ public class AgenticRagService {
             List<Document> vector = vectorSearch(state, decision, q);
             rawCandidates += vector.size();
             addRanked(merged, vector, rankBase++);
+            log.debug("RAG retrieval-source query={} vectorCount={}", q, vector.size());
 
             if (hybridEnabled) {
                 List<Document> keyword = keywordSearch(state, decision, q, MAX_CANDIDATES);
                 rawCandidates += keyword.size();
                 addRanked(merged, keyword, rankBase++);
+                log.debug("RAG retrieval-source query={} keywordCount={}", q, keyword.size());
             }
         }
 
@@ -201,6 +226,8 @@ public class AgenticRagService {
                 .limit(MAX_CANDIDATES)
                 .map(RankedDocument::document)
                 .toList();
+        log.info("RAG RRF fusion rawCandidates={} uniqueCandidates={} fusedTopK={} sources={}",
+                rawCandidates, merged.size(), fused.size(), sourceNames(fused));
         return new Retrieval(fused, Math.max(rawCandidates, merged.size()));
     }
 
@@ -228,11 +255,15 @@ public class AgenticRagService {
             builder.filterExpression(filter);
         }
         try {
-            return vectorStore.similaritySearch(builder.build());
+            List<Document> results = vectorStore.similaritySearch(builder.build());
+            log.debug("RAG vector-search query={} filter={} results={}", query, filter, results.size());
+            return results;
         } catch (Exception ex) {
             log.warn("Destination metadata vector filter failed; retrying without filter: {}", ex.getMessage());
-            return vectorStore.similaritySearch(SearchRequest.builder()
+            List<Document> results = vectorStore.similaritySearch(SearchRequest.builder()
                     .query(query).topK(Math.max(topK, 8)).similarityThreshold(similarityThreshold).build());
+            log.debug("RAG vector-search fallback query={} results={}", query, results.size());
+            return results;
         }
     }
 
@@ -269,7 +300,7 @@ public class AgenticRagService {
             params.addAll(sqlDestinationParams(decision));
             params.add(query);
             params.add(limit);
-            return jdbcTemplate.query(sql,
+            List<Document> results = jdbcTemplate.query(sql,
                     (rs, rowNum) -> {
                         Map<String, Object> metadata = new LinkedHashMap<>();
                         String rawMetadata = rs.getString("metadata");
@@ -282,6 +313,8 @@ public class AgenticRagService {
                         metadata.put("retrieval", "keyword");
                         return new Document(rs.getString("content"), metadata);
                     }, params.toArray());
+            log.debug("RAG keyword-search query={} destinationKeys={} results={}", query, destinationKeys(decision), results.size());
+            return results;
         } catch (Exception ex) {
             log.warn("Hybrid keyword retrieval unavailable; continuing with vector search: {}", ex.getMessage());
             return List.of();
@@ -290,8 +323,13 @@ public class AgenticRagService {
 
     private String destinationFilter(Decision decision) {
         List<String> keys = destinationKeys(decision);
+        // Do not restrict an unknown-destination knowledge query to global documents.
+        // Landmark/topic queries such as "Eiffel Tower history" may not contain a
+        // city name in the extracted destination field, while the relevant document
+        // is correctly tagged with destinationKey=paris. In that case search the
+        // complete knowledge base and let hybrid retrieval + reranking select evidence.
         if (keys.isEmpty()) {
-            return "destinationKey == 'global'";
+            return "";
         }
         return "destinationKey == 'global' || " + keys.stream()
                 .map(key -> "destinationKey == '" + escapeFilter(key) + "'")
@@ -305,8 +343,11 @@ public class AgenticRagService {
 
     private String sqlDestinationFilter(Decision decision) {
         List<String> keys = destinationKeys(decision);
+        // Unknown destination: do not force global-only filtering. This is important
+        // for landmark/topic questions where the query identifies the subject but not
+        // the city (for example, "Eiffel Tower history").
         if (keys.isEmpty()) {
-            return "and metadata ->> 'destinationKey' = 'global'";
+            return "";
         }
         return "and (metadata ->> 'destinationKey' = 'global' or " + keys.stream()
                 .map(key -> "metadata ->> 'destinationKey' = ?")
@@ -384,19 +425,34 @@ public class AgenticRagService {
                 """,
                 "USER REQUEST:\n%s\n\nRETRIEVAL QUERY:\n%s\n\n%s".formatted(state.userRequest(), query, prompt));
 
-        List<Integer> indices = new ArrayList<>();
+        List<ScoredCandidate> scored = new ArrayList<>();
         jsonSupport.readTree(raw).ifPresent(node -> {
             var ranked = node.path("ranked");
             if (ranked.isArray()) {
                 ranked.forEach(item -> {
                     int index = item.path("index").asInt(-1) - 1;
-                    if (index >= 0 && index < candidates.size() && !indices.contains(index)) indices.add(index);
+                    double score = item.path("score").asDouble(0.0);
+                    if (index >= 0 && index < candidates.size() && score >= MIN_RERANK_SCORE) {
+                        scored.add(new ScoredCandidate(index, score));
+                    }
                 });
             }
         });
-        if (indices.isEmpty()) return candidates.stream().limit(topK).toList();
+
+        if (scored.isEmpty()) {
+            log.info("RAG rerank produced no candidates above threshold={} query={}",
+                    MIN_RERANK_SCORE, query);
+            return List.of();
+        }
+
+        scored.sort(Comparator.comparingDouble(ScoredCandidate::score).reversed());
         List<Document> result = new ArrayList<>();
-        for (Integer index : indices) result.add(candidates.get(index));
+        Set<Integer> seen = new LinkedHashSet<>();
+        for (ScoredCandidate candidate : scored) {
+            if (seen.add(candidate.index())) {
+                result.add(candidates.get(candidate.index()));
+            }
+        }
         return result.stream().limit(topK).toList();
     }
 
@@ -511,6 +567,8 @@ public class AgenticRagService {
         Document document() { return document; }
         double rrfScore() { return rrfScore; }
     }
+
+    private record ScoredCandidate(int index, double score) {}
 
     public record RagResult(boolean used, String decision, String query, String context,
                              List<String> sources, int iterations, boolean sufficient,

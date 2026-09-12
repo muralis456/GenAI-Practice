@@ -1,15 +1,40 @@
 # Amsterdam Travel Knowledge
 
-- Country: Netherlands
-- Airport: Amsterdam Airport Schiphol
+- Country: Country: Netherlands
+- Airport: Airport: Amsterdam Airport Schiphol
 - IATA: AMS
 - ICAO: EHAM
-- Knowledge type: destination-city / airport-directory
+- Knowledge type: destination-city / durable-travel-knowledge
+## Stable destination knowledge
 
-## RAG usage
+Amsterdam is a capital of the Netherlands. This document contains durable destination context for RAG;
+it is not a source of live operational information.
 
-Use this document to recognize `Amsterdam` and its airport identifiers when planning a trip. The IATA/ICAO values come from the project's seeded airport directory.
+### Core attractions and areas
+- Rijksmuseum
+- Van Gogh Museum
+- Anne Frank House
+- canal ring
+- Jordaan
 
-## Live-data boundary
+### Culture and heritage
+Canal-city heritage, Dutch Golden Age art, cycling culture and compact neighborhoods shape the visitor experience.
 
-Do not use this document for current flight schedules, ticket prices, hotel availability, weather, visa requirements, airport closures, or travel advisories. Those should be retrieved from live/authoritative sources through the project's MCP or research capabilities.
+### Food and local experiences
+- Dutch pancakes
+- herring
+- stroopwafels
+
+### Airport grounding
+- Country: Country: Netherlands
+- Common airport record in the bundled directory: Airport: Amsterdam Airport Schiphol
+- IATA: AMS
+- ICAO: EHAM
+- For authoritative airport/city resolution, the `airport_location` database record remains the application source of truth.
+- A destination can have multiple airports; do not infer airport choice solely from this document.
+
+### Retrieval and live-data boundary
+Use this document for stable destination recognition, history, culture, major attractions and general planning context.
+Do not use it for current flight schedules, fares, hotel availability/prices, weather forecasts, attraction opening hours,
+transport schedules, visa/entry rules, closures, strikes or travel advisories. Those require live/authoritative sources
+through MCP or other approved live integrations.
