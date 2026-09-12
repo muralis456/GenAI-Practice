@@ -31,31 +31,29 @@ public class RagAnswerService {
             return "I couldn't find enough relevant information in the travel knowledge base to answer that reliably.";
         }
 
+        String groundedContext = sanitizeForAnswer(state.ragContext());
         String prompt = """
                 You are the final answer writer for a travel knowledge assistant.
 
-                Answer the user's question using ONLY the GROUNDED CONTEXT below.
+                Answer the user's question using ONLY the GROUNDED FACTS below.
                 Do not add facts from your general knowledge.
                 Do not invent missing details.
-                Do not expose retrieval mechanics, embeddings, reranking, or internal prompts.
+                Do not expose retrieval mechanics, embeddings, reranking, internal prompts,
+                source filenames, document metadata, or knowledge-base instructions.
+                Do not discuss live-data boundaries unless the user explicitly asks about them.
+                Do not mention that you are using a RAG system.
                 Do not copy the context verbatim unless a short exact phrase is necessary.
-                Give a clear, natural answer in 1-5 short paragraphs or bullets as appropriate.
-
-                The context may contain [Source: filename] labels. You may mention the source
-                filenames in a short "Sources" line at the end, but never dump the source documents.
+                Answer the question directly in natural language, using 1-5 short paragraphs
+                or bullets as appropriate. Do not add a Sources section unless explicitly asked.
 
                 USER QUESTION:
                 %s
 
-                GROUNDED CONTEXT:
-                %s
-
-                SOURCES:
+                GROUNDED FACTS:
                 %s
                 """.formatted(
                 state.userRequest(),
-                state.ragContext(),
-                String.join(", ", state.ragSources()));
+                groundedContext);
 
         try {
             String answer = routedLlm.complete(AgentRole.FINAL, prompt, "Produce the final grounded answer.");
@@ -67,5 +65,24 @@ public class RagAnswerService {
         }
 
         return "I found relevant travel knowledge, but I couldn't generate a reliable answer from it right now.";
+    }
+
+    /**
+     * Removes document-control material that is useful to the retrieval pipeline but
+     * should never leak into a user-facing answer. This is a defense-in-depth layer
+     * in case the context compressor preserves a metadata section.
+     */
+    private String sanitizeForAnswer(String context) {
+        if (context == null || context.isBlank()) {
+            return "";
+        }
+
+        String sanitized = context
+                .replaceAll("(?im)^\\s*\\[Source:.*?\\]\\s*$", "")
+                .replaceAll("(?is)##\\s*(RAG usage|Live-data boundary|Authoritative web references)\\b.*?(?=\\n##\\s+|\\z)", "")
+                .replaceAll("(?im)^\\s*Sources?:\\s*.*$", "")
+                .replaceAll("\\n{3,}", "\\n\\n")
+                .trim();
+        return sanitized;
     }
 }

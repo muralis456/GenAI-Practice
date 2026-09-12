@@ -185,18 +185,37 @@ public class AgenticRagService {
                 packing, culture, safety, planning policies and document-backed facts.
                 Do NOT retrieve for live flight availability, hotel prices, live weather, currency rates,
                 or airport resolution; those are handled by MCP/tools.
+
+                IMPORTANT: the query field must contain ONLY the knowledge subject to retrieve.
+                Never include the user's origin, travel dates, budget, traveler count, travel style,
+                or other trip-planning state unless those details are explicitly part of the knowledge question.
+                Example: for "What is the history and cultural significance of the Eiffel Tower?",
+                query should be "Eiffel Tower history and cultural significance".
                 Return JSON only: {"retrieve":true|false,"query":"concise semantic query","reason":"short reason","destination":"city or destination","country":"country","topics":["culture","food"]}
                 """,
                 requestContext(state));
         var node = jsonSupport.readTree(raw).orElse(null);
         List<String> topics = new ArrayList<>();
         if (node != null && node.path("topics").isArray()) node.path("topics").forEach(v -> topics.add(v.asText()));
+        boolean retrieve = node != null && node.path("retrieve").asBoolean(false);
+        String destination = node == null ? state.destination() : node.path("destination").asText(state.destination());
+        String country = node == null ? "" : node.path("country").asText("");
+        String query = node == null ? "" : node.path("query").asText("");
+
+        // Knowledge-only requests must retrieve against the user's actual question.
+        // Do not contaminate the semantic query with trip-planning state such as origin,
+        // dates, budget or travel style. Those fields belong to planning, not durable
+        // knowledge retrieval. This also makes landmark/topic queries deterministic.
+        if (isKnowledgeOnly(state) && !TravelState.isBlank(state.userRequest())) {
+            query = state.userRequest().trim();
+        }
+
         return new Decision(
-                node != null && node.path("retrieve").asBoolean(false),
-                node == null ? "" : node.path("query").asText(""),
+                retrieve,
+                query,
                 node == null ? "" : node.path("reason").asText(""),
-                node == null ? state.destination() : node.path("destination").asText(state.destination()),
-                node == null ? "" : node.path("country").asText(""),
+                destination,
+                country,
                 topics);
     }
 
@@ -235,14 +254,32 @@ public class AgenticRagService {
         Set<String> queries = new LinkedHashSet<>();
         queries.add(query);
         String destination = !TravelState.isBlank(decision.destination()) ? decision.destination() : state.destination();
-        if (!TravelState.isBlank(destination)) {
+
+        if (isKnowledgeOnly(state)) {
+            // Keep knowledge retrieval focused on the subject. A destination-qualified
+            // variant helps landmark/topic documents while avoiding planning noise such
+            // as budget, dates and travel style.
+            if (!TravelState.isBlank(destination) && !query.toLowerCase().contains(destination.toLowerCase())) {
+                queries.add(destination + " " + query);
+            }
+            if (decision.topics() != null && !decision.topics().isEmpty()) {
+                queries.add(query + " " + String.join(" ", decision.topics()));
+            }
+        } else if (!TravelState.isBlank(destination)) {
             queries.add(query + " " + destination + " destination travel");
             queries.add(destination + " " + query);
         }
-        if (decision.topics() != null && !decision.topics().isEmpty()) {
-            queries.add(query + " " + String.join(" ", decision.topics()));
-        }
         return queries.stream().limit(3).toList();
+    }
+
+    private boolean isKnowledgeOnly(TravelState state) {
+        return state.needsKnowledge()
+                && !state.needsFlights()
+                && !state.needsHotels()
+                && !state.needsResearch()
+                && !state.needsWeather()
+                && !state.needsBudget()
+                && !state.needsItinerary();
     }
 
     private List<Document> vectorSearch(TravelState state, Decision decision, String query) {
@@ -257,6 +294,13 @@ public class AgenticRagService {
         try {
             List<Document> results = vectorStore.similaritySearch(builder.build());
             log.debug("RAG vector-search query={} filter={} results={}", query, filter, results.size());
+            if (results.isEmpty() && !filter.isBlank()) {
+                log.info("RAG vector destination filter returned 0 results; retrying without destination filter destination={} keys={}",
+                        decision.destination(), destinationKeys(decision));
+                results = vectorStore.similaritySearch(SearchRequest.builder()
+                        .query(query).topK(Math.max(topK, 8)).similarityThreshold(similarityThreshold).build());
+                log.debug("RAG vector-search unfiltered-fallback query={} results={}", query, results.size());
+            }
             return results;
         } catch (Exception ex) {
             log.warn("Destination metadata vector filter failed; retrying without filter: {}", ex.getMessage());
@@ -314,6 +358,30 @@ public class AgenticRagService {
                         return new Document(rs.getString("content"), metadata);
                     }, params.toArray());
             log.debug("RAG keyword-search query={} destinationKeys={} results={}", query, destinationKeys(decision), results.size());
+            if (results.isEmpty() && !destinationFilter.isBlank()) {
+                log.info("RAG keyword destination filter returned 0 results; retrying without destination filter destination={} keys={}",
+                        decision.destination(), destinationKeys(decision));
+                String fallbackSql = """
+                        select content, metadata
+                        from vector_store
+                        where to_tsvector('simple', content) @@ plainto_tsquery('simple', ?)
+                        order by ts_rank(to_tsvector('simple', content), plainto_tsquery('simple', ?)) desc
+                        limit ?
+                        """;
+                results = jdbcTemplate.query(fallbackSql,
+                        (rs, rowNum) -> {
+                            Map<String, Object> metadata = new LinkedHashMap<>();
+                            String rawMetadata = rs.getString("metadata");
+                            if (rawMetadata != null) {
+                                try {
+                                    jsonSupport.readTree(rawMetadata).ifPresent(node -> node.properties().forEach(e -> metadata.put(e.getKey(), e.getValue().asText())));
+                                } catch (Exception ignored) { }
+                            }
+                            metadata.putIfAbsent("source", extractSource(rawMetadata));
+                            metadata.put("retrieval", "keyword");
+                            return new Document(rs.getString("content"), metadata);
+                        }, query, query, limit);
+            }
             return results;
         } catch (Exception ex) {
             log.warn("Hybrid keyword retrieval unavailable; continuing with vector search: {}", ex.getMessage());
@@ -370,7 +438,8 @@ public class AgenticRagService {
         if (TravelState.isBlank(value)) {
             return;
         }
-        String normalized = value.toLowerCase().trim()
+        String trimmed = value.trim();
+        String normalized = trimmed.toLowerCase()
                 .replaceAll("[^a-z0-9]+", "-")
                 .replaceAll("^-|-$", "");
         if (normalized.isBlank()) {
@@ -378,6 +447,21 @@ public class AgenticRagService {
         }
         keys.add(normalized);
         keys.addAll(DESTINATION_ALIASES.getOrDefault(normalized, List.of()));
+
+        // The LLM may return a display destination such as "Paris, France"
+        // while the vector metadata uses the canonical city key "paris".
+        // Keep the display key, but also add each comma-separated component.
+        if (trimmed.contains(",")) {
+            for (String part : trimmed.split(",")) {
+                String component = part.toLowerCase().trim()
+                        .replaceAll("[^a-z0-9]+", "-")
+                        .replaceAll("^-|-$", "");
+                if (!component.isBlank()) {
+                    keys.add(component);
+                    keys.addAll(DESTINATION_ALIASES.getOrDefault(component, List.of()));
+                }
+            }
+        }
     }
 
     private static final Map<String, List<String>> DESTINATION_ALIASES = Map.ofEntries(
@@ -464,7 +548,10 @@ public class AgenticRagService {
                 You are a grounded context compressor.
                 Extract only facts explicitly supported by the supplied passages.
                 Do not add general knowledge, guesses, recommendations, or live data.
-                Preserve source labels in [Source: filename] form so downstream agents can cite them.
+                Exclude internal retrieval metadata and document-control text such as sections named
+                "RAG usage", "Live-data boundary", "Authoritative web references", source filenames,
+                indexing instructions, and instructions about which tools to call.
+                Preserve only user-relevant factual content.
                 Return JSON only: {"context":"2-6 concise factual bullets or short paragraphs"}
                 """,
                 "USER REQUEST:\n%s\n\nQUERY:\n%s\n\nPASSAGES:\n%s".formatted(state.userRequest(), query, rawEvidence));
