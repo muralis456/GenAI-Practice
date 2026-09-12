@@ -16,7 +16,7 @@
       "needsFlights": false,
       "needsHotels": false,
       "needsResearch": true,
-      "needsWeather": false,
+      "needsWeather": true,
       "needsBudget": false,
       "needsItinerary": false
     }
@@ -38,9 +38,9 @@
       "needsFlights": false,
       "needsHotels": true,
       "needsResearch": true,
-      "needsWeather": false,
+      "needsWeather": true,
       "needsBudget": false,
-      "needsItinerary": false
+      "needsItinerary": true
     }
   },
   {

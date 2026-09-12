@@ -24,374 +24,366 @@ import java.util.Map;
 @Component
 public class ReplanStrategyExecutor {
 
-        private final ReplanActionValidator replanActionValidator;
+    private final ReplanActionValidator replanActionValidator;
 
-        public ReplanStrategyExecutor(
-                        ReplanActionValidator replanActionValidator) {
+    public ReplanStrategyExecutor(
+            ReplanActionValidator replanActionValidator) {
 
-                this.replanActionValidator = replanActionValidator;
+        this.replanActionValidator = replanActionValidator;
+    }
+
+    public Map<String, Object> apply(
+            TravelState state,
+            ReplanStrategy strategy) {
+
+        List<ReplanAction> actions = replanActionValidator.resolve(
+                strategy,
+                state);
+
+        strategy.setResolvedActions(actions);
+
+        Map<String, Object> updates = new LinkedHashMap<>();
+
+        BigDecimal factor = state.costFactor();
+
+        boolean hotelCheaper = state.hotelCheaper();
+
+        String flightPreference = state.flightPreference();
+
+        String travelStyle = state.travelStyle();
+
+        if (travelStyle == null) {
+            travelStyle = "";
         }
 
-        public Map<String, Object> apply(
-                        TravelState state,
-                        ReplanStrategy strategy) {
+        /*
+         * Apply semantic actions selected by the LLM.
+         */
+        for (ReplanAction action : actions) {
 
-                List<ReplanAction> actions = replanActionValidator.resolve(
-                                strategy,
-                                state);
+            switch (action) {
 
-                strategy.setResolvedActions(actions);
-
-                Map<String, Object> updates = new LinkedHashMap<>();
-
-                BigDecimal factor = state.costFactor();
-
-                boolean hotelCheaper = state.hotelCheaper();
-
-                String flightPreference = state.flightPreference();
-
-                String travelStyle = state.travelStyle();
-
-                if (travelStyle == null) {
-                        travelStyle = "";
+                case GET_FLIGHT_DETAILS -> {
+                    /*
+                     * User wants flight information.
+                     *
+                     * Do not change flight preference.
+                     *
+                     * Specialist execution is handled by
+                     * applySelectiveRouting().
+                     */
                 }
 
-                /*
-                 * Apply semantic actions selected by the LLM.
-                 */
-                for (ReplanAction action : actions) {
+                case CHEAPER_FLIGHT -> {
 
-                        switch (action) {
+                    flightPreference = "cheapest";
 
-                                case GET_FLIGHT_DETAILS -> {
-                                        /*
-                                         * User wants flight information.
-                                         *
-                                         * Do not change flight preference.
-                                         *
-                                         * Specialist execution is handled by
-                                         * applySelectiveRouting().
-                                         */
-                                }
+                    factor = factor.multiply(
+                            BigDecimal.valueOf(0.95));
+                }
 
-                                case GET_BUDGET_BREAKDOWN, GET_HOTEL_DETAILS,
-                                                GET_WEATHER_DETAILS -> {
-                                        /*
-                                         * Information requests are handled by
-                                         * applySelectiveRouting().
-                                         */
-                                }
+                case REDUCE_HOTEL_BUDGET -> {
 
-                                case CHEAPER_FLIGHT -> {
+                    hotelCheaper = true;
 
-                                        flightPreference = "cheapest";
+                    factor = factor.multiply(
+                            BigDecimal.valueOf(0.90));
+                }
 
-                                        factor = factor.multiply(
-                                                        BigDecimal.valueOf(0.95));
-                                }
+                case HOTEL_UPGRADE -> {
 
-                                case REDUCE_HOTEL_BUDGET -> {
+                    hotelCheaper = false;
 
-                                        hotelCheaper = true;
+                    if (!travelStyle
+                            .toLowerCase()
+                            .contains("luxury")) {
 
-                                        factor = factor.multiply(
-                                                        BigDecimal.valueOf(0.90));
-                                }
+                        travelStyle = "upscale";
+                    }
+                }
 
-                                case HOTEL_UPGRADE -> {
+                case REMOVE_EXPENSIVE_ATTRACTIONS -> {
 
-                                        hotelCheaper = false;
+                    if (!state.attractions().isEmpty()) {
 
-                                        if (!travelStyle
-                                                        .toLowerCase()
-                                                        .contains("luxury")) {
+                        updates.put(
+                                TravelState.ATTRACTIONS,
+                                new ArrayList<>(
+                                        state.attractions()
+                                                .subList(
+                                                        0,
+                                                        Math.min(
+                                                                3,
+                                                                state.attractions()
+                                                                        .size()))));
+                    }
+                }
 
-                                                travelStyle = "upscale";
-                                        }
-                                }
+                case ADD_DESTINATION -> {
 
-                                case REMOVE_EXPENSIVE_ATTRACTIONS -> {
+                    if (state.modification() != null
+                            && !TravelState.isBlank(
+                                    state.modification()
+                                            .getDestination())) {
 
-                                        if (!state.attractions().isEmpty()) {
+                        String extra = state.modification()
+                                .getDestination();
 
-                                                updates.put(
-                                                                TravelState.ATTRACTIONS,
-                                                                new ArrayList<>(
-                                                                                state.attractions()
-                                                                                                .subList(
-                                                                                                                0,
-                                                                                                                Math.min(
-                                                                                                                                3,
-                                                                                                                                state.attractions()
-                                                                                                                                                .size()))));
-                                        }
-                                }
+                        String current = TravelState.firstNonBlank(
+                                state.destination());
 
-                                case ADD_DESTINATION -> {
+                        if (!TravelState.isBlank(current)
+                                && !current
+                                        .toLowerCase()
+                                        .contains(
+                                                extra.toLowerCase())) {
 
-                                        if (state.modification() != null
-                                                        && !TravelState.isBlank(
-                                                                        state.modification()
-                                                                                        .getDestination())) {
-
-                                                String extra = state.modification()
-                                                                .getDestination();
-
-                                                String current = TravelState.firstNonBlank(
-                                                                state.destination());
-
-                                                if (!TravelState.isBlank(current)
-                                                                && !current
-                                                                                .toLowerCase()
-                                                                                .contains(
-                                                                                                extra.toLowerCase())) {
-
-                                                        updates.put(
-                                                                        TravelState.DESTINATION,
-                                                                        current
-                                                                                        + " and "
-                                                                                        + extra);
-                                                }
-
-                                                updates.put(
-                                                                TravelState.NEEDS_RESEARCH,
-                                                                Boolean.TRUE);
-
-                                                updates.put(
-                                                                TravelState.NEEDS_ITINERARY,
-                                                                Boolean.TRUE);
-
-                                                updates.put(
-                                                                TravelState.RUN_RESEARCH,
-                                                                Boolean.TRUE);
-
-                                                updates.put(
-                                                                TravelState.RUN_ITINERARY,
-                                                                Boolean.TRUE);
-                                        }
-                                }
-
-                                case ADJUST_ITINERARY -> {
-
-                                        updates.put(
-                                                        TravelState.NEEDS_ITINERARY,
-                                                        Boolean.TRUE);
-
-                                        updates.put(
-                                                        TravelState.RUN_ITINERARY,
-                                                        Boolean.TRUE);
-                                }
+                            updates.put(
+                                    TravelState.DESTINATION,
+                                    current
+                                            + " and "
+                                            + extra);
                         }
+
+                        updates.put(
+                                TravelState.NEEDS_RESEARCH,
+                                Boolean.TRUE);
+
+                        updates.put(
+                                TravelState.NEEDS_ITINERARY,
+                                Boolean.TRUE);
+
+                        updates.put(
+                                TravelState.RUN_RESEARCH,
+                                Boolean.TRUE);
+
+                        updates.put(
+                                TravelState.RUN_ITINERARY,
+                                Boolean.TRUE);
+                    }
                 }
 
-                /*
-                 * Convert approved semantic actions into specialist
-                 * execution flags.
-                 */
-                applySelectiveRouting(
-                                updates,
-                                actions,
-                                state);
+                case ADJUST_ITINERARY -> {
 
-                /*
-                 * Preserve node-failure recovery behavior.
-                 */
-                NodeFailureRouting.applySelectiveNeeds(
-                                updates,
-                                state);
+                    updates.put(
+                            TravelState.NEEDS_ITINERARY,
+                            Boolean.TRUE);
 
-                String notes = "Replan priority="
-                                + strategy.getPriority()
-                                + " actions="
-                                + actions
-                                + " cause="
-                                + (TravelState.isBlank(
-                                                strategy.getReason())
-                                                                ? String.join(
-                                                                                "; ",
-                                                                                state.validationErrors())
-                                                                                + " "
-                                                                                + String.join(
-                                                                                                "; ",
-                                                                                                state.semanticNotes())
-                                                                : strategy.getReason());
-
-                AgentDecision decision = new AgentDecision(
-                                "replanner",
-                                TravelState.firstNonBlank(
-                                                strategy.getPriority(),
-                                                "REPLAN").toUpperCase(),
-                                notes,
-                                strategy.getExpectedImpact() > 0
-                                                ? strategy.getExpectedImpact()
-                                                : 0.8);
-
-                updates.put(
-                                TravelState.COST_FACTOR,
-                                factor);
-
-                updates.put(
-                                TravelState.HOTEL_CHEAPER,
-                                hotelCheaper);
-
-                updates.put(
-                                TravelState.FLIGHT_PREFERENCE,
-                                flightPreference);
-
-                updates.put(
-                                TravelState.TRAVEL_STYLE,
-                                travelStyle);
-
-                updates.put(
-                                TravelState.REPLAN_NOTES,
-                                notes);
-
-                updates.put(
-                                TravelState.REPLAN_STRATEGY,
-                                strategy);
-
-                updates.put(
-                                TravelState.LAST_DECISION,
-                                decision);
-
-                updates.putAll(
-                                NodeFailureSupport.clear());
-
-                /*
-                 * Build logging information using the NEW selective
-                 * requirements, not the old checkpoint values.
-                 */
-                Map<String, Object> selectiveNeeds = new LinkedHashMap<>();
-
-                selectiveNeeds.put(
-                                "runFlights",
-                                updates.getOrDefault(TravelState.RUN_FLIGHTS, state.runFlights()));
-
-                selectiveNeeds.put(
-                                "runHotels",
-                                updates.getOrDefault(TravelState.RUN_HOTELS, state.runHotels()));
-
-                selectiveNeeds.put(
-                                "runResearch",
-                                updates.getOrDefault(TravelState.RUN_RESEARCH, state.runResearch()));
-
-                selectiveNeeds.put(
-                                "runWeather",
-                                updates.getOrDefault(TravelState.RUN_WEATHER, state.runWeather()));
-
-                selectiveNeeds.put(
-                                "runBudget",
-                                updates.getOrDefault(TravelState.RUN_BUDGET, state.runBudget()));
-
-                selectiveNeeds.put(
-                                "runItinerary",
-                                updates.getOrDefault(TravelState.RUN_ITINERARY, state.runItinerary()));
-
-                selectiveNeeds.put(
-                                "needsFlights",
-                                updates.getOrDefault(TravelState.NEEDS_FLIGHTS, state.needsFlights()));
-
-                selectiveNeeds.put(
-                                "needsHotels",
-                                updates.getOrDefault(TravelState.NEEDS_HOTELS, state.needsHotels()));
-
-                GraphExecutionLogger.replan(
-                                state,
-                                actions,
-                                selectiveNeeds);
-
-                return updates;
+                    updates.put(
+                            TravelState.RUN_ITINERARY,
+                            Boolean.TRUE);
+                }
+            }
         }
 
-        private void applySelectiveRouting(
-                        Map<String, Object> updates,
-                        List<ReplanAction> actions,
-                        TravelState state) {
+        /*
+         * Convert approved semantic actions into specialist
+         * execution flags.
+         */
+        applySelectiveRouting(
+                updates,
+                actions,
+                state);
 
-                // NEEDS_* is cumulative across the conversation.
-                boolean needsFlights = state.needsFlights();
-                boolean needsHotels = state.needsHotels();
-                boolean needsResearch = state.needsResearch();
-                boolean needsWeather = state.needsWeather();
-                boolean needsBudget = state.needsBudget();
-                boolean needsItinerary = state.needsItinerary();
+        /*
+         * Preserve node-failure recovery behavior.
+         */
+        NodeFailureRouting.applySelectiveNeeds(
+                updates,
+                state);
 
-                // RUN_* is only for the current graph pass.
-                boolean runFlights = false;
-                boolean runHotels = false;
-                boolean runResearch = false;
-                boolean runWeather = false;
-                boolean runBudget = false;
-                boolean runItinerary = false;
+        String notes = "Replan priority="
+                + strategy.getPriority()
+                + " actions="
+                + actions
+                + " cause="
+                + (TravelState.isBlank(
+                        strategy.getReason())
+                                ? String.join(
+                                        "; ",
+                                        state.validationErrors())
+                                        + " "
+                                        + String.join(
+                                                "; ",
+                                                state.semanticNotes())
+                                : strategy.getReason());
 
-                if (actions != null) {
-                        for (ReplanAction action : actions) {
-                                if (action == null) {
-                                        continue;
-                                }
+        AgentDecision decision = new AgentDecision(
+                "replanner",
+                TravelState.firstNonBlank(
+                        strategy.getPriority(),
+                        "REPLAN").toUpperCase(),
+                notes,
+                strategy.getExpectedImpact() > 0
+                        ? strategy.getExpectedImpact()
+                        : 0.8);
 
-                                switch (action) {
-                                        case GET_FLIGHT_DETAILS -> {
-                                                runFlights = true;
-                                                needsFlights = true;
-                                        }
-                                        case CHEAPER_FLIGHT -> {
-                                                runFlights = true;
-                                                runBudget = true;
-                                                needsFlights = true;
-                                                needsBudget = true;
-                                        }
-                                        case GET_HOTEL_DETAILS, HOTEL_UPGRADE -> {
-                                                runHotels = true;
-                                                needsHotels = true;
-                                        }
-                                        case GET_WEATHER_DETAILS -> {
-                                                runWeather = true;
-                                                needsWeather = true;
-                                        }
-                                        case GET_BUDGET_BREAKDOWN -> {
-                                                runBudget = true;
-                                                needsBudget = true;
-                                        }
-                                        case REDUCE_HOTEL_BUDGET -> {
-                                                runHotels = true;
-                                                runBudget = true;
-                                                runItinerary = true;
-                                                needsHotels = true;
-                                                needsBudget = true;
-                                                needsItinerary = true;
-                                        }
-                                        case REMOVE_EXPENSIVE_ATTRACTIONS -> {
-                                                runResearch = true;
-                                                needsResearch = true;
-                                        }
-                                        case ADD_DESTINATION -> {
-                                                runResearch = true;
-                                                runItinerary = true;
-                                                needsResearch = true;
-                                                needsItinerary = true;
-                                        }
-                                        case ADJUST_ITINERARY -> {
-                                                runItinerary = true;
-                                                needsItinerary = true;
-                                        }
-                                }
-                        }
+        updates.put(
+                TravelState.COST_FACTOR,
+                factor);
+
+        updates.put(
+                TravelState.HOTEL_CHEAPER,
+                hotelCheaper);
+
+        updates.put(
+                TravelState.FLIGHT_PREFERENCE,
+                flightPreference);
+
+        updates.put(
+                TravelState.TRAVEL_STYLE,
+                travelStyle);
+
+        updates.put(
+                TravelState.REPLAN_NOTES,
+                notes);
+
+        updates.put(
+                TravelState.REPLAN_STRATEGY,
+                strategy);
+
+        updates.put(
+                TravelState.LAST_DECISION,
+                decision);
+
+        updates.putAll(
+                NodeFailureSupport.clear());
+
+        /*
+         * Build logging information using the NEW selective
+         * requirements, not the old checkpoint values.
+         */
+        Map<String, Object> selectiveNeeds = new LinkedHashMap<>();
+
+        selectiveNeeds.put(
+                "runFlights",
+                updates.getOrDefault(TravelState.RUN_FLIGHTS, state.runFlights()));
+
+        selectiveNeeds.put(
+                "runHotels",
+                updates.getOrDefault(TravelState.RUN_HOTELS, state.runHotels()));
+
+        selectiveNeeds.put(
+                "runResearch",
+                updates.getOrDefault(TravelState.RUN_RESEARCH, state.runResearch()));
+
+        selectiveNeeds.put(
+                "runWeather",
+                updates.getOrDefault(TravelState.RUN_WEATHER, state.runWeather()));
+
+        selectiveNeeds.put(
+                "runBudget",
+                updates.getOrDefault(TravelState.RUN_BUDGET, state.runBudget()));
+
+        selectiveNeeds.put(
+                "runItinerary",
+                updates.getOrDefault(TravelState.RUN_ITINERARY, state.runItinerary()));
+
+        selectiveNeeds.put(
+                "needsFlights",
+                updates.getOrDefault(TravelState.NEEDS_FLIGHTS, state.needsFlights()));
+
+        selectiveNeeds.put(
+                "needsHotels",
+                updates.getOrDefault(TravelState.NEEDS_HOTELS, state.needsHotels()));
+
+        GraphExecutionLogger.replan(
+                state,
+                actions,
+                selectiveNeeds);
+
+        return updates;
+    }
+
+    private void applySelectiveRouting(
+            Map<String, Object> updates,
+            List<ReplanAction> actions,
+            TravelState state) {
+
+        // NEEDS_* is cumulative across the conversation.
+        boolean needsFlights = state.needsFlights();
+        boolean needsHotels = state.needsHotels();
+        boolean needsResearch = state.needsResearch();
+        boolean needsWeather = state.needsWeather();
+        boolean needsBudget = state.needsBudget();
+        boolean needsItinerary = state.needsItinerary();
+
+        // RUN_* is only for the current graph pass.
+        boolean runFlights = false;
+        boolean runHotels = false;
+        boolean runResearch = false;
+        boolean runWeather = false;
+        boolean runBudget = false;
+        boolean runItinerary = false;
+
+        if (actions != null) {
+            for (ReplanAction action : actions) {
+                if (action == null) {
+                    continue;
                 }
 
-                updates.put(TravelState.RUN_FLIGHTS, runFlights);
-                updates.put(TravelState.RUN_HOTELS, runHotels);
-                updates.put(TravelState.RUN_RESEARCH, runResearch);
-                updates.put(TravelState.RUN_WEATHER, runWeather);
-                updates.put(TravelState.RUN_BUDGET, runBudget);
-                updates.put(TravelState.RUN_ITINERARY, runItinerary);
-
-                updates.put(TravelState.NEEDS_FLIGHTS, needsFlights);
-                updates.put(TravelState.NEEDS_HOTELS, needsHotels);
-                updates.put(TravelState.NEEDS_RESEARCH, needsResearch);
-                updates.put(TravelState.NEEDS_WEATHER, needsWeather);
-                updates.put(TravelState.NEEDS_BUDGET, needsBudget);
-                updates.put(TravelState.NEEDS_ITINERARY, needsItinerary);
+                switch (action) {
+                    case GET_FLIGHT_DETAILS -> {
+                        runFlights = true;
+                        needsFlights = true;
+                    }
+                    case CHEAPER_FLIGHT -> {
+                        runFlights = true;
+                        runBudget = true;
+                        needsFlights = true;
+                        needsBudget = true;
+                    }
+                    case GET_HOTEL_DETAILS, HOTEL_UPGRADE -> {
+                        runHotels = true;
+                        needsHotels = true;
+                    }
+                    case GET_WEATHER_DETAILS -> {
+                        runWeather = true;
+                        needsWeather = true;
+                    }
+                    case GET_BUDGET_BREAKDOWN -> {
+                        runBudget = true;
+                        needsBudget = true;
+                    }
+                    case REDUCE_HOTEL_BUDGET -> {
+                        runHotels = true;
+                        runBudget = true;
+                        runItinerary = true;
+                        needsHotels = true;
+                        needsBudget = true;
+                        needsItinerary = true;
+                    }
+                    case REMOVE_EXPENSIVE_ATTRACTIONS -> {
+                        runResearch = true;
+                        needsResearch = true;
+                    }
+                    case ADD_DESTINATION -> {
+                        runResearch = true;
+                        runItinerary = true;
+                        needsResearch = true;
+                        needsItinerary = true;
+                    }
+                    case ADJUST_ITINERARY -> {
+                        runItinerary = true;
+                        needsItinerary = true;
+                    }
+                }
+            }
         }
+
+        updates.put(TravelState.RUN_FLIGHTS, runFlights);
+        updates.put(TravelState.RUN_HOTELS, runHotels);
+        updates.put(TravelState.RUN_RESEARCH, runResearch);
+        updates.put(TravelState.RUN_WEATHER, runWeather);
+        updates.put(TravelState.RUN_BUDGET, runBudget);
+        updates.put(TravelState.RUN_ITINERARY, runItinerary);
+
+        updates.put(TravelState.NEEDS_FLIGHTS, needsFlights);
+        updates.put(TravelState.NEEDS_HOTELS, needsHotels);
+        updates.put(TravelState.NEEDS_RESEARCH, needsResearch);
+        updates.put(TravelState.NEEDS_WEATHER, needsWeather);
+        updates.put(TravelState.NEEDS_BUDGET, needsBudget);
+        updates.put(TravelState.NEEDS_ITINERARY, needsItinerary);
+    }
 
 }

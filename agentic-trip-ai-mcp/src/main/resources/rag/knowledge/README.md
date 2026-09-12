@@ -18,14 +18,3 @@ Use live MCP/tools for changing facts such as current fares, availability, forec
 
 ## City and airport directory
 The RAG corpus now includes `project-airport-city-directory.md` plus one `city-*.md` document for every city seeded by `AirportLocationSeeder`. This allows destination-aware retrieval and city/IATA grounding.
-
-## RAG answer-generation policy
-
-Retrieved passages are internal evidence only. The application must never expose raw retrieved
-documents as the user-facing answer. Knowledge-only requests pass grounded context to a final
-answer-generation step. If evidence is insufficient, the final answer must explicitly say so
-rather than guessing.
-
-The corpus intentionally contains both durable travel knowledge and project-aware engineering
-knowledge. Travel questions should prefer travel/destination evidence; project questions may use
-`project-*` documents.

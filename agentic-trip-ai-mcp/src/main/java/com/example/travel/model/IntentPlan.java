@@ -25,22 +25,12 @@ public class IntentPlan implements Serializable {
     private boolean needsBudget = false;
     private boolean needsItinerary = false;
     private boolean needsKnowledge = false;
-    private String strategy = "parallel_search";
-    private String priority = "balanced";
+    private String strategy = "none";
+    private String priority = "none";
     private double confidence = 0.5;
 
     public static IntentPlan fullTrip() {
         IntentPlan plan = new IntentPlan();
-        plan.requestType = TRIP_PLANNING;
-        plan.needsFlights = true;
-        plan.needsHotels = true;
-        plan.needsResearch = true;
-        plan.needsWeather = true;
-        plan.needsBudget = true;
-        plan.needsItinerary = true;
-        plan.needsKnowledge = true;
-        plan.strategy = "parallel_search";
-        plan.priority = "balanced";
         plan.confidence = 0.85;
         return plan;
     }
@@ -83,11 +73,10 @@ public class IntentPlan implements Serializable {
         plan.needsFlights = false;
         plan.needsHotels = false;
         plan.needsResearch = true;
-        plan.needsWeather = false;
+        plan.needsWeather = true;
         plan.needsBudget = false;
         plan.needsItinerary = false;
-        plan.needsKnowledge = false;
-        plan.strategy = "research_only";
+        plan.strategy = "research_weather";
         plan.priority = "research";
         plan.confidence = 0.9;
         return plan;

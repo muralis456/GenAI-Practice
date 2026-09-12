@@ -778,10 +778,10 @@
 
         .composer-bar textarea {
             width: 100%;
-            min-height: 26px;
-            max-height: 160px;
+            min-height: 28px;
+            max-height: 168px;
             resize: none;
-            overflow-y: auto;
+            overflow-y: hidden;
             border: none;
             background: transparent;
             padding: 4px 6px;
@@ -790,6 +790,41 @@
             line-height: 1.45;
             outline: none;
             box-shadow: none;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+        }
+
+        /* Keep the composer clean while typing. The scrollbar appears only
+           when the prompt exceeds the maximum height, and never shows the
+           native up/down arrow buttons. */
+        .composer-bar textarea::-webkit-scrollbar {
+            width: 0;
+            height: 0;
+        }
+
+        .composer-bar textarea.has-overflow {
+            overflow-y: auto;
+            scrollbar-width: thin;
+            scrollbar-color: rgba(170, 190, 220, 0.45) transparent;
+        }
+
+        .composer-bar textarea.has-overflow::-webkit-scrollbar {
+            width: 5px;
+        }
+
+        .composer-bar textarea.has-overflow::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .composer-bar textarea.has-overflow::-webkit-scrollbar-thumb {
+            background: rgba(170, 190, 220, 0.45);
+            border-radius: 999px;
+        }
+
+        .composer-bar textarea.has-overflow::-webkit-scrollbar-button {
+            display: none;
+            width: 0;
+            height: 0;
         }
 
         .composer-bar textarea:focus {
@@ -859,6 +894,14 @@
             width: 18px;
             height: 18px;
             fill: currentColor;
+        }
+
+        .composer-hint {
+            margin: 6px 12px 0;
+            color: rgba(198, 210, 228, 0.42);
+            font-size: 11px;
+            text-align: center;
+            user-select: none;
         }
 
         .composer-foot {
@@ -1090,7 +1133,7 @@
                     <div class="composer-bar">
                         <button type="button" id="composerNewChat" class="composer-icon-btn" title="New chat" aria-label="New chat">+</button>
                         <div class="composer-input-wrap">
-                            <textarea id="tripPrompt" name="preferences" rows="1" placeholder="Ask anything">From Bengaluru to Japan for 7 days under ₹2 lakh — family-friendly with good food and local experiences.</textarea>
+                            <textarea id="tripPrompt" name="preferences" rows="1" placeholder="Ask anything — plan a trip, get travel advice, check weather, find hotels, or ask about a destination…"></textarea>
                         </div>
                         <div class="composer-actions">
                             <select name="selectedModel" id="modelPolicy" class="composer-chip" aria-label="Model policy">
@@ -1103,13 +1146,14 @@
                             </button>
                         </div>
                     </div>
+                    <div class="composer-hint">Enter to send · Shift+Enter for a new line</div>
                     <div class="hidden-fields">
                         <input type="hidden" name="userId" value="aaro_hi_user" />
-                        <input type="hidden" name="departureCity" value="Bengaluru" />
+                        <input type="hidden" name="departureCity" value="" />
                         <input type="hidden" name="departureDate" value="" />
                         <input type="hidden" name="returnDate" value="" />
-                        <input type="hidden" name="budget" value="2 lakh" />
-                        <input type="hidden" name="travelStyle" value="balanced" />
+                        <input type="hidden" name="budget" value="" />
+                        <input type="hidden" name="travelStyle" value="" />
                         <input type="hidden" name="destination" value="" />
                     </div>
                     <div class="composer-foot">
@@ -1137,11 +1181,25 @@
     const newChatBtn = document.getElementById('newChatBtn');
     const composerNewChat = document.getElementById('composerNewChat');
 
-    const DEFAULT_PROMPT = 'From Bengaluru to Japan for 7 days under ₹2 lakh — family-friendly with good food and local experiences.';
+    const DEFAULT_PROMPT = '';
 
     const resizePrompt = () => {
+        const maxHeight = 168;
         promptInput.style.height = 'auto';
-        promptInput.style.height = Math.min(promptInput.scrollHeight, 160) + 'px';
+        const nextHeight = Math.min(Math.max(promptInput.scrollHeight, 28), maxHeight);
+        promptInput.style.height = nextHeight + 'px';
+
+        const overflowing = promptInput.scrollHeight > maxHeight + 1;
+        promptInput.classList.toggle('has-overflow', overflowing);
+        if (overflowing) {
+            promptInput.scrollTop = promptInput.scrollHeight;
+        }
+    };
+
+    const updateComposerState = () => {
+        if (!submitButton.disabled) {
+            submitButton.disabled = !promptInput.value.trim();
+        }
     };
 
     const storageKey = () => 'agentic-trip-ai-chats:' + (userIdField.value.trim() || 'aaro_hi_user');
@@ -1390,6 +1448,7 @@
         renderHistoryList();
         promptInput.value = DEFAULT_PROMPT;
         resizePrompt();
+        updateComposerState();
         promptInput.focus();
     });
 
@@ -1399,7 +1458,10 @@
         });
     }
 
-    promptInput.addEventListener('input', resizePrompt);
+    promptInput.addEventListener('input', () => {
+        resizePrompt();
+        updateComposerState();
+    });
 
     const markChatActive = () => {
         layout.classList.add('has-chat');
@@ -1973,6 +2035,7 @@
         } finally {
             submitButton.disabled = false;
             loadingState.classList.remove('visible');
+            updateComposerState();
             promptInput.focus();
         }
     });

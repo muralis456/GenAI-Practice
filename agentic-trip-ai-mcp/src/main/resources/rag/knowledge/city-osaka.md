@@ -1,40 +1,15 @@
 # Osaka Travel Knowledge
 
-- Country: Country: Japan
-- Airport: Airport: Kansai International Airport
+- Country: Japan
+- Airport: Kansai International Airport
 - IATA: KIX
 - ICAO: RJBB
-- Knowledge type: destination-city / durable-travel-knowledge
-## Stable destination knowledge
+- Knowledge type: destination-city / airport-directory
 
-Osaka is a major city in Japan's Kansai region. This document contains durable destination context for RAG;
-it is not a source of live operational information.
+## RAG usage
 
-### Core attractions and areas
-- Osaka Castle
-- Dotonbori
-- Kuromon Market
-- Umeda
-- Shinsekai
+Use this document to recognize `Osaka` and its airport identifiers when planning a trip. The IATA/ICAO values come from the project's seeded airport directory.
 
-### Culture and heritage
-Merchant-city history, lively entertainment districts and Kansai food culture are major themes.
+## Live-data boundary
 
-### Food and local experiences
-- takoyaki
-- okonomiyaki
-- kushikatsu
-
-### Airport grounding
-- Country: Country: Japan
-- Common airport record in the bundled directory: Airport: Kansai International Airport
-- IATA: KIX
-- ICAO: RJBB
-- For authoritative airport/city resolution, the `airport_location` database record remains the application source of truth.
-- A destination can have multiple airports; do not infer airport choice solely from this document.
-
-### Retrieval and live-data boundary
-Use this document for stable destination recognition, history, culture, major attractions and general planning context.
-Do not use it for current flight schedules, fares, hotel availability/prices, weather forecasts, attraction opening hours,
-transport schedules, visa/entry rules, closures, strikes or travel advisories. Those require live/authoritative sources
-through MCP or other approved live integrations.
+Do not use this document for current flight schedules, ticket prices, hotel availability, weather, visa requirements, airport closures, or travel advisories. Those should be retrieved from live/authoritative sources through the project's MCP or research capabilities.

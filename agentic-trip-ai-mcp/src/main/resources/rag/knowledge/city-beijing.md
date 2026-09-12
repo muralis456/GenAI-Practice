@@ -1,40 +1,15 @@
 # Beijing Travel Knowledge
 
-- Country: Country: China
-- Airport: Airport: Beijing Capital International Airport
+- Country: China
+- Airport: Beijing Capital International Airport
 - IATA: PEK
 - ICAO: ZBAA
-- Knowledge type: destination-city / durable-travel-knowledge
-## Stable destination knowledge
+- Knowledge type: destination-city / airport-directory
 
-Beijing is a capital of China. This document contains durable destination context for RAG;
-it is not a source of live operational information.
+## RAG usage
 
-### Core attractions and areas
-- Forbidden City
-- Temple of Heaven
-- Great Wall access
-- Summer Palace
-- hutongs
+Use this document to recognize `Beijing` and its airport identifiers when planning a trip. The IATA/ICAO values come from the project's seeded airport directory.
 
-### Culture and heritage
-Imperial history, palace architecture, traditional hutong neighborhoods and modern Chinese capital life are major themes.
+## Live-data boundary
 
-### Food and local experiences
-- Peking duck
-- jiaozi
-- Beijing noodles
-
-### Airport grounding
-- Country: Country: China
-- Common airport record in the bundled directory: Airport: Beijing Capital International Airport
-- IATA: PEK
-- ICAO: ZBAA
-- For authoritative airport/city resolution, the `airport_location` database record remains the application source of truth.
-- A destination can have multiple airports; do not infer airport choice solely from this document.
-
-### Retrieval and live-data boundary
-Use this document for stable destination recognition, history, culture, major attractions and general planning context.
-Do not use it for current flight schedules, fares, hotel availability/prices, weather forecasts, attraction opening hours,
-transport schedules, visa/entry rules, closures, strikes or travel advisories. Those require live/authoritative sources
-through MCP or other approved live integrations.
+Do not use this document for current flight schedules, ticket prices, hotel availability, weather, visa requirements, airport closures, or travel advisories. Those should be retrieved from live/authoritative sources through the project's MCP or research capabilities.

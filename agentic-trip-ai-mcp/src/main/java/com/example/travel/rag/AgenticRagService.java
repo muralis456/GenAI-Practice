@@ -38,7 +38,6 @@ public class AgenticRagService {
     private static final int MAX_CANDIDATES = 10;
     private static final int MAX_RERANK_INPUT_CHARS = 1100;
     private static final int MAX_CONTEXT_CHARS = 6500;
-    private static final double MIN_RERANK_SCORE = 0.45;
 
     private final VectorStore vectorStore;
     private final JdbcTemplate jdbcTemplate;
@@ -82,13 +81,7 @@ public class AgenticRagService {
             return RagResult.skipped("disabled");
         }
 
-        long ragStarted = System.nanoTime();
-        log.info("RAG start requestType={} needsKnowledge={} destination={} enabled={} topK={} threshold={} maxIterations={} hybrid={} rerank={} compression={}",
-                state.requestType(), state.needsKnowledge(), state.destination(), enabled, topK,
-                similarityThreshold, maxIterations, hybridEnabled, rerankEnabled, compressionEnabled);
         Decision decision = decideRetrieval(state);
-        log.info("RAG decision retrieve={} reason={} query={} destination={} country={} topics={}",
-                decision.retrieve(), decision.reason(), decision.query(), decision.destination(), decision.country(), decision.topics());
         if (!decision.retrieve() || decision.query().isBlank()) {
             log.info("Agentic RAG decision=skip reason={} destination={}", decision.reason(), state.destination());
             return RagResult.skipped("llm_decided_no_retrieval");
@@ -106,21 +99,14 @@ public class AgenticRagService {
 
         while (iterations < maxIterations) {
             iterations++;
-            log.info("RAG retrieval-start iteration={} query={} destinationKeys={}",
-                    iterations, activeQuery, destinationKeys(decision));
             Retrieval retrieval = hybridRetrieve(state, decision, activeQuery);
             evidence = retrieval.documents();
             candidateCount = retrieval.candidateCount();
-            log.info("RAG retrieval-complete iteration={} rawCandidates={} uniqueDocuments={} sources={}",
-                    iterations, retrieval.candidateCount(), evidence.size(), sourceNames(evidence));
             sources.addAll(sourceNames(evidence));
 
             if (rerankEnabled && !evidence.isEmpty()) {
-                int beforeRerank = evidence.size();
                 evidence = rerank(state, activeQuery, evidence);
                 rerankedCount = evidence.size();
-                log.info("RAG rerank-complete iteration={} before={} after={} sources={}",
-                        iterations, beforeRerank, rerankedCount, sourceNames(evidence));
                 sources.addAll(sourceNames(evidence));
             }
 
@@ -142,8 +128,6 @@ public class AgenticRagService {
 
             Evaluation evaluation = evaluateEvidence(state, activeQuery, compressedContext, evidence);
             sufficient = evaluation.sufficient();
-            log.info("RAG evidence-evaluation iteration={} sufficient={} reason={} evidenceScore={} groundedContextChars={}",
-                    iterations, sufficient, evaluation.reason(), evidenceScore(activeQuery, compressedContext, sources), compressedContext.length());
             if (sufficient) {
                 break;
             }
@@ -157,12 +141,6 @@ public class AgenticRagService {
             }
             activeQuery = nextQuery.trim();
         }
-
-        log.info("RAG complete iterations={} sufficient={} decision={} method={} candidates={} reranked={} sources={} contextChars={} evidenceScore={} durationMs={}",
-                iterations, sufficient, sufficient ? "sufficient" : "best_effort", retrievalMethod,
-                candidateCount, rerankedCount, sources, compressedContext.length(),
-                evidenceScore(activeQuery, compressedContext, sources),
-                (System.nanoTime() - ragStarted) / 1_000_000L);
 
         String decisionName = sufficient ? "hybrid_reranked_compressed_sufficient"
                 : "hybrid_reranked_compressed_best_effort";
@@ -185,43 +163,23 @@ public class AgenticRagService {
                 packing, culture, safety, planning policies and document-backed facts.
                 Do NOT retrieve for live flight availability, hotel prices, live weather, currency rates,
                 or airport resolution; those are handled by MCP/tools.
-
-                IMPORTANT: the query field must contain ONLY the knowledge subject to retrieve.
-                Never include the user's origin, travel dates, budget, traveler count, travel style,
-                or other trip-planning state unless those details are explicitly part of the knowledge question.
-                Example: for "What is the history and cultural significance of the Eiffel Tower?",
-                query should be "Eiffel Tower history and cultural significance".
                 Return JSON only: {"retrieve":true|false,"query":"concise semantic query","reason":"short reason","destination":"city or destination","country":"country","topics":["culture","food"]}
                 """,
                 requestContext(state));
         var node = jsonSupport.readTree(raw).orElse(null);
         List<String> topics = new ArrayList<>();
-        if (node != null && node.path("topics").isArray()) node.path("topics").forEach(v -> topics.add(v.asText()));
-        boolean retrieve = node != null && node.path("retrieve").asBoolean(false);
-        String destination = node == null ? state.destination() : node.path("destination").asText(state.destination());
-        String country = node == null ? "" : node.path("country").asText("");
-        String query = node == null ? "" : node.path("query").asText("");
-
-        // Knowledge-only requests must retrieve against the user's actual question.
-        // Do not contaminate the semantic query with trip-planning state such as origin,
-        // dates, budget or travel style. Those fields belong to planning, not durable
-        // knowledge retrieval. This also makes landmark/topic queries deterministic.
-        if (isKnowledgeOnly(state) && !TravelState.isBlank(state.userRequest())) {
-            query = state.userRequest().trim();
-        }
-
+        if (node != null && node.path("topics").isArray()) node.path("topics").forEach(v -> topics.add(v.asString()));
         return new Decision(
-                retrieve,
-                query,
-                node == null ? "" : node.path("reason").asText(""),
-                destination,
-                country,
+                node != null && node.path("retrieve").asBoolean(false),
+                node == null ? "" : node.path("query").asString(""),
+                node == null ? "" : node.path("reason").asString(""),
+                node == null ? state.destination() : node.path("destination").asString(state.destination()),
+                node == null ? "" : node.path("country").asString(""),
                 topics);
     }
 
     private Retrieval hybridRetrieve(TravelState state, Decision decision, String query) {
         List<String> queries = multiQueries(state, decision, query);
-        log.info("RAG multi-query generated count={} queries={}", queries.size(), queries);
         Map<String, RankedDocument> merged = new LinkedHashMap<>();
         int rawCandidates = 0;
         int rankBase = 1;
@@ -230,13 +188,11 @@ public class AgenticRagService {
             List<Document> vector = vectorSearch(state, decision, q);
             rawCandidates += vector.size();
             addRanked(merged, vector, rankBase++);
-            log.debug("RAG retrieval-source query={} vectorCount={}", q, vector.size());
 
             if (hybridEnabled) {
                 List<Document> keyword = keywordSearch(state, decision, q, MAX_CANDIDATES);
                 rawCandidates += keyword.size();
                 addRanked(merged, keyword, rankBase++);
-                log.debug("RAG retrieval-source query={} keywordCount={}", q, keyword.size());
             }
         }
 
@@ -245,8 +201,6 @@ public class AgenticRagService {
                 .limit(MAX_CANDIDATES)
                 .map(RankedDocument::document)
                 .toList();
-        log.info("RAG RRF fusion rawCandidates={} uniqueCandidates={} fusedTopK={} sources={}",
-                rawCandidates, merged.size(), fused.size(), sourceNames(fused));
         return new Retrieval(fused, Math.max(rawCandidates, merged.size()));
     }
 
@@ -254,32 +208,14 @@ public class AgenticRagService {
         Set<String> queries = new LinkedHashSet<>();
         queries.add(query);
         String destination = !TravelState.isBlank(decision.destination()) ? decision.destination() : state.destination();
-
-        if (isKnowledgeOnly(state)) {
-            // Keep knowledge retrieval focused on the subject. A destination-qualified
-            // variant helps landmark/topic documents while avoiding planning noise such
-            // as budget, dates and travel style.
-            if (!TravelState.isBlank(destination) && !query.toLowerCase().contains(destination.toLowerCase())) {
-                queries.add(destination + " " + query);
-            }
-            if (decision.topics() != null && !decision.topics().isEmpty()) {
-                queries.add(query + " " + String.join(" ", decision.topics()));
-            }
-        } else if (!TravelState.isBlank(destination)) {
+        if (!TravelState.isBlank(destination)) {
             queries.add(query + " " + destination + " destination travel");
             queries.add(destination + " " + query);
         }
+        if (decision.topics() != null && !decision.topics().isEmpty()) {
+            queries.add(query + " " + String.join(" ", decision.topics()));
+        }
         return queries.stream().limit(3).toList();
-    }
-
-    private boolean isKnowledgeOnly(TravelState state) {
-        return state.needsKnowledge()
-                && !state.needsFlights()
-                && !state.needsHotels()
-                && !state.needsResearch()
-                && !state.needsWeather()
-                && !state.needsBudget()
-                && !state.needsItinerary();
     }
 
     private List<Document> vectorSearch(TravelState state, Decision decision, String query) {
@@ -292,29 +228,28 @@ public class AgenticRagService {
             builder.filterExpression(filter);
         }
         try {
-            List<Document> results = vectorStore.similaritySearch(builder.build());
-            log.debug("RAG vector-search query={} filter={} results={}", query, filter, results.size());
-            if (results.isEmpty() && !filter.isBlank()) {
+            List<Document> filtered = vectorStore.similaritySearch(builder.build());
+            // A metadata mismatch must never turn into a false "no knowledge" result.
+            // If the destination filter yields nothing, retry once without the filter and
+            // let RRF + reranking decide relevance.
+            if (filtered.isEmpty() && !filter.isBlank()) {
                 log.info("RAG vector destination filter returned 0 results; retrying without destination filter destination={} keys={}",
                         decision.destination(), destinationKeys(decision));
-                results = vectorStore.similaritySearch(SearchRequest.builder()
+                return vectorStore.similaritySearch(SearchRequest.builder()
                         .query(query).topK(Math.max(topK, 8)).similarityThreshold(similarityThreshold).build());
-                log.debug("RAG vector-search unfiltered-fallback query={} results={}", query, results.size());
             }
-            return results;
+            return filtered;
         } catch (Exception ex) {
             log.warn("Destination metadata vector filter failed; retrying without filter: {}", ex.getMessage());
-            List<Document> results = vectorStore.similaritySearch(SearchRequest.builder()
+            return vectorStore.similaritySearch(SearchRequest.builder()
                     .query(query).topK(Math.max(topK, 8)).similarityThreshold(similarityThreshold).build());
-            log.debug("RAG vector-search fallback query={} results={}", query, results.size());
-            return results;
         }
     }
 
     private void addRanked(Map<String, RankedDocument> merged, List<Document> documents, int rankBase) {
         for (int i = 0; i < documents.size(); i++) {
             Document document = documents.get(i);
-            String key = document.getMetadata().getOrDefault("source", "") + "|" + document.getText().hashCode();
+            String key = document.getMetadata().getOrDefault("source", "") + "|" + String.valueOf(document.getText()).hashCode();
             RankedDocument current = merged.get(key);
             double contribution = 1.0 / (60.0 + i + rankBase);
             if (current == null) {
@@ -344,21 +279,20 @@ public class AgenticRagService {
             params.addAll(sqlDestinationParams(decision));
             params.add(query);
             params.add(limit);
-            List<Document> results = jdbcTemplate.query(sql,
+            List<Document> filtered = jdbcTemplate.query(sql,
                     (rs, rowNum) -> {
                         Map<String, Object> metadata = new LinkedHashMap<>();
                         String rawMetadata = rs.getString("metadata");
                         if (rawMetadata != null) {
                             try {
-                                jsonSupport.readTree(rawMetadata).ifPresent(node -> node.properties().forEach(e -> metadata.put(e.getKey(), e.getValue().asText())));
+                                jsonSupport.readTree(rawMetadata).ifPresent(node -> node.properties().forEach(e -> metadata.put(e.getKey(), e.getValue().asString())));
                             } catch (Exception ignored) { }
                         }
                         metadata.putIfAbsent("source", extractSource(rawMetadata));
                         metadata.put("retrieval", "keyword");
                         return new Document(rs.getString("content"), metadata);
                     }, params.toArray());
-            log.debug("RAG keyword-search query={} destinationKeys={} results={}", query, destinationKeys(decision), results.size());
-            if (results.isEmpty() && !destinationFilter.isBlank()) {
+            if (filtered.isEmpty() && !destinationFilter.isBlank()) {
                 log.info("RAG keyword destination filter returned 0 results; retrying without destination filter destination={} keys={}",
                         decision.destination(), destinationKeys(decision));
                 String fallbackSql = """
@@ -368,13 +302,13 @@ public class AgenticRagService {
                         order by ts_rank(to_tsvector('simple', content), plainto_tsquery('simple', ?)) desc
                         limit ?
                         """;
-                results = jdbcTemplate.query(fallbackSql,
+                return jdbcTemplate.query(fallbackSql,
                         (rs, rowNum) -> {
                             Map<String, Object> metadata = new LinkedHashMap<>();
                             String rawMetadata = rs.getString("metadata");
                             if (rawMetadata != null) {
                                 try {
-                                    jsonSupport.readTree(rawMetadata).ifPresent(node -> node.properties().forEach(e -> metadata.put(e.getKey(), e.getValue().asText())));
+                                    jsonSupport.readTree(rawMetadata).ifPresent(node -> node.properties().forEach(e -> metadata.put(e.getKey(), e.getValue().asString())));
                                 } catch (Exception ignored) { }
                             }
                             metadata.putIfAbsent("source", extractSource(rawMetadata));
@@ -382,7 +316,7 @@ public class AgenticRagService {
                             return new Document(rs.getString("content"), metadata);
                         }, query, query, limit);
             }
-            return results;
+            return filtered;
         } catch (Exception ex) {
             log.warn("Hybrid keyword retrieval unavailable; continuing with vector search: {}", ex.getMessage());
             return List.of();
@@ -391,11 +325,8 @@ public class AgenticRagService {
 
     private String destinationFilter(Decision decision) {
         List<String> keys = destinationKeys(decision);
-        // Do not restrict an unknown-destination knowledge query to global documents.
-        // Landmark/topic queries such as "Eiffel Tower history" may not contain a
-        // city name in the extracted destination field, while the relevant document
-        // is correctly tagged with destinationKey=paris. In that case search the
-        // complete knowledge base and let hybrid retrieval + reranking select evidence.
+        // No destination means no metadata restriction. Filtering to global would
+        // incorrectly hide destination-specific knowledge from a valid RAG query.
         if (keys.isEmpty()) {
             return "";
         }
@@ -411,9 +342,7 @@ public class AgenticRagService {
 
     private String sqlDestinationFilter(Decision decision) {
         List<String> keys = destinationKeys(decision);
-        // Unknown destination: do not force global-only filtering. This is important
-        // for landmark/topic questions where the query identifies the subject but not
-        // the city (for example, "Eiffel Tower history").
+        // No destination means no metadata restriction; search the complete knowledge base.
         if (keys.isEmpty()) {
             return "";
         }
@@ -445,12 +374,13 @@ public class AgenticRagService {
         if (normalized.isBlank()) {
             return;
         }
+
         keys.add(normalized);
         keys.addAll(DESTINATION_ALIASES.getOrDefault(normalized, List.of()));
 
-        // The LLM may return a display destination such as "Paris, France"
-        // while the vector metadata uses the canonical city key "paris".
-        // Keep the display key, but also add each comma-separated component.
+        // LLMs commonly return a display value such as "Paris, France" while
+        // the vector metadata uses the city key "paris". Add each comma-separated
+        // component so display names and canonical metadata keys both match.
         if (trimmed.contains(",")) {
             for (String part : trimmed.split(",")) {
                 String component = part.toLowerCase().trim()
@@ -484,7 +414,7 @@ public class AgenticRagService {
     private String extractSource(String metadataJson) {
         if (metadataJson == null || metadataJson.isBlank()) return "knowledge-base";
         try {
-            return jsonSupport.readTree(metadataJson).map(n -> n.path("source").asText("knowledge-base"))
+            return jsonSupport.readTree(metadataJson).map(n -> n.path("source").asString("knowledge-base"))
                     .orElse("knowledge-base");
         } catch (Exception ignored) {
             return metadataJson;
@@ -494,7 +424,7 @@ public class AgenticRagService {
     private List<Document> rerank(TravelState state, String query, List<Document> candidates) {
         StringBuilder prompt = new StringBuilder();
         for (int i = 0; i < candidates.size(); i++) {
-            String text = candidates.get(i).getText();
+            String text = String.valueOf(candidates.get(i).getText());
             if (text.length() > MAX_RERANK_INPUT_CHARS) text = text.substring(0, MAX_RERANK_INPUT_CHARS);
             prompt.append("[CANDIDATE ").append(i + 1).append("] source=")
                     .append(candidates.get(i).getMetadata().getOrDefault("source", "knowledge-base"))
@@ -509,34 +439,19 @@ public class AgenticRagService {
                 """,
                 "USER REQUEST:\n%s\n\nRETRIEVAL QUERY:\n%s\n\n%s".formatted(state.userRequest(), query, prompt));
 
-        List<ScoredCandidate> scored = new ArrayList<>();
+        List<Integer> indices = new ArrayList<>();
         jsonSupport.readTree(raw).ifPresent(node -> {
             var ranked = node.path("ranked");
             if (ranked.isArray()) {
                 ranked.forEach(item -> {
                     int index = item.path("index").asInt(-1) - 1;
-                    double score = item.path("score").asDouble(0.0);
-                    if (index >= 0 && index < candidates.size() && score >= MIN_RERANK_SCORE) {
-                        scored.add(new ScoredCandidate(index, score));
-                    }
+                    if (index >= 0 && index < candidates.size() && !indices.contains(index)) indices.add(index);
                 });
             }
         });
-
-        if (scored.isEmpty()) {
-            log.info("RAG rerank produced no candidates above threshold={} query={}",
-                    MIN_RERANK_SCORE, query);
-            return List.of();
-        }
-
-        scored.sort(Comparator.comparingDouble(ScoredCandidate::score).reversed());
+        if (indices.isEmpty()) return candidates.stream().limit(topK).toList();
         List<Document> result = new ArrayList<>();
-        Set<Integer> seen = new LinkedHashSet<>();
-        for (ScoredCandidate candidate : scored) {
-            if (seen.add(candidate.index())) {
-                result.add(candidates.get(candidate.index()));
-            }
-        }
+        for (Integer index : indices) result.add(candidates.get(index));
         return result.stream().limit(topK).toList();
     }
 
@@ -548,14 +463,11 @@ public class AgenticRagService {
                 You are a grounded context compressor.
                 Extract only facts explicitly supported by the supplied passages.
                 Do not add general knowledge, guesses, recommendations, or live data.
-                Exclude internal retrieval metadata and document-control text such as sections named
-                "RAG usage", "Live-data boundary", "Authoritative web references", source filenames,
-                indexing instructions, and instructions about which tools to call.
-                Preserve only user-relevant factual content.
+                Preserve source labels in [Source: filename] form so downstream agents can cite them.
                 Return JSON only: {"context":"2-6 concise factual bullets or short paragraphs"}
                 """,
                 "USER REQUEST:\n%s\n\nQUERY:\n%s\n\nPASSAGES:\n%s".formatted(state.userRequest(), query, rawEvidence));
-        String context = jsonSupport.readTree(raw).map(n -> n.path("context").asText("")).orElse("").trim();
+        String context = jsonSupport.readTree(raw).map(n -> n.path("context").asString("")).orElse("").trim();
         return context.isBlank() ? rawEvidence : context;
     }
 
@@ -570,8 +482,8 @@ public class AgenticRagService {
                         .formatted(state.userRequest(), query, context, sourceNames(evidence)));
         return new Evaluation(
                 jsonSupport.readTree(raw).map(n -> n.path("sufficient").asBoolean(false)).orElse(false),
-                jsonSupport.readTree(raw).map(n -> n.path("nextQuery").asText("")).orElse(""),
-                jsonSupport.readTree(raw).map(n -> n.path("reason").asText("")).orElse(""));
+                jsonSupport.readTree(raw).map(n -> n.path("nextQuery").asString("")).orElse(""),
+                jsonSupport.readTree(raw).map(n -> n.path("reason").asString("")).orElse(""));
     }
 
     private String refineQuery(TravelState state, String query, String feedback) {
@@ -582,7 +494,7 @@ public class AgenticRagService {
                 Return JSON only: {"query":"..."}
                 """,
                 "User request=%s\nCurrent query=%s\nFeedback=%s".formatted(state.userRequest(), query, feedback));
-        return jsonSupport.readTree(raw).map(n -> n.path("query").asText("")).orElse("");
+        return jsonSupport.readTree(raw).map(n -> n.path("query").asString("")).orElse("");
     }
 
     private String requestContext(TravelState state) {
@@ -604,7 +516,7 @@ public class AgenticRagService {
         for (Document document : documents) {
             String source = String.valueOf(document.getMetadata().getOrDefault("source", "knowledge-base"));
             sb.append("[Source: ").append(source).append("]\n")
-                    .append(document.getText()).append("\n\n");
+                    .append(String.valueOf(document.getText())).append("\n\n");
             if (++index > topK + 1) break;
         }
         return sb.toString().trim();
@@ -654,8 +566,6 @@ public class AgenticRagService {
         Document document() { return document; }
         double rrfScore() { return rrfScore; }
     }
-
-    private record ScoredCandidate(int index, double score) {}
 
     public record RagResult(boolean used, String decision, String query, String context,
                              List<String> sources, int iterations, boolean sufficient,

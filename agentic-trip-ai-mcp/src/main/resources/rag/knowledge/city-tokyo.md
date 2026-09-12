@@ -1,40 +1,15 @@
 # Tokyo Travel Knowledge
 
-- Country: Country: Japan
-- Airport: Airport: Narita International Airport
+- Country: Japan
+- Airport: Narita International Airport
 - IATA: NRT
 - ICAO: RJAA
-- Knowledge type: destination-city / durable-travel-knowledge
-## Stable destination knowledge
+- Knowledge type: destination-city / airport-directory
 
-Tokyo is a capital of Japan. This document contains durable destination context for RAG;
-it is not a source of live operational information.
+## RAG usage
 
-### Core attractions and areas
-- Tokyo Skytree
-- Meiji Shrine
-- Asakusa
-- Shibuya
-- Tokyo National Museum
+Use this document to recognize `Tokyo` and its airport identifiers when planning a trip. The IATA/ICAO values come from the project's seeded airport directory.
 
-### Culture and heritage
-Traditional Japanese heritage and highly modern urban districts coexist across a very large metropolitan area.
+## Live-data boundary
 
-### Food and local experiences
-- sushi
-- ramen
-- tempura and regional Japanese food
-
-### Airport grounding
-- Country: Country: Japan
-- Common airport record in the bundled directory: Airport: Narita International Airport
-- IATA: NRT
-- ICAO: RJAA
-- For authoritative airport/city resolution, the `airport_location` database record remains the application source of truth.
-- A destination can have multiple airports; do not infer airport choice solely from this document.
-
-### Retrieval and live-data boundary
-Use this document for stable destination recognition, history, culture, major attractions and general planning context.
-Do not use it for current flight schedules, fares, hotel availability/prices, weather forecasts, attraction opening hours,
-transport schedules, visa/entry rules, closures, strikes or travel advisories. Those require live/authoritative sources
-through MCP or other approved live integrations.
+Do not use this document for current flight schedules, ticket prices, hotel availability, weather, visa requirements, airport closures, or travel advisories. Those should be retrieved from live/authoritative sources through the project's MCP or research capabilities.

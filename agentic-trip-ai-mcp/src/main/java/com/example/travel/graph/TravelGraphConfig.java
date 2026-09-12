@@ -161,7 +161,7 @@ public class TravelGraphConfig {
                 .addNode(TravelGraphNodes.CANCEL, async(TravelGraphNodes.CANCEL, cancelNode))
                 .addEdge(START, TravelGraphNodes.INTENT)
                 .addConditionalEdges(TravelGraphNodes.INTENT,
-                        edge_async(SpecialistRouter::afterIntent),
+                        edge_async(state -> isKnowledgeOnly(state) ? TravelGraphNodes.RAG : TravelGraphNodes.PLANNER),
                         EdgeMappings.builder()
                                 .to(TravelGraphNodes.RAG, TravelGraphNodes.RAG)
                                 .to(TravelGraphNodes.PLANNER, TravelGraphNodes.PLANNER)
@@ -172,12 +172,7 @@ public class TravelGraphConfig {
                                 .to(TravelGraphNodes.RAG, TravelGraphNodes.RAG)
                                 .to(TravelGraphNodes.ROUTER, TravelGraphNodes.ROUTER)
                                 .build())
-                .addConditionalEdges(TravelGraphNodes.RAG,
-                        edge_async(SpecialistRouter::afterRag),
-                        EdgeMappings.builder()
-                                .to(TravelGraphNodes.FINAL, TravelGraphNodes.FINAL)
-                                .to(TravelGraphNodes.ROUTER, TravelGraphNodes.ROUTER)
-                                .build())
+                .addEdge(TravelGraphNodes.RAG, TravelGraphNodes.ROUTER)
                 .addConditionalEdges(TravelGraphNodes.AIRPORT,
                         edge_async(SpecialistRouter::afterAirport),
                         EdgeMappings.builder()
@@ -188,7 +183,10 @@ public class TravelGraphConfig {
                                 .to(TravelGraphNodes.WEATHER, TravelGraphNodes.WEATHER)
                                 .to(TravelGraphNodes.SUPERVISOR, TravelGraphNodes.SUPERVISOR)
                                 .build())
-                .addEdge(TravelGraphNodes.FAN_OUT, TravelGraphNodes.SUPERVISOR)
+                .addEdge(TravelGraphNodes.FAN_OUT, TravelGraphNodes.FLIGHT)
+                .addEdge(TravelGraphNodes.FAN_OUT, TravelGraphNodes.HOTEL)
+                .addEdge(TravelGraphNodes.FAN_OUT, TravelGraphNodes.RESEARCH)
+                .addEdge(TravelGraphNodes.FAN_OUT, TravelGraphNodes.WEATHER)
                 .addEdge(TravelGraphNodes.FLIGHT, TravelGraphNodes.SUPERVISOR)
                 .addEdge(TravelGraphNodes.HOTEL, TravelGraphNodes.SUPERVISOR)
                 .addEdge(TravelGraphNodes.RESEARCH, TravelGraphNodes.SUPERVISOR)
@@ -242,16 +240,7 @@ public class TravelGraphConfig {
                                 .to(TravelGraphNodes.REPLAN, TravelGraphNodes.ROUTE_INVALID)
                                 .build())
                 .addEdge(TravelGraphNodes.REPLAN, TravelGraphNodes.ROUTER)
-                .addConditionalEdges(TravelGraphNodes.FINAL,
-                        edge_async(state -> state.needsKnowledge()
-                                && !state.needsFlights() && !state.needsHotels()
-                                && !state.needsResearch() && !state.needsWeather()
-                                && !state.needsBudget() && !state.needsItinerary()
-                                ? TravelGraphNodes.COMPLETE : TravelGraphNodes.HITL),
-                        EdgeMappings.builder()
-                                .to(TravelGraphNodes.COMPLETE, TravelGraphNodes.COMPLETE)
-                                .to(TravelGraphNodes.HITL, TravelGraphNodes.HITL)
-                                .build())
+                .addEdge(TravelGraphNodes.FINAL, TravelGraphNodes.HITL)
                 .addConditionalEdges(TravelGraphNodes.HITL,
                         edge_async(state -> {
                             String decision = state.hitlDecision() == null ? "" : state.hitlDecision().toLowerCase();
@@ -298,6 +287,17 @@ public class TravelGraphConfig {
         return RunnableConfig.builder()
                 .addParallelNodeExecutor(TravelGraphNodes.FAN_OUT, travelParallelExecutor)
                 .build();
+    }
+
+    private static boolean isKnowledgeOnly(TravelState state) {
+        return state != null
+                && state.needsKnowledge()
+                && !state.needsFlights()
+                && !state.needsHotels()
+                && !state.needsResearch()
+                && !state.needsWeather()
+                && !state.needsBudget()
+                && !state.needsItinerary();
     }
 
     private AsyncNodeAction<TravelState> async(String nodeName,

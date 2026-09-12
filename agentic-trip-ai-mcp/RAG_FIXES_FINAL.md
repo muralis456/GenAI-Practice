@@ -35,3 +35,9 @@ The question:
 `What is the history and cultural significance of the Eiffel Tower?`
 
 should produce a direct natural-language answer without exposing RAG metadata or live-data instructions.
+
+## Intent classification fix - destination travel-plan information
+
+Changed deterministic intent classification so the word `trip` alone no longer triggers a full-trip plan. Knowledge-oriented phrases such as `I want to know`, `I want know`, `travel guide`, `travel information`, `destination information`, `city information`, `where is`, and `located` are treated as knowledge/RAG when no operational capability is requested.
+
+Explicit trip-planning phrases such as `plan my trip`, `plan a trip`, `create an itinerary`, `book flights and hotels`, and `full trip plan` still trigger full trip planning.

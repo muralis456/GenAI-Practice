@@ -60,7 +60,6 @@ public class McpToolClient {
         if (!allowedTools.isEmpty() && !allowedTools.contains(toolName)) {
             throw new IllegalStateException("MCP tool is not allowed: " + toolName);
         }
-        validateArguments(toolName, arguments);
         return invoke(toolName, findExact(toolName), arguments);
     }
 
@@ -69,7 +68,7 @@ public class McpToolClient {
      * Spring AI populates these callbacks from the MCP tools/list response.
      */
     public List<ToolCallback> availableTools() {
-        return List.copyOf(Arrays.asList(toolCallbackProvider.getToolCallbacks()));
+        return Arrays.stream(toolCallbackProvider.getToolCallbacks()).toList();
     }
 
     /**
@@ -82,7 +81,6 @@ public class McpToolClient {
         String enrichedTask = buildSelectionContext(agentPurpose, userInput, arguments);
         ToolCallback callback = findByUserInput(agentPurpose, enrichedTask);
         String toolName = callback.getToolDefinition().name();
-        validateArguments(toolName, arguments);
         return invoke(toolName, callback, arguments);
     }
 
@@ -105,63 +103,7 @@ public class McpToolClient {
         }
         log.info("mcp.client.tool-catalog purpose='{}' candidates={}", agentPurpose,
                 candidates.stream().map(c -> c.getToolDefinition().name()).toList());
-
-        // Hard capability guard: an LLM selector must never cross tool domains.
-        String forcedTool = forcedToolForPurpose(agentPurpose, candidates);
-        if (forcedTool != null) {
-            ToolCallback selected = candidates.stream()
-                    .filter(c -> forcedTool.equals(c.getToolDefinition().name()))
-                    .findFirst()
-                    .orElseThrow(() -> new IllegalStateException("Required MCP tool is not available: " + forcedTool));
-            log.info("mcp.client.tool-selection mode=capability-guard purpose='{}' selectedTool='{}'",
-                    agentPurpose, forcedTool);
-            return selected;
-        }
-        ToolCallback selected = toolSelector.select(agentPurpose, userInput, candidates);
-        log.info("mcp.client.tool-selection mode=llm purpose='{}' selectedTool='{}'",
-                agentPurpose, selected.getToolDefinition().name());
-        return selected;
-    }
-
-    private String forcedToolForPurpose(String purpose, List<ToolCallback> candidates) {
-        String p = purpose == null ? "" : purpose.toLowerCase(java.util.Locale.ROOT);
-        if (p.contains("weather")) return "get_weather";
-        if (p.contains("airport") || p.contains("iata")) return "resolve_airport";
-        if (p.contains("flight")) return "search_flights";
-        if (p.contains("hotel") || p.contains("accommodation")) return "search_hotels";
-        if (p.contains("travel web research") || p.contains("destination information")) return "search_travel_research";
-        return null;
-    }
-
-    private void validateArguments(String toolName, Map<String, Object> arguments) {
-        Map<String, Object> args = arguments == null ? Map.of() : arguments;
-        switch (toolName) {
-            case "search_travel_research" -> requireArgument(toolName, args, "query");
-            case "get_weather" -> requireArgument(toolName, args, "destination");
-            case "resolve_airport" -> requireAnyArgument(toolName, args, "cityOrCode", "city", "code");
-            case "search_flights" -> {
-                requireArgument(toolName, args, "origin");
-                requireArgument(toolName, args, "destination");
-            }
-            case "search_hotels" -> requireArgument(toolName, args, "destination");
-            default -> { }
-        }
-        log.debug("mcp.client.arguments-valid tool={} keys={}", toolName, args.keySet());
-    }
-
-    private void requireArgument(String tool, Map<String, Object> args, String name) {
-        Object value = args.get(name);
-        if (value == null || String.valueOf(value).isBlank()) {
-            throw new IllegalArgumentException("MCP tool '" + tool + "' requires argument '" + name + "'");
-        }
-    }
-
-    private void requireAnyArgument(String tool, Map<String, Object> args, String... names) {
-        for (String name : names) {
-            Object value = args.get(name);
-            if (value != null && !String.valueOf(value).isBlank()) return;
-        }
-        throw new IllegalArgumentException("MCP tool '" + tool + "' requires one of " + java.util.Arrays.toString(names));
+        return toolSelector.select(agentPurpose, userInput, candidates);
     }
 
     /**

@@ -1,40 +1,15 @@
 # Cairo Travel Knowledge
 
-- Country: Country: Egypt
-- Airport: Airport: Cairo International Airport
+- Country: Egypt
+- Airport: Cairo International Airport
 - IATA: CAI
 - ICAO: HECA
-- Knowledge type: destination-city / durable-travel-knowledge
-## Stable destination knowledge
+- Knowledge type: destination-city / airport-directory
 
-Cairo is a capital of Egypt. This document contains durable destination context for RAG;
-it is not a source of live operational information.
+## RAG usage
 
-### Core attractions and areas
-- Giza pyramids
-- Egyptian Museum
-- Khan el-Khalili
-- Citadel of Saladin
-- Nile riverfront
+Use this document to recognize `Cairo` and its airport identifiers when planning a trip. The IATA/ICAO values come from the project's seeded airport directory.
 
-### Culture and heritage
-Ancient Egyptian heritage, Islamic Cairo, Coptic history and Nile-centered urban life make Cairo a major cultural gateway.
+## Live-data boundary
 
-### Food and local experiences
-- koshari
-- ful medames
-- taameya and Egyptian street food
-
-### Airport grounding
-- Country: Country: Egypt
-- Common airport record in the bundled directory: Airport: Cairo International Airport
-- IATA: CAI
-- ICAO: HECA
-- For authoritative airport/city resolution, the `airport_location` database record remains the application source of truth.
-- A destination can have multiple airports; do not infer airport choice solely from this document.
-
-### Retrieval and live-data boundary
-Use this document for stable destination recognition, history, culture, major attractions and general planning context.
-Do not use it for current flight schedules, fares, hotel availability/prices, weather forecasts, attraction opening hours,
-transport schedules, visa/entry rules, closures, strikes or travel advisories. Those require live/authoritative sources
-through MCP or other approved live integrations.
+Do not use this document for current flight schedules, ticket prices, hotel availability, weather, visa requirements, airport closures, or travel advisories. Those should be retrieved from live/authoritative sources through the project's MCP or research capabilities.

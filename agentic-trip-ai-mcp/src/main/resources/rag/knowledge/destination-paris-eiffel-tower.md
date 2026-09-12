@@ -1,29 +1,37 @@
-# Eiffel Tower — Paris
+# Eiffel Tower — Paris Travel Knowledge
 
-## Historical facts
-- The Eiffel Tower was built for the 1889 Exposition Universelle in Paris.
-- Construction began in January 1887 and the structure was completed on 31 March 1889.
-- The official Eiffel Tower history records a construction period of 2 years, 2 months and 5 days.
-- The tower was an important engineering and architectural demonstration of late-19th-century metal construction.
-- Gustave Eiffel's company led the construction; the official history also credits engineers Maurice Koechlin and Émile Nouguier with the early concept, with architect Stephen Sauvestre contributing to the design.
-- The tower was initially intended to be temporary, but scientific and communications uses helped preserve it.
+destinationKey: paris
+topic: history, culture, architecture, tourism
+
+## Historical significance
+
+The Eiffel Tower was built for the 1889 Exposition Universelle (World's Fair) in Paris, held to commemorate the centenary of the French Revolution. Excavation work began on 26 January 1887 and the structure was completed on 31 March 1889, after 2 years, 2 months and 5 days of construction.
+
+The project was selected from a competition for a 300-metre iron tower. The project was led by Gustave Eiffel, with engineers Maurice Koechlin and Émile Nouguier and architect Stephen Sauvestre contributing to its design and development.
+
+The tower was a major attraction of the 1889 World's Fair and was the tallest tower in the world at the time. It demonstrated the possibilities of large-scale iron construction and became a landmark of nineteenth-century engineering.
 
 ## Cultural significance
-- The tower became a defining symbol of Paris and, more broadly, France.
-- It was controversial among some contemporary artists and writers when proposed, making its later cultural acceptance especially significant.
-- It has remained a major Paris landmark and a prominent part of the city's visual identity.
-- The monument combines engineering history, tourism, public culture and views over Paris.
 
-## Visitor-oriented durable context
-- The tower stands on the Champ-de-Mars in Paris's 7th arrondissement.
-- It has multiple visitor levels with views over Paris and historical/cultural interpretation.
-- The surrounding Eiffel Tower/Trocadéro/Seine area contains museums, gardens, viewpoints and other cultural landmarks.
+The Eiffel Tower became an enduring symbol of Paris and France. Its bold iron structure initially attracted criticism from some artists and writers, but it quickly gained public popularity during the 1889 World's Fair. The contrast between early controversy and later acceptance is an important part of the monument's cultural history.
 
-## Live-data boundary
-Do not use this document for current opening hours, ticket availability, prices, security rules, temporary closures or event schedules.
-Verify those through the official Eiffel Tower or Paris tourism sources at execution time.
+The tower is associated with Parisian identity, tourism, engineering, modernity, art and public culture. It provides views over Paris and has become one of the city's defining visual landmarks.
 
-## Authoritative web references
-- Official Eiffel Tower history: https://www.toureiffel.paris/en/the-monument/history
-- Official Eiffel Tower 1889 exhibition history: https://www.toureiffel.paris/en/the-monument/universal-exhibition
-- Paris tourism office: https://parisjetaime.com/eng/article/explore-the-eiffel-tower-a1068
+## Engineering and construction facts
+
+- Construction material: iron (puddle iron), not steel.
+- Approximately 7,300 tonnes of iron were used.
+- The structure contains about 18,038 metallic parts and 2.5 million rivets.
+- The original project targeted a height of 300 metres.
+- The tower was prefabricated in parts at Gustave Eiffel's works and assembled on site.
+
+## Traveler context
+
+For stable historical, cultural, architectural and general destination questions, this document can be used as durable RAG knowledge.
+
+For current opening hours, ticket prices, availability, temporary closures, security rules, events or other time-sensitive visitor information, use current official sources rather than this document.
+
+## Sources used for this knowledge
+
+- Official Eiffel Tower website — History and architecture: https://www.toureiffel.paris/en/the-monument/history
+- Official Eiffel Tower website — 1889 World's Fair: https://www.toureiffel.paris/en/the-monument/universal-exhibition

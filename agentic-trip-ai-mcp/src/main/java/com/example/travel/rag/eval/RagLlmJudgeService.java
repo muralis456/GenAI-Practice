@@ -49,7 +49,7 @@ public class RagLlmJudgeService {
             double coverage = clamp(n.path("coverage").asDouble(0));
             double unsupported = clamp(n.path("unsupportedClaimRate").asDouble(1));
             boolean pass = n.path("pass").asBoolean(grounded >= 0.80 && coverage >= 0.70 && unsupported <= 0.20);
-            String reason = n.path("reason").asText("No reason supplied.");
+            String reason = n.path("reason").asString("No reason supplied.");
             return new JudgeResult(grounded, coverage, unsupported, pass, reason);
         }).orElseGet(() -> new JudgeResult(0, 0, 1, false, "LLM judge returned invalid JSON."));
     }
@@ -69,7 +69,7 @@ public class RagLlmJudgeService {
             double coverage = clamp(n.path("coverage").asDouble(0));
             double unsupported = clamp(n.path("unsupportedClaimRate").asDouble(1));
             boolean pass = n.path("pass").asBoolean(grounded >= 0.80 && coverage >= 0.70 && unsupported <= 0.20);
-            return new JudgeResult(grounded, coverage, unsupported, pass, n.path("reason").asText(""));
+            return new JudgeResult(grounded, coverage, unsupported, pass, n.path("reason").asString(""));
         }).orElseGet(() -> new JudgeResult(0, 0, 1, false, "LLM judge returned invalid JSON."));
     }
 

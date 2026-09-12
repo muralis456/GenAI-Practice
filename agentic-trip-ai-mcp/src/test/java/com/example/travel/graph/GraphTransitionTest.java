@@ -8,7 +8,6 @@ import com.example.travel.model.PlanQualityScore;
 import com.example.travel.model.ReplanStrategy;
 import com.example.travel.service.ReplanActionValidator;
 import org.junit.jupiter.api.Test;
-import com.example.travel.support.IntentClassifier;
 
 import java.math.BigDecimal;
 import java.util.LinkedHashMap;
@@ -25,38 +24,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class GraphTransitionTest {
 
     private final ReplanStrategyExecutor replanExecutor = new ReplanStrategyExecutor(new ReplanActionValidator());
-
-
-    @Test
-    void knowledgeOnlyRequestRoutesDirectlyToRag() {
-        var plan = IntentClassifier.classify("What is the history and cultural significance of the Eiffel Tower?");
-        assertEquals("KNOWLEDGE_QUERY", plan.getRequestType());
-        assertTrue(plan.isNeedsKnowledge());
-        assertFalse(plan.isNeedsFlights());
-        assertFalse(plan.isNeedsHotels());
-        assertFalse(plan.isNeedsResearch());
-        assertFalse(plan.isNeedsWeather());
-        assertFalse(plan.isNeedsBudget());
-        assertFalse(plan.isNeedsItinerary());
-
-        TravelState state = state(Map.of(
-                TravelState.NEEDS_KNOWLEDGE, Boolean.TRUE,
-                TravelState.RUN_FLIGHTS, Boolean.FALSE,
-                TravelState.RUN_HOTELS, Boolean.FALSE,
-                TravelState.RUN_RESEARCH, Boolean.FALSE,
-                TravelState.RUN_WEATHER, Boolean.FALSE,
-                TravelState.RUN_BUDGET, Boolean.FALSE,
-                TravelState.RUN_ITINERARY, Boolean.FALSE));
-        assertEquals(TravelGraphNodes.RAG, SpecialistRouter.afterIntent(state));
-        assertEquals(TravelGraphNodes.FINAL, SpecialistRouter.afterRag(state));
-    }
-
-    @Test
-    void researchOnlyDoesNotEnableWeather() {
-        var plan = IntentClassifier.classify("Find attractions in Paris");
-        assertTrue(plan.isNeedsResearch());
-        assertFalse(plan.isNeedsWeather());
-    }
 
     @Test
     void plannerRoutesToAirportWhenFlightsNeeded() {

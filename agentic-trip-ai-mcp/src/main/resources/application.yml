@@ -28,7 +28,6 @@ spring:
         distance-type: COSINE_DISTANCE
         initialize-schema: true
         max-document-batch-size: 1000
-        dimensions: 768
   datasource:
     url: jdbc:postgresql://localhost:5432/travel_agent
     username: ${DB_USERNAME:postgres}

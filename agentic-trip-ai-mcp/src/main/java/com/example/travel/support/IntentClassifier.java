@@ -22,9 +22,6 @@ public final class IntentClassifier {
                 "where to stay");
         boolean research = containsAny(text, "places to visit", "sightseeing", "attractions",
                 "things to do", "what to see", "what should i see", "recommendations", "best places");
-        boolean knowledge = containsAny(text, "history", "historical", "cultural significance", "culture",
-                "tradition", "visa", "travel rules", "safety", "packing", "best time to visit",
-                "when to visit", "why is", "what is", "tell me about", "information about");
         boolean weather = containsAny(text, "weather", "forecast", "rain");
         boolean bookedFlight = containsAny(text, "already booked", "already have a flight", "already have flights",
                 "flight is booked", "flights are booked");
@@ -33,12 +30,11 @@ public final class IntentClassifier {
             IntentPlan plan = new IntentPlan();
             plan.setRequestType("STAY_AND_EXPLORE");
             plan.setNeedsFlights(false);
-            plan.setNeedsHotels(hotels);
-            plan.setNeedsResearch(research || containsAny(text, "things to do", "what to see"));
-            plan.setNeedsWeather(weather);
-            plan.setNeedsBudget(containsAny(text, "budget", "cost", "expense", "lakh", "under"));
-            plan.setNeedsItinerary(containsAny(text, "itinerary", "day-by-day", "schedule"));
-            plan.setNeedsKnowledge(false);
+            plan.setNeedsHotels(hotels || trip || !research);
+            plan.setNeedsResearch(research || trip || containsAny(text, "things to do", "what to see"));
+            plan.setNeedsWeather(true);
+            plan.setNeedsBudget(containsAny(text, "budget", "lakh", "under"));
+            plan.setNeedsItinerary(research || trip || containsAny(text, "things to do"));
             plan.setStrategy("hotels_research");
             plan.setPriority("hotels");
             plan.setConfidence(0.86);
@@ -62,7 +58,7 @@ public final class IntentClassifier {
             plan.setNeedsFlights(false);
             plan.setNeedsHotels(true);
             plan.setNeedsResearch(true);
-            plan.setNeedsWeather(false);
+            plan.setNeedsWeather(true);
             plan.setNeedsBudget(false);
             plan.setNeedsItinerary(true);
             plan.setStrategy("hotels_research");
@@ -76,36 +72,11 @@ public final class IntentClassifier {
         if (!trip && research && !flights && !hotels) {
             return IntentPlan.researchOnly();
         }
-        if (!trip && knowledge && !flights && !hotels && !weather && !research) {
-            IntentPlan plan = new IntentPlan();
-            plan.setRequestType("KNOWLEDGE_QUERY");
-            plan.setNeedsFlights(false);
-            plan.setNeedsHotels(false);
-            plan.setNeedsResearch(false);
-            plan.setNeedsWeather(false);
-            plan.setNeedsBudget(false);
-            plan.setNeedsItinerary(false);
-            plan.setNeedsKnowledge(true);
-            plan.setStrategy("rag_only");
-            plan.setPriority("knowledge");
-            plan.setConfidence(0.92);
-            return plan;
-        }
         if (trip) {
             return IntentPlan.fullTrip();
         }
-        IntentPlan fallback = new IntentPlan();
-        fallback.setRequestType("GENERAL");
-        fallback.setNeedsFlights(false);
-        fallback.setNeedsHotels(false);
-        fallback.setNeedsResearch(false);
-        fallback.setNeedsWeather(false);
-        fallback.setNeedsBudget(false);
-        fallback.setNeedsItinerary(false);
-        fallback.setNeedsKnowledge(true);
-        fallback.setStrategy("rag_only");
-        fallback.setPriority("knowledge");
-        fallback.setConfidence(0.50);
+        IntentPlan fallback = IntentPlan.fullTrip();
+        fallback.setConfidence(0.55);
         return fallback;
     }
 

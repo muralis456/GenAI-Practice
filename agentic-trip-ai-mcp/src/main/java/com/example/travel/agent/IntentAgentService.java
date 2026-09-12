@@ -5,7 +5,6 @@ import com.example.travel.graph.TravelState;
 import com.example.travel.model.AgentDecision;
 import com.example.travel.model.IntentPlan;
 import com.example.travel.service.RoutedLlm;
-import com.example.travel.support.IntentClassifier;
 import com.example.travel.support.JsonSupport;
 import com.example.travel.support.TripRequirementsParser;
 import org.slf4j.Logger;
@@ -40,21 +39,132 @@ public class IntentAgentService {
      * the LLM is used to refine the intent.
      */
     public Map<String, Object> classify(TravelState state) {
-
-        IntentPlan plan =
-                IntentClassifier.classify(state.userRequest());
-
-        if (plan.getConfidence() < IntentClassifier.LLM_THRESHOLD) {
-            plan = refineWithLlm(state, plan);
-        }
+        IntentPlan plan = classifySemantically(state);
 
         log.info(
-                "Intent agent requestType={} confidence={} capabilities=[flights={},hotels={},research={},weather={},budget={},itinerary={},knowledge={}] strategy={} priority={} query={}",
-                plan.getRequestType(), plan.getConfidence(), plan.isNeedsFlights(), plan.isNeedsHotels(),
-                plan.isNeedsResearch(), plan.isNeedsWeather(), plan.isNeedsBudget(), plan.isNeedsItinerary(),
-                plan.isNeedsKnowledge(), plan.getStrategy(), plan.getPriority(), state.userRequest());
+                "Intent agent requestType={} confidence={} capabilities=[flights={},hotels={},research={},weather={},budget={},itinerary={},knowledge={}] query={}",
+                plan.getRequestType(), plan.getConfidence(),
+                plan.isNeedsFlights(), plan.isNeedsHotels(), plan.isNeedsResearch(),
+                plan.isNeedsWeather(), plan.isNeedsBudget(), plan.isNeedsItinerary(),
+                plan.isNeedsKnowledge(), state == null ? "" : state.userRequest());
 
         return toUpdates(state, plan);
+    }
+
+    /**
+     * Semantic-first intent analysis. There is deliberately no keyword
+     * classifier in the decision path. The model interprets the user's
+     * meaning, including natural language noise, typos, implicit objectives
+     * and multiple simultaneous requests. Java only applies safety rules after
+     * the model response: no invented capabilities and no invented intent.
+     */
+    private IntentPlan classifySemantically(TravelState state) {
+        if (state == null || TravelState.isBlank(state.userRequest())) {
+            return emptyPlan();
+        }
+
+        String system = """
+                You are the semantic intent planner for a production travel-agent system.
+
+                Understand the USER REQUEST by meaning, not by exact words.
+                The user may use typos, abbreviations, incomplete grammar, slang,
+                spelling mistakes, or several requests in one sentence. Infer the
+                intended meaning when it is reasonably clear. Do NOT require exact
+                keywords.
+
+                You must classify ONLY what the user is asking for NOW. Do not copy
+                capabilities from conversation state. Do not invent a destination,
+                dates, flights, hotels, weather, budget, or itinerary.
+
+                Capability semantics:
+                - flights: the user wants flight search/details/airfare/flight changes.
+                - hotels: the user wants accommodation, hotels, rooms, or areas to stay.
+                - research: the user wants current/open-web destination research,
+                  recommendations, attractions, activities, or things to do.
+                - weather: the user wants current or forecast weather/conditions.
+                - budget: the user asks to calculate, estimate, compare, or optimize cost.
+                - itinerary: the user wants a trip plan, schedule, day-by-day plan,
+                  or changes to such a plan.
+                - knowledge: the user wants durable/general travel knowledge such as
+                  culture, history, significance, customs, visa/safety/packing guidance,
+                  travel tips, destination overview, or general advice.
+
+                Important distinction:
+                A destination knowledge request does NOT automatically require flights,
+                hotels, weather, budget, or itinerary. A request for an itinerary DOES
+                require itinerary=true even if the user does not use the word itinerary.
+                A request for current weather requires weather=true.
+
+                Intent types should describe the primary user goal, for example:
+                TRAVEL_INFORMATION, TRIP_PLANNING, FLIGHT_SEARCH, HOTEL_SEARCH,
+                WEATHER, BUDGET, RESEARCH, ITINERARY_CHANGE, GENERAL.
+                For multiple goals use a combined descriptive type such as
+                TRIP_PLANNING or MULTI_INTENT rather than dropping secondary goals.
+
+                Semantic examples (examples are about meaning, not keyword matching):
+                - "Give bangalore travel trios" means the user is asking for travel tips/advice
+                  about Bengaluru despite the noisy spelling/grammar.
+                  => knowledge=true, destination=Bengaluru, no flights/hotels/weather/budget/itinerary.
+                - "what should I see in Dubai this weekend" => research=true, destination=Dubai.
+                - "will it rain in Dubai tomorrow" => weather=true, destination=Dubai.
+                - "plan five days in Japan from Bangalore" => itinerary=true, destination=Japan,
+                  origin=Bengaluru; do not add flights unless flights are requested.
+                - "find a hotel near downtown and tell me what area is best" => hotels=true,
+                  knowledge=true; preserve both objectives.
+                - "cheapest flights and a 4 day itinerary" => flights=true, itinerary=true;
+                  budget is true only if cost calculation/optimization is explicitly requested.
+
+                Return JSON only:
+                {
+                  "requestType":"",
+                  "needsFlights":false,
+                  "needsHotels":false,
+                  "needsResearch":false,
+                  "needsWeather":false,
+                  "needsBudget":false,
+                  "needsItinerary":false,
+                  "needsKnowledge":false,
+                  "strategy":"",
+                  "priority":"",
+                  "confidence":0.0
+                }
+
+                Confidence must reflect semantic certainty. Do not output a high
+                confidence merely because the request resembles a travel query.
+                """;
+
+        try {
+            String content = routedLlm.complete(
+                    AgentRole.EXTRACT,
+                    system,
+                    "USER REQUEST:\n" + state.userRequest() +
+                    "\n\nReturn the semantic capability plan now.");
+
+            log.info("Intent semantic raw LLM response={}", content);
+            IntentPlan parsed = jsonSupport.read(content, IntentPlan.class).orElse(null);
+            if (parsed == null) {
+                return emptyPlan();
+            }
+            return sanitizeSemanticPlan(parsed);
+        } catch (Exception ex) {
+            log.warn("Semantic intent analysis failed", ex);
+            return emptyPlan();
+        }
+    }
+
+    private IntentPlan sanitizeSemanticPlan(IntentPlan plan) {
+        if (plan.getConfidence() <= 0) plan.setConfidence(0.5);
+        if (plan.getConfidence() > 1) plan.setConfidence(1);
+        if (plan.getRequestType() == null || plan.getRequestType().isBlank()) {
+            plan.setRequestType("GENERAL");
+        }
+        if (!plan.isNeedsFlights() && !plan.isNeedsHotels() && !plan.isNeedsResearch()
+                && !plan.isNeedsWeather() && !plan.isNeedsBudget() && !plan.isNeedsItinerary()
+                && !plan.isNeedsKnowledge()) {
+            plan.setStrategy("none");
+            plan.setPriority("none");
+        }
+        return plan;
     }
 
     /**
@@ -397,8 +507,6 @@ public class IntentAgentService {
                     parsed.isNeedsBudget(),
                     parsed.isNeedsItinerary(),
                     parsed.getConfidence());
-            log.info("Intent capability decision requestType={} knowledge={} strategy={} priority={}",
-                    parsed.getRequestType(), parsed.isNeedsKnowledge(), parsed.getStrategy(), parsed.getPriority());
 
             return parsed;
 
