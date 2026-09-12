@@ -1,6 +1,7 @@
 package com.example.travel.config;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import com.example.travel.service.ModelRoutingContext;
 
 @ConfigurationProperties(prefix = "travel.models")
 public class TravelModelsProperties {
@@ -129,7 +130,11 @@ public class TravelModelsProperties {
      */
     public String resolve(AgentRole role, String policy) {
         if (policy == null || policy.isBlank() || "BALANCED".equalsIgnoreCase(policy)) {
-            return firstNonBlank(model(role), balanced);
+            return switch (ModelRoutingContext.getComplexity()) {
+                case SIMPLE -> firstNonBlank(fast, model(role));
+                case NORMAL -> firstNonBlank(model(role), balanced, fast);
+                case COMPLEX -> firstNonBlank(reasoning, model(role), balanced);
+            };
         }
         if ("FAST".equalsIgnoreCase(policy)) {
             return firstNonBlank(fast, extraction, model(role));

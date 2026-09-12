@@ -45,7 +45,8 @@ public class McpFlightSearchClient {
                     "passengers", Math.max(1, passengers));
                 return parse(mcpToolClient.callByUserInput("Live flight schedule search", userInput, input));
         } catch (Exception exception) {
-            log.warn("MCP search_flights failed for {} -> {}: {}", origin, destination, exception.getMessage());
+            log.error("mcp.client.error client=McpFlightSearchClient operation=search origin={} destination={} departureDate={} passengers={} errorType={} errorMessage={}",
+                    origin, destination, departureDate, passengers, exception.getClass().getName(), safeMessage(exception), exception);
             return List.of(unavailable("MCP flight search is unavailable: " + safeMessage(exception)));
         }
     }

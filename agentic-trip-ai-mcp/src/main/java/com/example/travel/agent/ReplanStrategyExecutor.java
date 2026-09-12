@@ -74,6 +74,15 @@ public class ReplanStrategyExecutor {
                      */
                 }
 
+                         case GET_HOTEL_DETAILS, GET_BUDGET_BREAKDOWN,
+                                    GET_WEATHER_DETAILS -> {
+                                /*
+                                 * Informational requests do not change the plan.
+                                 * Specialist execution is handled by
+                                 * applySelectiveRouting().
+                                 */
+                         }
+
                 case CHEAPER_FLIGHT -> {
 
                     flightPreference = "cheapest";

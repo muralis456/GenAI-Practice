@@ -1,6 +1,8 @@
 package com.example.travel.service;
 
 import com.example.travel.model.WeatherForecast;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import tools.jackson.databind.JsonNode;
@@ -11,6 +13,8 @@ import java.util.Map;
 @Service
 @ConditionalOnProperty(prefix = "travel.mcp.client", name = "enabled", havingValue = "true")
 public class McpWeatherClient {
+
+    private static final Logger log = LoggerFactory.getLogger(McpWeatherClient.class);
 
     private final McpToolClient client;
 
@@ -32,7 +36,13 @@ public class McpWeatherClient {
                     root.path("summary").asString("Weather unavailable."),
                     root.path("rainLikely").asBoolean(false));
         } catch (Exception exception) {
+            log.error("mcp.client.error client=McpWeatherClient operation=forecast destination={} start={} end={} errorType={} errorMessage={}",
+                    destination, start, end, exception.getClass().getName(), safeMessage(exception), exception);
             return new WeatherForecast(destination, "Weather lookup failed through MCP.", false);
         }
+    }
+
+    private String safeMessage(Exception exception) {
+        return exception.getMessage() == null ? exception.getClass().getSimpleName() : exception.getMessage();
     }
 }

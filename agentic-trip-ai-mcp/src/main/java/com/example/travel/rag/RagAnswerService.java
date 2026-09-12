@@ -64,6 +64,13 @@ public class RagAnswerService {
             log.warn("RAG answer generation failed; returning safe fallback", ex);
         }
 
+        // Retrieval already produced grounded evidence. If the answer LLM is
+        // unavailable (for example because the graph LLM budget is exhausted),
+        // preserve the grounded evidence rather than returning an empty answer.
+        String fallback = sanitizeForAnswer(state.ragContext());
+        if (!fallback.isBlank()) {
+            return fallback;
+        }
         return "I found relevant travel knowledge, but I couldn't generate a reliable answer from it right now.";
     }
 

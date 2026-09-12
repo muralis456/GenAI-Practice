@@ -68,7 +68,13 @@ public class McpToolClient {
      * Spring AI populates these callbacks from the MCP tools/list response.
      */
     public List<ToolCallback> availableTools() {
-        return Arrays.stream(toolCallbackProvider.getToolCallbacks()).toList();
+        try {
+            return Arrays.stream(toolCallbackProvider.getToolCallbacks()).toList();
+        } catch (Exception exception) {
+            log.error("mcp.client.error phase=tool-catalog errorType={} errorMessage={}",
+                    exception.getClass().getName(), safeExceptionMessage(exception), exception);
+            throw new IllegalStateException("Unable to read MCP tool catalog: " + safeExceptionMessage(exception), exception);
+        }
     }
 
     /**
@@ -79,9 +85,16 @@ public class McpToolClient {
     public JsonNode callByUserInput(String agentPurpose, String userInput,
                                     Map<String, Object> arguments) throws Exception {
         String enrichedTask = buildSelectionContext(agentPurpose, userInput, arguments);
-        ToolCallback callback = findByUserInput(agentPurpose, enrichedTask);
-        String toolName = callback.getToolDefinition().name();
-        return invoke(toolName, callback, arguments);
+        try {
+            ToolCallback callback = findByUserInput(agentPurpose, enrichedTask);
+            String toolName = callback.getToolDefinition().name();
+            return invoke(toolName, callback, arguments);
+        } catch (Exception exception) {
+            log.error("mcp.client.error phase=selection agentPurpose='{}' userInput='{}' errorType={} errorMessage={}",
+                    abbreviate(agentPurpose), abbreviate(userInput),
+                    exception.getClass().getName(), safeExceptionMessage(exception), exception);
+            throw exception;
+        }
     }
 
     private String buildSelectionContext(String agentPurpose, String userInput, Map<String, Object> arguments) {
@@ -126,21 +139,30 @@ public class McpToolClient {
                 String response = callback.call(objectMapper.writeValueAsString(arguments));
                 JsonNode result = responseTree(response);
                 if (result.has("success")) {
-                    log.info("mcp.client.response tool={} success={} errorCode={} message={}",
-                            toolName,
-                            result.path("success").asBoolean(),
-                            result.path("errorCode").asString(""),
-                            result.path("message").asString(""));
+                    boolean success = result.path("success").asBoolean();
+                    String errorCode = result.path("errorCode").asString("");
+                    String message = result.path("message").asString("");
+                    if (success) {
+                        log.info("mcp.client.response tool={} success=true errorCode={} message={}",
+                                toolName, errorCode, message);
+                    } else {
+                        log.error("mcp.client.error phase=server-response tool={} attempt={} success=false errorCode={} message={}",
+                                toolName, attempt, errorCode, message);
+                    }
                 }
                 log.info("mcp.client.complete tool={} attempt={} durationMs={}", toolName, attempt, elapsedMs(started));
                 return result;
             } catch (Exception exception) {
-                log.error("MCP tool invocation failed. tool={}", toolName, exception);
                 last = exception;
-                if (!isRetryable(exception) || attempt == maxAttempts) {
+                boolean retryable = isRetryable(exception);
+                log.error("mcp.client.error phase=invocation tool={} attempt={} retryable={} errorType={} errorMessage={} durationMs={}",
+                        toolName, attempt, retryable, exception.getClass().getName(),
+                        safeExceptionMessage(exception), elapsedMs(started), exception);
+                if (!retryable || attempt == maxAttempts) {
                     break;
                 }
-                log.warn("mcp.client.retry tool={} attempt={} error={}", toolName, attempt, exception.getMessage());
+                log.warn("mcp.client.retry tool={} attempt={} nextAttempt={} errorType={} errorMessage={}",
+                        toolName, attempt, attempt + 1, exception.getClass().getName(), safeExceptionMessage(exception));
             }
         }
         throw last;
@@ -179,6 +201,19 @@ public class McpToolClient {
             }
         }
         return result;
+    }
+
+    private String safeExceptionMessage(Throwable exception) {
+        if (exception == null) return "";
+        String message = exception.getMessage();
+        if (message != null && !message.isBlank()) return message.replace("\n", " ");
+        Throwable cause = exception.getCause();
+        return cause == null ? exception.getClass().getSimpleName() : safeExceptionMessage(cause);
+    }
+
+    private String abbreviate(String value) {
+        String normalized = value == null ? "" : value.replace("\n", " ").trim();
+        return normalized.length() <= 240 ? normalized : normalized.substring(0, 240) + "...";
     }
 
     private long elapsedMs(long started) {

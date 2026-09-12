@@ -23,7 +23,22 @@ public class FinalizationNode implements NodeAction<TravelState> {
 
     @Override
     public Map<String, Object> apply(TravelState state) {
-        String tips = finalPlannerAgentService.buildTips(state);
+        String tips;
+        boolean knowledgeOnlyResponse = state.ragSufficient()
+                && !state.ragAnswer().isBlank()
+                && !state.needsFlights()
+                && !state.needsHotels()
+                && !state.needsWeather()
+                && !state.needsBudget()
+                && !state.needsItinerary();
+        if (knowledgeOnlyResponse) {
+            tips = state.ragAnswer();
+        } else {
+            tips = finalPlannerAgentService.buildTips(state);
+            if ((tips == null || tips.isBlank()) && !state.ragAnswer().isBlank()) {
+                tips = state.ragAnswer();
+            }
+        }
         Map<String, Object> updates = new LinkedHashMap<>();
         updates.put(TravelState.AWAITING_APPROVAL, Boolean.TRUE);
         updates.put(TravelState.FINAL_TIPS, tips);

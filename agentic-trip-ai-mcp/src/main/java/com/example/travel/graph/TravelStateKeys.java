@@ -126,6 +126,7 @@ public final class TravelStateKeys {
         public static final String RAG_DECISION = "ragDecision";
         public static final String RAG_QUERY = "ragQuery";
         public static final String RAG_CONTEXT = "ragContext";
+        public static final String RAG_ANSWER = "ragAnswer";
         public static final String RAG_SOURCES = "ragSources";
         public static final String RAG_ITERATIONS = "ragIterations";
         public static final String RAG_SUFFICIENT = "ragSufficient";

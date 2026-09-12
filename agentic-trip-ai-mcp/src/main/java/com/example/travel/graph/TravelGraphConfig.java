@@ -161,10 +161,22 @@ public class TravelGraphConfig {
                 .addNode(TravelGraphNodes.CANCEL, async(TravelGraphNodes.CANCEL, cancelNode))
                 .addEdge(START, TravelGraphNodes.INTENT)
                 .addConditionalEdges(TravelGraphNodes.INTENT,
-                        edge_async(state -> isKnowledgeOnly(state) ? TravelGraphNodes.RAG : TravelGraphNodes.PLANNER),
+                        edge_async(state -> {
+                            // Planner is only for requests that need trip-slot execution.
+                            // Knowledge/research requests can resolve their destination
+                            // through RAG and must never invent dates, budget or routes.
+                            if (state.needsKnowledge() || state.needsResearch()) {
+                                return TravelGraphNodes.RAG;
+                            }
+                            if (!hasAnyIntentCapability(state)) {
+                                return TravelGraphNodes.FINAL;
+                            }
+                            return TravelGraphNodes.PLANNER;
+                        }),
                         EdgeMappings.builder()
                                 .to(TravelGraphNodes.RAG, TravelGraphNodes.RAG)
                                 .to(TravelGraphNodes.PLANNER, TravelGraphNodes.PLANNER)
+                                .to(TravelGraphNodes.FINAL, TravelGraphNodes.FINAL)
                                 .build())
                 .addConditionalEdges(TravelGraphNodes.PLANNER,
                         edge_async(state -> state.needsKnowledge() ? TravelGraphNodes.RAG : TravelGraphNodes.ROUTER),
@@ -172,7 +184,13 @@ public class TravelGraphConfig {
                                 .to(TravelGraphNodes.RAG, TravelGraphNodes.RAG)
                                 .to(TravelGraphNodes.ROUTER, TravelGraphNodes.ROUTER)
                                 .build())
-                .addEdge(TravelGraphNodes.RAG, TravelGraphNodes.ROUTER)
+                .addConditionalEdges(TravelGraphNodes.RAG,
+                        edge_async(TravelGraphConfig::afterRag),
+                        EdgeMappings.builder()
+                                .to(TravelGraphNodes.ROUTER, TravelGraphNodes.ROUTER)
+                                .to(TravelGraphNodes.RESEARCH, TravelGraphNodes.RESEARCH)
+                                .to(TravelGraphNodes.VALIDATOR, TravelGraphNodes.VALIDATOR)
+                                .build())
                 .addConditionalEdges(TravelGraphNodes.AIRPORT,
                         edge_async(SpecialistRouter::afterAirport),
                         EdgeMappings.builder()
@@ -289,15 +307,23 @@ public class TravelGraphConfig {
                 .build();
     }
 
-    private static boolean isKnowledgeOnly(TravelState state) {
-        return state != null
-                && state.needsKnowledge()
-                && !state.needsFlights()
-                && !state.needsHotels()
-                && !state.needsResearch()
-                && !state.needsWeather()
-                && !state.needsBudget()
-                && !state.needsItinerary();
+    private static boolean hasAnyIntentCapability(TravelState state) {
+        return state != null && (state.needsFlights()
+                || state.needsHotels()
+                || state.needsResearch()
+                || state.needsWeather()
+                || state.needsBudget()
+                || state.needsItinerary()
+                || state.needsKnowledge());
+    }
+
+    private static String afterRag(TravelState state) {
+        if (state == null) return TravelGraphNodes.VALIDATOR;
+        boolean tripExecution = state.runFlights() || state.runHotels() || state.runWeather()
+                || state.runBudget() || state.runItinerary();
+        if (tripExecution) return TravelGraphNodes.ROUTER;
+        if (state.runResearch()) return TravelGraphNodes.RESEARCH;
+        return TravelGraphNodes.VALIDATOR;
     }
 
     private AsyncNodeAction<TravelState> async(String nodeName,
@@ -311,6 +337,7 @@ public class TravelGraphConfig {
             } else {
                 ModelRoutingContext.set(state.modelPolicy());
             }
+            ModelRoutingContext.setComplexity(complexity(state));
             try {
                 Map<String, Object> updates = enrich(node, state);
                 GraphExecutionLogger.nodeComplete(nodeName, state, elapsedMs(started));
@@ -326,6 +353,21 @@ public class TravelGraphConfig {
                 }
             }
         });
+    }
+
+    private static ModelRoutingContext.Complexity complexity(TravelState state) {
+        if (state == null) return ModelRoutingContext.Complexity.SIMPLE;
+        int capabilities = 0;
+        if (state.needsFlights()) capabilities++;
+        if (state.needsHotels()) capabilities++;
+        if (state.needsResearch()) capabilities++;
+        if (state.needsWeather()) capabilities++;
+        if (state.needsBudget()) capabilities++;
+        if (state.needsItinerary()) capabilities++;
+        if (state.needsKnowledge()) capabilities++;
+        if (capabilities >= 4) return ModelRoutingContext.Complexity.COMPLEX;
+        if (capabilities >= 2) return ModelRoutingContext.Complexity.NORMAL;
+        return ModelRoutingContext.Complexity.SIMPLE;
     }
 
     private static long elapsedMs(long startedNanos) {

@@ -45,8 +45,13 @@ public class McpResearchClient {
             }
             return hits;
         } catch (Exception exception) {
-            log.warn("MCP travel research failed for query={}: {}", query, exception.getMessage());
+            log.error("mcp.client.error client=McpResearchClient operation=search query={} errorType={} errorMessage={}",
+                    query, exception.getClass().getName(), safeMessage(exception), exception);
             return List.of();
         }
+    }
+
+    private String safeMessage(Exception exception) {
+        return exception.getMessage() == null ? exception.getClass().getSimpleName() : exception.getMessage();
     }
 }

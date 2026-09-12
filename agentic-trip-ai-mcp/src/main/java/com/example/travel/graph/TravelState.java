@@ -111,6 +111,7 @@ public class TravelState extends AgentState {
     public static final String RAG_DECISION = Rag.RAG_DECISION;
     public static final String RAG_QUERY = Rag.RAG_QUERY;
     public static final String RAG_CONTEXT = Rag.RAG_CONTEXT;
+    public static final String RAG_ANSWER = Rag.RAG_ANSWER;
     public static final String RAG_SOURCES = Rag.RAG_SOURCES;
     public static final String RAG_ITERATIONS = Rag.RAG_ITERATIONS;
     public static final String RAG_SUFFICIENT = Rag.RAG_SUFFICIENT;
@@ -186,6 +187,7 @@ public class TravelState extends AgentState {
         input.put(RAG_DECISION, "skip");
         input.put(RAG_QUERY, "");
         input.put(RAG_CONTEXT, "");
+        input.put(RAG_ANSWER, "");
         input.put(RAG_SOURCES, new ArrayList<String>());
         input.put(RAG_ITERATIONS, 0);
         input.put(RAG_SUFFICIENT, Boolean.FALSE);
@@ -217,6 +219,10 @@ public class TravelState extends AgentState {
 
     public String ragContext() {
         return this.<String>value(RAG_CONTEXT).orElse("");
+    }
+
+    public String ragAnswer() {
+        return this.<String>value(RAG_ANSWER).orElse("");
     }
 
     public List<String> ragSources() {

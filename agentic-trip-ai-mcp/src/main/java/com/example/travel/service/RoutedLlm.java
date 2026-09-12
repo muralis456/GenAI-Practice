@@ -41,10 +41,13 @@ public class RoutedLlm {
         if (!executionBudget.tryConsumeLlm()) {
             return new LlmExecutionResult("LLM budget exhausted for this graph run.", "", "", 0);
         }
-        String model = models.resolve(role, ModelRoutingContext.get());
+        String policy = ModelRoutingContext.get();
+        ModelRoutingContext.Complexity complexity = ModelRoutingContext.getComplexity();
+        String model = models.resolve(role, policy);
         String toolNames = tools == null || tools.length == 0 ? ""
                 : Arrays.stream(tools).map(tool -> tool.getClass().getSimpleName()).collect(Collectors.joining(","));
-        log.info("Routing {} to Ollama model={} policy={} tools={}", role, model, ModelRoutingContext.get(), toolNames);
+        log.info("Routing {} to Ollama model={} policy={} complexity={} tools={}",
+                role, model, policy, complexity, toolNames);
         long started = System.currentTimeMillis();
         var prompt = chatClient.prompt()
             .options(OllamaChatOptions.builder()

@@ -7,6 +7,7 @@ package com.example.travel.service;
 public final class ModelRoutingContext {
 
     private static final InheritableThreadLocal<String> POLICY = new InheritableThreadLocal<>();
+    private static final InheritableThreadLocal<Complexity> COMPLEXITY = new InheritableThreadLocal<>();
 
     private ModelRoutingContext() {
     }
@@ -20,8 +21,24 @@ public final class ModelRoutingContext {
         return value == null || value.isBlank() ? "BALANCED" : value;
     }
 
+    public static void setComplexity(Complexity complexity) {
+        COMPLEXITY.set(complexity == null ? Complexity.SIMPLE : complexity);
+    }
+
+    public static Complexity getComplexity() {
+        Complexity value = COMPLEXITY.get();
+        return value == null ? Complexity.SIMPLE : value;
+    }
+
     public static void clear() {
         POLICY.remove();
+        COMPLEXITY.remove();
+    }
+
+    public enum Complexity {
+        SIMPLE,
+        NORMAL,
+        COMPLEX
     }
 
     public static String normalize(String selected) {

@@ -1,6 +1,8 @@
 package com.example.travel.service;
 
 import com.example.travel.model.HotelOption;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import tools.jackson.databind.JsonNode;
@@ -12,6 +14,8 @@ import java.util.Map;
 @Service
 @ConditionalOnProperty(prefix = "travel.mcp.client", name = "enabled", havingValue = "true")
 public class McpHotelSearchClient {
+
+    private static final Logger log = LoggerFactory.getLogger(McpHotelSearchClient.class);
 
     private final McpToolClient client;
 
@@ -38,7 +42,13 @@ public class McpHotelSearchClient {
             }
             return hotels;
         } catch (Exception exception) {
+            log.error("mcp.client.error client=McpHotelSearchClient operation=search destination={} cheaper={} errorType={} errorMessage={}",
+                    destination, cheaper, exception.getClass().getName(), safeMessage(exception), exception);
             return List.of();
         }
+    }
+
+    private String safeMessage(Exception exception) {
+        return exception.getMessage() == null ? exception.getClass().getSimpleName() : exception.getMessage();
     }
 }

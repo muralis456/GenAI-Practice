@@ -5,6 +5,7 @@ import com.example.travel.graph.NodeFailureSupport;
 import com.example.travel.graph.TravelGraphNodes;
 import com.example.travel.graph.TravelState;
 import com.example.travel.rag.AgenticRagService;
+import com.example.travel.rag.RagAnswerService;
 import org.bsc.langgraph4j.action.NodeAction;
 import org.springframework.stereotype.Component;
 
@@ -15,8 +16,11 @@ import java.util.Map;
 public class RagNode implements NodeAction<TravelState> {
 
     private final AgenticRagService agenticRagService;
-    public RagNode(AgenticRagService agenticRagService) {
+    private final RagAnswerService ragAnswerService;
+
+    public RagNode(AgenticRagService agenticRagService, RagAnswerService ragAnswerService) {
         this.agenticRagService = agenticRagService;
+        this.ragAnswerService = ragAnswerService;
     }
 
     @Override
@@ -28,6 +32,11 @@ public class RagNode implements NodeAction<TravelState> {
             updates.put(TravelState.RAG_DECISION, result.decision());
             updates.put(TravelState.RAG_QUERY, result.query());
             updates.put(TravelState.RAG_CONTEXT, result.context());
+            String ragAnswer = result.sufficient() ? ragAnswerService.answer(state) : "";
+            updates.put(TravelState.RAG_ANSWER, ragAnswer);
+            if (TravelState.isBlank(state.destination()) && !TravelState.isBlank(result.destination())) {
+                updates.put(TravelState.DESTINATION, result.destination());
+            }
             updates.put(TravelState.RAG_SOURCES, result.sources());
             updates.put(TravelState.RAG_ITERATIONS, result.iterations());
             updates.put(TravelState.RAG_SUFFICIENT, result.sufficient());

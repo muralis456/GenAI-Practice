@@ -27,23 +27,34 @@ public class RagLlmJudgeService {
             return new JudgeResult(1.0, 1.0, 1.0, true, "RAG evidence not required or unavailable.");
         }
         Itinerary itinerary = state.itinerary();
-        String answer = itinerary == null ? state.finalTips() : itinerary.toDisplay();
+        String answer = !state.ragAnswer().isBlank() ? state.ragAnswer()
+                : (itinerary == null ? state.finalTips() : itinerary.toDisplay());
         if (answer == null || answer.isBlank()) {
             return new JudgeResult(0.0, 0.0, 0.0, false, "No generated answer was available to judge.");
         }
-        String raw = routedLlm.complete(AgentRole.EXTRACT,
-                """
-                You are an evidence-groundedness evaluator for a travel AI system.
-                Judge ONLY claims that depend on the supplied durable RAG context.
-                Ignore live facts such as flight availability, hotel prices, weather and currency.
-                Penalize unsupported destination rules, packing guidance, culture, safety or policy claims.
-                A good answer can contain additional live-tool facts; do not penalize those.
-                Return JSON only:
-                {"groundedness":0.0,"coverage":0.0,"unsupportedClaimRate":0.0,"pass":true,"reason":"short reason"}
-                Pass normally requires groundedness >= 0.80, coverage >= 0.70 and unsupportedClaimRate <= 0.20.
-                """,
-                "USER REQUEST:\n%s\n\nRAG CONTEXT:\n%s\n\nGENERATED PLAN:\n%s"
-                        .formatted(state.userRequest(), state.ragContext(), answer));
+        final String raw;
+        try {
+            raw = routedLlm.complete(AgentRole.EXTRACT,
+                    """
+                    You are an evidence-groundedness evaluator for a travel AI system.
+                    Judge ONLY claims that depend on the supplied durable RAG context.
+                    Ignore live facts such as flight availability, hotel prices, weather and currency.
+                    Penalize unsupported destination rules, packing guidance, culture, safety or policy claims.
+                    A good answer can contain additional live-tool facts; do not penalize those.
+                    Return JSON only:
+                    {"groundedness":0.0,"coverage":0.0,"unsupportedClaimRate":0.0,"pass":true,"reason":"short reason"}
+                    Pass normally requires groundedness >= 0.80, coverage >= 0.70 and unsupportedClaimRate <= 0.20.
+                    """,
+                    "USER REQUEST:\n%s\n\nRAG CONTEXT:\n%s\n\nGENERATED ANSWER:\n%s"
+                            .formatted(state.userRequest(), state.ragContext(), answer));
+        } catch (Exception ex) {
+            // A validator must never turn a temporary LLM-budget problem into
+            // a destructive replan when grounded RAG evidence already exists.
+            double evidence = state.ragEvidenceScore();
+            boolean pass = evidence >= 0.50;
+            return new JudgeResult(evidence, evidence, Math.max(0, 1.0 - evidence), pass,
+                    "RAG judge unavailable; used deterministic evidence score.");
+        }
         return jsonSupport.readTree(raw).map(n -> {
             double grounded = clamp(n.path("groundedness").asDouble(0));
             double coverage = clamp(n.path("coverage").asDouble(0));

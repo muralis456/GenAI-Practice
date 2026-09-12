@@ -115,6 +115,7 @@ public final class TravelStateSchema {
         schema.put(Rag.RAG_DECISION, Channels.base(() -> "skip"));
         schema.put(Rag.RAG_QUERY, Channels.base(() -> ""));
         schema.put(Rag.RAG_CONTEXT, Channels.base(() -> ""));
+        schema.put(Rag.RAG_ANSWER, Channels.base(() -> ""));
         schema.put(Rag.RAG_SOURCES, Channels.base(() -> new ArrayList<String>()));
         schema.put(Rag.RAG_ITERATIONS, Channels.base(() -> 0));
         schema.put(Rag.RAG_SUFFICIENT, Channels.base(() -> Boolean.FALSE));

@@ -86,8 +86,8 @@ travel:
     itinerary: ${TRAVEL_MODEL_ITINERARY:llama3.2:3b}
     finale: ${TRAVEL_MODEL_FINAL:llama3.2:3b}
     fast: ${TRAVEL_MODEL_FAST:llama3.2:3b}
-    balanced: ${TRAVEL_MODEL_BALANCED:}
-    reasoning: ${TRAVEL_MODEL_REASONING:}
+    balanced: ${TRAVEL_MODEL_BALANCED:llama3.2:3b}
+    reasoning: ${TRAVEL_MODEL_REASONING:llama3.2:3b}
   tavily:
     api-url: https://api.tavily.com/search
     api-key: ${TAVILY_API_KEY:}

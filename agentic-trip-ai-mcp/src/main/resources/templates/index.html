@@ -915,6 +915,64 @@
             justify-content: center;
         }
 
+
+        /* ---------- Result-card redesign ---------- */
+        .result-card {
+            background: linear-gradient(180deg, rgba(18, 30, 50, 0.98), rgba(8, 16, 29, 0.99));
+            border: 1px solid rgba(142, 181, 239, 0.18);
+            border-radius: 22px;
+            overflow: hidden;
+            box-shadow: 0 22px 55px rgba(0,0,0,.28);
+        }
+        .result-hero {
+            padding: 24px 24px 20px;
+            background: radial-gradient(circle at 90% 0%, rgba(69,139,255,.20), transparent 38%), linear-gradient(135deg, rgba(49,104,186,.13), transparent 55%);
+        }
+        .result-eyebrow { color:#8fb9ef; font-size:11px; font-weight:800; letter-spacing:.12em; text-transform:uppercase; margin-bottom:8px; }
+        .result-title { margin:0; font-size:28px; line-height:1.15; letter-spacing:-.035em; }
+        .result-subtitle { margin:8px 0 0; color:var(--muted); font-size:14px; line-height:1.55; }
+        .result-chips { display:flex; flex-wrap:wrap; gap:8px; margin-top:16px; }
+        .result-chip { display:inline-flex; align-items:center; gap:6px; padding:7px 10px; border-radius:999px; background:rgba(255,255,255,.055); border:1px solid rgba(255,255,255,.09); color:#dceaff; font-size:12px; }
+        .result-chip.success { background:rgba(50,205,120,.11); border-color:rgba(50,205,120,.25); color:#baf3ce; }
+        .result-chip.warn { background:rgba(255,190,90,.10); border-color:rgba(255,190,90,.24); color:#ffe0a8; }
+        .result-body { padding:0 24px 22px; }
+        .result-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; margin-top:16px; }
+        .result-panel { background:rgba(255,255,255,.028); border:1px solid rgba(255,255,255,.075); border-radius:16px; padding:16px; }
+        .result-panel.full { grid-column:1/-1; }
+        .result-panel-title { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:12px; font-size:13px; font-weight:800; color:#cfe3ff; letter-spacing:.07em; text-transform:uppercase; }
+        .result-panel-title .count { color:#91b6e9; font-size:11px; letter-spacing:0; text-transform:none; font-weight:600; }
+        .result-empty { color:rgba(198,210,228,.48); font-size:13px; margin:0; }
+        .flight-card,.hotel-card { padding:12px 0; border-top:1px solid rgba(255,255,255,.065); }
+        .flight-card:first-child,.hotel-card:first-child { border-top:0; padding-top:0; }
+        .item-title { font-weight:750; color:#eef5ff; font-size:14px; }
+        .item-meta { color:var(--muted); font-size:12px; margin-top:5px; line-height:1.5; }
+        .item-note { color:#a9c2df; font-size:12px; margin-top:6px; line-height:1.5; }
+        .itin-list { display:grid; gap:10px; }
+        .itin-item { display:grid; grid-template-columns:54px 1fr; gap:12px; }
+        .itin-day-badge { align-self:start; text-align:center; padding:7px 4px; border-radius:10px; background:rgba(59,139,255,.12); border:1px solid rgba(91,155,255,.2); color:#bcd8ff; font-size:11px; font-weight:800; }
+        .itin-day-title { font-size:14px; font-weight:750; color:#edf5ff; }
+        .itin-activities { margin:6px 0 0; padding-left:17px; color:#c2d3e9; font-size:13px; line-height:1.55; }
+        .itin-activities li { margin-bottom:3px; }
+        .weather-card { display:flex; align-items:center; gap:14px; }
+        .weather-icon { width:48px; height:48px; display:flex; align-items:center; justify-content:center; border-radius:14px; background:rgba(255,255,255,.055); font-size:24px; }
+        .weather-main { font-size:15px; font-weight:750; color:#eff6ff; }
+        .weather-detail { color:var(--muted); font-size:12px; margin-top:4px; line-height:1.5; }
+        .budget-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+        .budget-card { padding:10px 11px; border-radius:11px; background:rgba(255,255,255,.035); border:1px solid rgba(255,255,255,.06); }
+        .budget-card .label { color:var(--muted); font-size:11px; }
+        .budget-card .amount { margin-top:3px; color:#eef5ff; font-size:14px; font-weight:750; }
+        .budget-total-card { margin-top:10px; display:flex; justify-content:space-between; gap:12px; padding:11px 12px; border-radius:12px; background:rgba(43,140,255,.10); border:1px solid rgba(82,153,255,.18); }
+        .knowledge-answer { color:#e7f0fb; font-size:15px; line-height:1.72; }
+        .knowledge-answer p { margin:0 0 12px; }
+        .knowledge-answer ul { margin:0 0 12px; padding-left:20px; }
+        .knowledge-answer li { margin-bottom:7px; }
+        .validation-banner { display:flex; gap:10px; align-items:flex-start; padding:12px 14px; border-radius:13px; background:rgba(255,190,90,.07); border:1px solid rgba(255,190,90,.18); color:#f6dca9; font-size:13px; line-height:1.5; }
+        .execution-mini { display:flex; flex-wrap:wrap; gap:7px; }
+        .execution-pill { padding:6px 9px; border-radius:9px; background:rgba(255,255,255,.045); border:1px solid rgba(255,255,255,.065); color:#b9cce3; font-size:11px; }
+        .result-card .agent-details { margin:16px 0 0; padding:0; border-top:0; }
+        .result-card .agent-details summary { padding:11px 12px; border-radius:11px; background:rgba(255,255,255,.035); border:1px solid rgba(255,255,255,.06); }
+        @media (max-width: 680px) { .result-grid { grid-template-columns:1fr; } .result-panel.full { grid-column:auto; } .result-hero,.result-body { padding-left:16px; padding-right:16px; } .budget-grid { grid-template-columns:1fr; } }
+
         .hidden-fields {
             display: none;
         }
@@ -1547,256 +1605,166 @@
     };
 
     const sectionBlock = (title, bodyHtml, emptyMessage) => {
-        const content = bodyHtml || '<p class="plan-muted">' + escapeHtml(emptyMessage || 'Not available.') + '</p>';
-        return '<section class="plan-section">'
-            + '<div class="plan-section-head">' + title + '</div>'
-            + '<div class="plan-section-body">' + content + '</div>'
-            + '</section>';
+        if (!bodyHtml && !emptyMessage) return '';
+        const content = bodyHtml || '<p class="result-empty">' + escapeHtml(emptyMessage || 'Not available.') + '</p>';
+        return '<section class="result-panel"><div class="result-panel-title">' + title + '</div><div>' + content + '</div></section>';
     };
 
-    const linesToList = (text, emptyMessage) => {
-        if (!text || text.startsWith('Not requested') || text.startsWith('No ')) {
-            return '<p class="plan-muted">' + escapeHtml(emptyMessage || text || 'Not available.') + '</p>';
-        }
-        const items = text.split('\n').map(line => line.trim()).filter(Boolean);
-        if (!items.length) {
-            return '<p class="plan-muted">' + escapeHtml(emptyMessage || 'Not available.') + '</p>';
-        }
-        return '<ul class="plan-list">' + items.map(item => '<li>' + escapeHtml(item) + '</li>').join('') + '</ul>';
+    const formatKnowledgeText = (text) => {
+        if (!text) return '';
+        const safe = escapeHtml(String(text).trim());
+        const paragraphs = safe.split(/\n\s*\n/).map(x => x.trim()).filter(Boolean);
+        if (!paragraphs.length) return '';
+        return paragraphs.map(p => {
+            if (/^(?:[-*•]\s+)/m.test(p)) {
+                const items = p.split(/\n/).map(x => x.replace(/^(?:[-*•]\s+)/,'').trim()).filter(Boolean);
+                return '<ul>' + items.map(i => '<li>' + i + '</li>').join('') + '</ul>';
+            }
+            return '<p>' + p.replace(/\n/g, '<br>') + '</p>';
+        }).join('');
     };
 
     const buildBudgetTable = (budget) => {
-        if (!budget || !budget.lineItems || !budget.lineItems.length) {
-            return '<p class="plan-muted">Budget breakdown not available.</p>';
-        }
+        if (!budget || !budget.lineItems || !budget.lineItems.length) return '';
         const rows = budget.lineItems.map(item =>
-            '<div class="budget-row"><span>' + escapeHtml(item.category || 'Item')
-            + '</span><span>' + formatInr(item.amountInr) + '</span></div>').join('');
-        const total = '<div class="budget-row budget-total"><span>Total</span><span>'
-            + formatInr(budget.estimatedCost) + '</span></div>';
-        let remaining = '';
-        if (budget.remaining != null) {
-            remaining = '<div class="budget-row budget-remaining"><span>Remaining vs ceiling</span><span>'
-                + formatInr(budget.remaining) + '</span></div>';
+            '<div class="budget-card"><div class="label">' + escapeHtml(item.category || 'Item') + '</div><div class="amount">' + formatInr(item.amountInr) + '</div></div>').join('');
+        let html = '<div class="budget-grid">' + rows + '</div>';
+        if (budget.estimatedCost != null) {
+            html += '<div class="budget-total-card"><span>Total estimated</span><strong>' + formatInr(budget.estimatedCost) + '</strong></div>';
         }
-        return '<div class="budget-table">' + rows
-            + '<div class="budget-divider"></div>' + total + remaining + '</div>';
+        return html;
     };
 
     const buildPlanReview = (data, userRequest) => {
         const validation = data.plan && data.plan.validation;
-        if (validation && validation.reviewItems && validation.reviewItems.length) {
-            let html = '<ul class="review-list">';
-            validation.reviewItems.forEach(item => {
-                const cls = item.level === 'warn' ? 'review-warn' : 'review-ok';
-                const icon = item.level === 'warn' ? '⚠' : '✓';
-                html += '<li class="' + cls + '">' + icon + ' ' + escapeHtml(item.text || '') + '</li>';
-            });
-            html += '</ul>';
-            return html;
-        }
-        const positives = [];
-        const text = (userRequest || '').toLowerCase();
-        if (text.includes('family')) positives.push('Family-friendly');
-        if (text.includes('food')) positives.push('Good food');
-        if (text.includes('local')) positives.push('Local experiences');
-        if (text.includes('budget') || text.includes('lakh') || text.includes('₹')) {
-            positives.push('Budget considered');
-        }
-        if (data.budgetSummary && data.budgetSummary.withinBudget) {
-            positives.push('Within budget ceiling');
-        }
         const warnings = (data.semanticNotes || []).concat(data.validationErrors || []);
-        let html = '<ul class="review-list">';
-        positives.forEach(item => {
-            html += '<li class="review-ok">✓ ' + escapeHtml(item) + '</li>';
-        });
-        warnings.forEach(item => {
-            html += '<li class="review-warn">⚠ ' + escapeHtml(item) + '</li>';
-        });
-        if (!positives.length && !warnings.length) {
-            html += '<li class="review-ok">✓ Plan validated</li>';
+        if (validation && validation.reviewItems && validation.reviewItems.length) {
+            const items = validation.reviewItems.map(item => (item.level === 'warn' ? '⚠ ' : '✓ ') + (item.text || '')).join(' · ');
+            return '<div class="validation-banner">' + escapeHtml(items) + '</div>';
         }
-        html += '</ul>';
-        return html;
+        if (warnings.length) return '<div class="validation-banner">⚠ ' + escapeHtml(warnings.join(' · ')) + '</div>';
+        if (data.ragJudge && data.ragJudge !== 'PASS') return '<div class="validation-banner">⚠ ' + escapeHtml(String(data.ragJudge)) + '</div>';
+        return '<div class="result-chip success">✓ Validation passed</div>';
     };
 
     const activityTags = (activity) => {
         const tags = [];
-        if (activity.indoorOutdoor && activity.indoorOutdoor !== 'mixed') {
-            tags.push(activity.indoorOutdoor);
-        }
-        if (activity.familyFriendly) {
-            tags.push('family-friendly');
-        }
-        if (activity.foodExperience) {
-            tags.push('food');
-        }
-        if (activity.localExperience) {
-            tags.push('local');
-        }
+        if (activity.indoorOutdoor && activity.indoorOutdoor !== 'mixed') tags.push(activity.indoorOutdoor);
+        if (activity.familyFriendly) tags.push('family-friendly');
+        if (activity.foodExperience) tags.push('food');
+        if (activity.localExperience) tags.push('local');
         return tags;
     };
 
     const buildFlightsSection = (flights) => {
-        if (!flights || !flights.length) {
-            return null;
-        }
-        const items = flights.map(f => {
-            const parts = [f.airline, f.flightNumber, (f.origin && f.destination) ? f.origin + ' → ' + f.destination : '', f.departureTime]
-                .filter(Boolean);
-            let line = '<li>' + escapeHtml(parts.join(' · '));
-            if (f.notes) {
-                line += ' <span class="plan-muted">(' + escapeHtml(f.notes) + ')</span>';
-            }
-            return line + '</li>';
+        if (!flights || !flights.length) return '';
+        return flights.map(f => {
+            const route = (f.origin && f.destination) ? f.origin + ' → ' + f.destination : '';
+            const meta = [route, f.departureTime, f.arrivalTime, f.price].filter(Boolean).join(' · ');
+            return '<div class="flight-card"><div class="item-title">' + escapeHtml([f.airline, f.flightNumber].filter(Boolean).join(' · ') || 'Flight option') + '</div>'
+                + (meta ? '<div class="item-meta">' + escapeHtml(meta) + '</div>' : '')
+                + (f.notes ? '<div class="item-note">' + escapeHtml(f.notes) + '</div>' : '') + '</div>';
         }).join('');
-        return '<ul class="plan-list">' + items + '</ul>';
     };
 
     const buildHotelsSection = (hotels) => {
-        if (!hotels || !hotels.length) {
-            return null;
-        }
-        const items = hotels.map(h => {
-            const parts = [h.name, h.area, h.priceRange, h.rating].filter(Boolean);
-            let line = '<li>' + escapeHtml(parts.join(' · '));
-            if (h.notes) {
-                line += ' <span class="plan-muted">— ' + escapeHtml(h.notes) + '</span>';
-            }
-            return line + '</li>';
+        if (!hotels || !hotels.length) return '';
+        return hotels.map(h => {
+            const meta = [h.area, h.priceRange, h.rating ? '★ ' + h.rating : ''].filter(Boolean).join(' · ');
+            return '<div class="hotel-card"><div class="item-title">' + escapeHtml(h.name || 'Hotel') + '</div>'
+                + (meta ? '<div class="item-meta">' + escapeHtml(meta) + '</div>' : '')
+                + (h.notes ? '<div class="item-note">' + escapeHtml(h.notes) + '</div>' : '') + '</div>';
         }).join('');
-        return '<ul class="plan-list">' + items + '</ul>';
     };
 
     const buildItinerarySection = (itinerary) => {
         const days = itinerary && itinerary.days ? itinerary.days : [];
-        if (!days.length) {
-            return null;
-        }
-        let html = '';
-        if (itinerary.summary) {
-            html += '<p class="plan-muted">' + escapeHtml(itinerary.summary) + '</p>';
-        }
+        if (!days.length) return '';
+        let html = '<div class="itin-list">';
         days.forEach(day => {
-            html += '<div class="itin-day"><div class="itin-day-head"><strong>Day ' + escapeHtml(String(day.day || ''));
-            if (day.title) {
-                html += ' — ' + escapeHtml(day.title);
-            }
-            html += '</strong></div><ul class="plan-list">';
-            (day.activities || []).forEach(activity => {
-                if (!activity || !activity.name) {
-                    return;
-                }
-                const tags = activityTags(activity);
-                html += '<li><span class="activity-name">' + escapeHtml(activity.name) + '</span>';
-                if (activity.type) {
-                    html += ' <span class="activity-type">[' + escapeHtml(activity.type) + ']</span>';
-                }
-                if (tags.length) {
-                    html += ' <span class="activity-tags">' + tags.map(t => escapeHtml(t)).join(' · ') + '</span>';
-                }
-                html += '</li>';
-            });
-            html += '</ul></div>';
+            const acts = (day.activities || []).filter(a => a && a.name).map(a => {
+                const tags = activityTags(a);
+                return '<li>' + escapeHtml(a.name) + (a.type ? ' · ' + escapeHtml(a.type) : '') + (tags.length ? ' <span class="item-meta">(' + escapeHtml(tags.join(' · ')) + ')</span>' : '') + '</li>';
+            }).join('');
+            html += '<div class="itin-item"><div class="itin-day-badge">DAY ' + escapeHtml(String(day.day || '')) + '</div><div>'
+                + '<div class="itin-day-title">' + escapeHtml(day.title || 'Explore') + '</div>'
+                + (acts ? '<ul class="itin-activities">' + acts + '</ul>' : '') + '</div></div>';
         });
-        return html;
+        return html + '</div>';
     };
 
     const buildWeatherSection = (weather) => {
-        if (!weather || (!weather.summary && !weather.location)) {
-            return null;
-        }
-        const text = (weather.location ? weather.location + ': ' : '') + (weather.summary || '');
-        const rain = weather.rainLikely ? ' <span class="plan-muted">(rain likely)</span>' : '';
-        return '<p>' + escapeHtml(text) + rain + '</p>';
+        if (!weather || (!weather.summary && !weather.location)) return '';
+        const summary = weather.summary || 'Weather information available';
+        const detail = [weather.location, weather.rainLikely ? 'Rain may be likely' : ''].filter(Boolean).join(' · ');
+        return '<div class="weather-card"><div class="weather-icon">🌤️</div><div><div class="weather-main">' + escapeHtml(summary) + '</div>'
+            + (detail ? '<div class="weather-detail">' + escapeHtml(detail) + '</div>' : '') + '</div></div>';
     };
 
     const buildAgentDetails = (data) => {
         const exec = data.execution || {};
         const rawSteps = exec.timeline || data.executionTimeline || data.pipeline || [];
-        const steps = dedupeSteps(rawSteps).slice(-16).map(formatStepLine).join('\n');
-        const sources = [...new Set(exec.sources || data.sources || [])].join('\n');
+        const stepsArr = dedupeSteps(rawSteps).slice(-16);
+        const sourcesArr = [...new Set(exec.sources || data.sources || [])];
         const history = exec.executionHistory || data.executionHistory || '';
-        if (!steps && !sources && !history) {
-            return '';
+        if (!stepsArr.length && !sourcesArr.length && !history) return '';
+        let body = '<div class="agent-details-body">';
+        if (stepsArr.length) {
+            body += '<div class="agent-subsection"><div class="agent-subtitle">Execution</div><div class="execution-mini">'
+                + stepsArr.map(step => '<span class="execution-pill">' + escapeHtml(formatStepLine(step)) + '</span>').join('') + '</div></div>';
         }
-        let body = '';
-        if (steps) {
-            body += '<div class="agent-subsection"><div class="agent-subtitle">Timeline</div>'
-                + '<pre class="agent-pre">' + escapeHtml(steps) + '</pre></div>';
-        }
-        if (sources) {
-            body += '<div class="agent-subsection"><div class="agent-subtitle">Provenance</div>'
-                + '<pre class="agent-pre">' + escapeHtml(sources) + '</pre></div>';
-        }
-        if (history) {
-            body += '<div class="agent-subsection"><div class="agent-subtitle">Execution History</div>'
-                + '<pre class="agent-pre">' + escapeHtml(history) + '</pre></div>';
-        }
-        return '<details class="agent-details"><summary>🔍 Agent Execution Details</summary><div class="agent-details-body">'
-            + body + '</div></details>';
+        if (sourcesArr.length) body += '<div class="agent-subsection"><div class="agent-subtitle">Sources</div><pre class="agent-pre">' + escapeHtml(sourcesArr.join('\n')) + '</pre></div>';
+        if (history) body += '<div class="agent-subsection"><div class="agent-subtitle">History</div><pre class="agent-pre">' + escapeHtml(history) + '</pre></div>';
+        body += '</div>';
+        return '<details class="agent-details"><summary>🔎 Agent execution & sources</summary>' + body + '</details>';
     };
 
     const buildPlanCardHtml = (data, userRequest) => {
         const plan = data.plan || {};
         const trip = plan.trip || {};
-        const tips = plan.tips || '';
+        const tips = plan.tips || data.finalPlan || '';
         if (data.status === 'ERROR' || (tips && String(tips).startsWith('Error:'))) {
-            return '<div class="trip-plan-card error"><p>' + escapeHtml(tips || 'Something went wrong.') + '</p></div>';
+            return '<div class="result-card"><div class="result-hero"><div class="result-eyebrow">Agent response</div><h2 class="result-title">Something went wrong</h2></div><div class="result-body"><div class="validation-banner">⚠ ' + escapeHtml(tips || 'Something went wrong.') + '</div></div></div>';
         }
-        const hasStructured = !!(trip.destination || (plan.flights && plan.flights.length)
-            || (plan.hotels && plan.hotels.length) || (plan.itinerary && plan.itinerary.days && plan.itinerary.days.length)
-            || (plan.budget && plan.budget.lineItems && plan.budget.lineItems.length));
-        if (!hasStructured && tips) {
-            return '<div class="trip-plan-card legacy"><pre class="plan-legacy">' + escapeHtml(tips) + '</pre></div>';
+
+        const hasFlights = Array.isArray(plan.flights) && plan.flights.length;
+        const hasHotels = Array.isArray(plan.hotels) && plan.hotels.length;
+        const hasItinerary = !!(plan.itinerary && Array.isArray(plan.itinerary.days) && plan.itinerary.days.length);
+        const hasBudget = !!(plan.budget && Array.isArray(plan.budget.lineItems) && plan.budget.lineItems.length);
+        const hasWeather = !!(plan.weather && (plan.weather.summary || plan.weather.location));
+        const hasTrip = !!(trip.destination || trip.origin || trip.departureDate || trip.returnDate);
+
+        // Knowledge/research answer: do not force it into an empty trip template.
+        if (!hasTrip && !hasFlights && !hasHotels && !hasItinerary && !hasBudget && !hasWeather && tips) {
+            const title = tripTitle(data);
+            const dest = data.destination || trip.destination || '';
+            let html = '<div class="result-card"><div class="result-hero"><div class="result-eyebrow">Travel guidance' + (dest ? ' · ' + escapeHtml(dest) : '') + '</div><h2 class="result-title">' + escapeHtml(title || 'Travel information') + '</h2><div class="result-chips"><span class="result-chip success">✓ Knowledge answer</span></div></div><div class="result-body"><div class="result-panel full"><div class="knowledge-answer">' + formatKnowledgeText(tips) + '</div></div>';
+            html += buildAgentDetails(data) + '</div></div>';
+            return html;
         }
-        const quality = trip.qualityScore != null ? trip.qualityScore
-            : (plan.validation && plan.validation.quality && plan.validation.quality.overall > 0
-                ? Math.round(plan.validation.quality.overall * 100) : null);
-        const statusClass = (trip.awaitingApproval ?? data.awaitingApproval) ? 'ready'
-            : ((trip.status || data.status) === 'COMPLETE' ? 'complete' : 'pending');
-        const statusLabel = (trip.awaitingApproval ?? data.awaitingApproval) ? '🟢 PLAN READY FOR APPROVAL'
-            : (trip.status || data.status) === 'COMPLETE' ? '✅ PLAN CONFIRMED' : (trip.status || data.status || 'PLAN');
-        const origin = trip.origin;
-        const destination = trip.destination;
-        const route = origin && destination ? origin + ' → ' + destination : 'Route TBD';
-        const departureDate = trip.departureDate;
-        const returnDate = trip.returnDate;
-        const nights = trip.nights;
-        const budgetLabel = trip.budgetLabel;
-        let html = '<div class="trip-plan-card"><header class="trip-header">'
-            + '<h2 class="trip-title">' + tripEmoji(destination) + ' ' + escapeHtml(tripTitle(data)) + '</h2>'
-            + '<div class="trip-rule"></div>'
-            + '<div class="trip-meta">'
-            + '<div>📍 ' + escapeHtml(route || 'Route TBD') + '</div>'
-            + '<div>📅 ' + escapeHtml(formatDateRange(departureDate, returnDate)) + '</div>'
-            + '<div>🌙 ' + escapeHtml(String(nights || '—')) + ' nights · ' + escapeHtml(audienceLabel(data, userRequest)) + '</div>'
-            + '<div>💰 Budget: ' + escapeHtml(budgetLabel || '—') + '</div>'
-            + '</div>'
-            + '<div class="trip-status">'
-            + '<span class="status-pill ' + statusClass + '">' + escapeHtml(statusLabel) + '</span>';
-        if (quality != null) {
-            html += '<span class="quality-pill">Quality Score: ' + quality + '/100</span>';
-        }
-        html += '</div><div class="trip-rule"></div></header>';
-        const flightsHtml = buildFlightsSection(plan.flights);
-        html += sectionBlock('✈️ FLIGHTS', flightsHtml, 'No flight options available.');
-        const hotelsHtml = buildHotelsSection(plan.hotels);
-        html += sectionBlock('🏨 HOTELS', hotelsHtml, 'No hotel options available.');
-        const itineraryHtml = buildItinerarySection(plan.itinerary);
-        html += sectionBlock('🗺️ ITINERARY', itineraryHtml, 'Itinerary not available.');
-        html += sectionBlock('💰 BUDGET', buildBudgetTable(plan.budget), 'Budget breakdown not available.');
-        const weatherHtml = buildWeatherSection(plan.weather);
-        if (weatherHtml) {
-            html += sectionBlock('🌦️ WEATHER', weatherHtml);
-        }
-        html += sectionBlock('✅ VALIDATION', buildPlanReview(data, userRequest));
-        if (plan.tips) {
-            html += sectionBlock('💡 TIPS', '<p>' + escapeHtml(plan.tips) + '</p>');
-        }
-        html += buildAgentDetails(data);
-        html += '</div>';
+
+        const quality = trip.qualityScore != null ? trip.qualityScore : (plan.validation && plan.validation.quality && plan.validation.quality.overall > 0 ? Math.round(plan.validation.quality.overall * 100) : null);
+        const approved = (trip.awaitingApproval ?? data.awaitingApproval);
+        const complete = (trip.status || data.status) === 'COMPLETE';
+        const title = trip.title || tripTitle(data);
+        const route = trip.origin && trip.destination ? trip.origin + ' → ' + trip.destination : (trip.destination || data.destination || 'Travel plan');
+        const chips = [];
+        if (trip.departureDate || trip.returnDate) chips.push('📅 ' + formatDateRange(trip.departureDate, trip.returnDate));
+        if (trip.nights) chips.push('🌙 ' + trip.nights + ' nights');
+        chips.push(audienceLabel(data, userRequest));
+        if (trip.budgetLabel) chips.push('💰 ' + trip.budgetLabel);
+        if (approved) chips.push('🟢 Ready for approval'); else if (complete) chips.push('✓ Confirmed');
+        if (quality != null) chips.push('Quality ' + quality + '/100');
+
+        let html = '<div class="result-card"><div class="result-hero"><div class="result-eyebrow">AI travel plan</div><h2 class="result-title">' + tripEmoji(trip.destination || data.destination) + ' ' + escapeHtml(title) + '</h2><div class="result-subtitle">' + escapeHtml(route) + '</div><div class="result-chips">' + chips.map((c,i) => '<span class="result-chip ' + ((approved || complete) && i === chips.length-1 ? 'success' : '') + '">' + escapeHtml(c) + '</span>').join('') + '</div></div><div class="result-body"><div class="result-grid">';
+        if (hasFlights) html += sectionBlock('✈️ Flights', buildFlightsSection(plan.flights), null);
+        if (hasHotels) html += sectionBlock('🏨 Stay options', buildHotelsSection(plan.hotels), null);
+        if (hasWeather) html += sectionBlock('🌦️ Weather', buildWeatherSection(plan.weather), null);
+        if (hasItinerary) html += '<section class="result-panel full"><div class="result-panel-title">🗺️ Itinerary <span class="count">' + plan.itinerary.days.length + ' days</span></div>' + buildItinerarySection(plan.itinerary) + '</section>';
+        if (hasBudget) html += sectionBlock('💰 Budget', buildBudgetTable(plan.budget), null);
+        if (tips) html += '<section class="result-panel full"><div class="result-panel-title">💡 Travel notes</div><div class="knowledge-answer">' + formatKnowledgeText(tips) + '</div></section>';
+        if (data.validationErrors?.length || data.semanticNotes?.length || data.ragJudge) html += '<section class="result-panel full"><div class="result-panel-title">✅ Validation</div>' + buildPlanReview(data, userRequest) + '</section>';
+        html += '</div>' + buildAgentDetails(data) + '</div></div>';
         return html;
     };
 

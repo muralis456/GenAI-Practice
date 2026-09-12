@@ -5,20 +5,10 @@ import com.example.travel.rag.RagKnowledgeLoader;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import com.example.travel.rag.eval.RagEvaluationCase;
 import com.example.travel.rag.eval.RagEvaluationCatalog;
 import com.example.travel.rag.eval.RagEvaluationRunner;
 import com.example.travel.rag.eval.RagEvaluationService;
-import org.springframework.ai.document.Document;
-import org.springframework.ai.transformer.splitter.TokenTextSplitter;
 import org.springframework.ai.vectorstore.VectorStore;
-import org.springframework.core.io.Resource;
-import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
-
-import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 @RestController
