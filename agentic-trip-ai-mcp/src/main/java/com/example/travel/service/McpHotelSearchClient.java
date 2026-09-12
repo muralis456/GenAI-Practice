@@ -21,7 +21,7 @@ public class McpHotelSearchClient {
 
     public List<HotelOption> search(String destination, String travelStyle, boolean cheaper) {
         try {
-            JsonNode root = client.call("search_hotels", Map.of(
+            JsonNode root = client.callByUserInput("Find accommodation/hotels", "Find hotel accommodation for destination " + (destination == null ? "" : destination) + ", travel style " + (travelStyle == null ? "balanced" : travelStyle) + ", cheaper=" + cheaper, Map.of(
                     "destination", destination == null ? "" : destination,
                     "travelStyle", travelStyle == null ? "balanced" : travelStyle,
                     "cheaper", cheaper));

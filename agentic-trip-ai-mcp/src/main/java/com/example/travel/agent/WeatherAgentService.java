@@ -18,6 +18,6 @@ public class WeatherAgentService {
         if (!state.needsWeather() || TravelState.isBlank(state.destination())) {
             return new WeatherForecast("", "", false);
         }
-        return weatherTool.forecast(state.destination(), state.departureDate(), state.returnDate());
+        return weatherTool.forecast(state.destination(), state.departureDate(), state.returnDate(), state.userRequest());
     }
 }

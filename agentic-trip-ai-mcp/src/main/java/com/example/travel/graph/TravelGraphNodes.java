@@ -19,6 +19,7 @@ public final class TravelGraphNodes {
     public static final String WEATHER = "weather";
     public static final String CANCEL = "cancel";
     public static final String ROUTER = "router";
+    public static final String RAG = "rag";
     public static final String FAN_OUT = "fan_out";
     public static final String SUPERVISOR = "supervisor";
 

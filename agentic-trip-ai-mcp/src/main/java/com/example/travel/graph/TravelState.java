@@ -30,6 +30,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import static com.example.travel.graph.TravelStateKeys.Rag;
+
 @Slf4j
 public class TravelState extends AgentState {
 
@@ -79,6 +81,7 @@ public class TravelState extends AgentState {
     public static final String NEEDS_WEATHER = TravelStateKeys.Needs.NEEDS_WEATHER;
     public static final String NEEDS_BUDGET = TravelStateKeys.Needs.NEEDS_BUDGET;
     public static final String NEEDS_ITINERARY = TravelStateKeys.Needs.NEEDS_ITINERARY;
+    public static final String NEEDS_KNOWLEDGE = TravelStateKeys.Needs.NEEDS_KNOWLEDGE;
     public static final String RUN_FLIGHTS = TravelStateKeys.Run.RUN_FLIGHTS;
     public static final String RUN_HOTELS = TravelStateKeys.Run.RUN_HOTELS;
     public static final String RUN_RESEARCH = TravelStateKeys.Run.RUN_RESEARCH;
@@ -104,6 +107,24 @@ public class TravelState extends AgentState {
     public static final String SEMANTIC_VALIDATION = TravelStateKeys.Validation.SEMANTIC_VALIDATION;
     public static final String SUPERVISOR_ASSESSMENT = TravelStateKeys.Control.SUPERVISOR_ASSESSMENT;
     public static final String NODE_FAILURE = TravelStateKeys.Control.NODE_FAILURE;
+    public static final String RAG_ENABLED = Rag.RAG_ENABLED;
+    public static final String RAG_DECISION = Rag.RAG_DECISION;
+    public static final String RAG_QUERY = Rag.RAG_QUERY;
+    public static final String RAG_CONTEXT = Rag.RAG_CONTEXT;
+    public static final String RAG_SOURCES = Rag.RAG_SOURCES;
+    public static final String RAG_ITERATIONS = Rag.RAG_ITERATIONS;
+    public static final String RAG_SUFFICIENT = Rag.RAG_SUFFICIENT;
+    public static final String RAG_RETRIEVAL_METHOD = Rag.RAG_RETRIEVAL_METHOD;
+    public static final String RAG_CANDIDATE_COUNT = Rag.RAG_CANDIDATE_COUNT;
+    public static final String RAG_RERANKED_COUNT = Rag.RAG_RERANKED_COUNT;
+    public static final String RAG_CONTEXT_CHARS = Rag.RAG_CONTEXT_CHARS;
+    public static final String RAG_EVIDENCE_SCORE = Rag.RAG_EVIDENCE_SCORE;
+    public static final String RAG_GROUNDEDNESS = Rag.RAG_GROUNDEDNESS;
+    public static final String RAG_JUDGE_PASS = Rag.RAG_JUDGE_PASS;
+    public static final String RAG_JUDGE_REASON = Rag.RAG_JUDGE_REASON;
+    public static final String RAG_DESTINATION = Rag.RAG_DESTINATION;
+    public static final String RAG_COUNTRY = Rag.RAG_COUNTRY;
+    public static final String RAG_TOPICS = Rag.RAG_TOPICS;
 
     public static final Map<String, Channel<?>> SCHEMA = TravelStateSchema.SCHEMA;
 
@@ -145,6 +166,7 @@ public class TravelState extends AgentState {
         input.put(NEEDS_WEATHER, false);
         input.put(NEEDS_BUDGET, false);
         input.put(NEEDS_ITINERARY, false);
+        input.put(NEEDS_KNOWLEDGE, false);
         input.put(RUN_FLIGHTS, false);
         input.put(RUN_HOTELS, false);
         input.put(RUN_RESEARCH, false);
@@ -160,8 +182,98 @@ public class TravelState extends AgentState {
         input.put(ITINERARY, new Itinerary());
         input.put(BUDGET_SUMMARY, new BudgetSummary());
         input.put(WEATHER, new WeatherForecast("", "", false));
+        input.put(RAG_ENABLED, Boolean.TRUE);
+        input.put(RAG_DECISION, "skip");
+        input.put(RAG_QUERY, "");
+        input.put(RAG_CONTEXT, "");
+        input.put(RAG_SOURCES, new ArrayList<String>());
+        input.put(RAG_ITERATIONS, 0);
+        input.put(RAG_SUFFICIENT, Boolean.FALSE);
+        input.put(RAG_RETRIEVAL_METHOD, "none");
+        input.put(RAG_CANDIDATE_COUNT, 0);
+        input.put(RAG_RERANKED_COUNT, 0);
+        input.put(RAG_CONTEXT_CHARS, 0);
+        input.put(RAG_EVIDENCE_SCORE, 0.0d);
+        input.put(RAG_GROUNDEDNESS, 0.0d);
+        input.put(RAG_JUDGE_PASS, Boolean.TRUE);
+        input.put(RAG_JUDGE_REASON, "not_applicable");
+        input.put(RAG_DESTINATION, "");
+        input.put(RAG_COUNTRY, "");
+        input.put(RAG_TOPICS, new ArrayList<String>());
         return input;
     }
+
+    public boolean ragEnabled() {
+        return Boolean.TRUE.equals(this.<Boolean>value(RAG_ENABLED).orElse(Boolean.FALSE));
+    }
+
+    public String ragDecision() {
+        return this.<String>value(RAG_DECISION).orElse("skip");
+    }
+
+    public String ragQuery() {
+        return this.<String>value(RAG_QUERY).orElse("");
+    }
+
+    public String ragContext() {
+        return this.<String>value(RAG_CONTEXT).orElse("");
+    }
+
+    public List<String> ragSources() {
+        return this.<List<String>>value(RAG_SOURCES).orElseGet(List::of);
+    }
+
+    public int ragIterations() {
+        Object value = this.value(RAG_ITERATIONS).orElse(0);
+        return value instanceof Number number ? number.intValue() : 0;
+    }
+
+    public boolean ragSufficient() {
+        return Boolean.TRUE.equals(this.<Boolean>value(RAG_SUFFICIENT).orElse(Boolean.FALSE));
+    }
+
+    public String ragRetrievalMethod() {
+        return this.<String>value(RAG_RETRIEVAL_METHOD).orElse("none");
+    }
+
+    public int ragCandidateCount() {
+        Object value = this.value(RAG_CANDIDATE_COUNT).orElse(0);
+        return value instanceof Number number ? number.intValue() : 0;
+    }
+
+    public int ragRerankedCount() {
+        Object value = this.value(RAG_RERANKED_COUNT).orElse(0);
+        return value instanceof Number number ? number.intValue() : 0;
+    }
+
+    public double ragGroundedness() {
+        Object value = this.value(RAG_GROUNDEDNESS).orElse(0.0d);
+        return value instanceof Number number ? number.doubleValue() : 0.0d;
+    }
+
+    public boolean ragJudgePass() {
+        return Boolean.TRUE.equals(this.<Boolean>value(RAG_JUDGE_PASS).orElse(Boolean.TRUE));
+    }
+
+    public String ragJudgeReason() {
+        return this.<String>value(RAG_JUDGE_REASON).orElse("not_applicable");
+    }
+
+    public double ragEvidenceScore() {
+        Object value = this.value(RAG_EVIDENCE_SCORE).orElse(0.0d);
+        return value instanceof Number number ? number.doubleValue() : 0.0d;
+    }
+
+    public int ragContextChars() {
+        Object value = this.value(RAG_CONTEXT_CHARS).orElse(0);
+        return value instanceof Number number ? number.intValue() : 0;
+    }
+
+    public String ragDestination() { return this.<String>value(RAG_DESTINATION).orElse(""); }
+
+    public String ragCountry() { return this.<String>value(RAG_COUNTRY).orElse(""); }
+
+    public List<String> ragTopics() { return this.<List<String>>value(RAG_TOPICS).orElseGet(List::of); }
 
     public String userRequest() {
         return this.<String>value(USER_REQUEST).orElse("");
@@ -354,6 +466,10 @@ public class TravelState extends AgentState {
         return flag(NEEDS_ITINERARY);
     }
 
+    public boolean needsKnowledge() {
+        return flag(NEEDS_KNOWLEDGE);
+    }
+
     public boolean runFlights() {
         return flag(RUN_FLIGHTS);
     }
@@ -385,6 +501,7 @@ public class TravelState extends AgentState {
         updates.put(NEEDS_WEATHER, plan.isNeedsWeather());
         updates.put(NEEDS_BUDGET, plan.isNeedsBudget());
         updates.put(NEEDS_ITINERARY, plan.isNeedsItinerary());
+        updates.put(NEEDS_KNOWLEDGE, plan.isNeedsKnowledge());
         updates.put(RUN_FLIGHTS, plan.isNeedsFlights());
         updates.put(RUN_HOTELS, plan.isNeedsHotels());
         updates.put(RUN_RESEARCH, plan.isNeedsResearch());
@@ -528,7 +645,8 @@ public class TravelState extends AgentState {
         boolean semanticFailure = !semanticNotes().isEmpty() || semanticValidation().failed();
         boolean qualityFailure = planQuality() != null && planQuality().getOverall() > 0
                 && planQuality().getOverall() < PlanQualityScore.PASS_THRESHOLD;
-        return (deterministicFailure || semanticFailure || qualityFailure) && retryCount() < maxRetries();
+        boolean ragGroundingFailure = ragEnabled() && ragSufficient() && !ragJudgePass();
+        return (deterministicFailure || semanticFailure || qualityFailure || ragGroundingFailure) && retryCount() < maxRetries();
     }
 
     public boolean shouldReplanForBudget() {

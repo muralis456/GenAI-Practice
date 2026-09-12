@@ -6,11 +6,13 @@ import org.springframework.boot.CommandLineRunner;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
+import org.springframework.core.annotation.Order;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
 @Component
+@Order(1)
 public class AirportLocationSeeder implements CommandLineRunner {
 
     private static final Logger log = LoggerFactory.getLogger(AirportLocationSeeder.class);

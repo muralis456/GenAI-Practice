@@ -21,7 +21,7 @@ public class McpResearchClient {
 
     public List<SearchHit> search(String query) {
         try {
-            JsonNode root = client.call("search_travel_research", Map.of("query", query == null ? "" : query));
+            JsonNode root = client.callByUserInput("Travel web research and destination information", query == null ? "" : query, Map.of("query", query == null ? "" : query));
             List<SearchHit> hits = new ArrayList<>();
             for (JsonNode node : root.path("hits")) {
                 hits.add(new SearchHit(node.path("title").asString(""),

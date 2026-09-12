@@ -78,6 +78,8 @@ public class ItineraryAgentService {
                 Hotels=%s
                 Attractions=%s
                 Research=%s
+                Knowledge context=%s
+                Knowledge sources=%s
                 Budget summary=%s
                 """.formatted(
                 state.destination(),
@@ -95,6 +97,8 @@ public class ItineraryAgentService {
                 state.hotels().stream().map(hotel -> hotel.toDisplay()).toList(),
                 state.attractions().stream().map(attraction -> attraction.toDisplay()).toList(),
                 state.research().stream().map(item -> item.toDisplay()).toList(),
+                state.ragContext(),
+                state.ragSources(),
                 budgetNotes
         );
     }

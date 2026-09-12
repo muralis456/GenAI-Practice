@@ -129,6 +129,7 @@ public class IntentAgentService {
                       "needsWeather":false,
                       "needsBudget":false,
                       "needsItinerary":false,
+                      "needsKnowledge":false,
                       "strategy":"",
                       "priority":"",
                       "confidence":0.0
@@ -205,6 +206,7 @@ public class IntentAgentService {
                       "needsWeather":false,
                       "needsBudget":false,
                       "needsItinerary":false,
+                      "needsKnowledge":false,
                       "strategy":"none",
                       "priority":"normal",
                       "confidence":0.95
@@ -222,6 +224,7 @@ public class IntentAgentService {
                       "needsWeather":false,
                       "needsBudget":false,
                       "needsItinerary":false,
+                      "needsKnowledge":false,
                       "strategy":"none",
                       "priority":"normal",
                       "confidence":0.95
@@ -239,6 +242,7 @@ public class IntentAgentService {
                       "needsWeather":true,
                       "needsBudget":false,
                       "needsItinerary":false,
+                      "needsKnowledge":false,
                       "strategy":"none",
                       "priority":"normal",
                       "confidence":0.95
@@ -256,6 +260,7 @@ public class IntentAgentService {
                       "needsWeather":false,
                       "needsBudget":true,
                       "needsItinerary":false,
+                      "needsKnowledge":false,
                       "strategy":"none",
                       "priority":"normal",
                       "confidence":0.95
@@ -273,6 +278,7 @@ public class IntentAgentService {
                       "needsWeather":false,
                       "needsBudget":false,
                       "needsItinerary":false,
+                      "needsKnowledge":false,
                       "strategy":"none",
                       "priority":"normal",
                       "confidence":0.95
@@ -307,6 +313,7 @@ public class IntentAgentService {
                       "needsWeather":false,
                       "needsBudget":false,
                       "needsItinerary":false,
+                      "needsKnowledge":false,
                       "strategy":"none",
                       "priority":"normal",
                       "confidence":0.95
@@ -324,6 +331,7 @@ public class IntentAgentService {
                       "needsWeather":true,
                       "needsBudget":true,
                       "needsItinerary":false,
+                      "needsKnowledge":false,
                       "strategy":"none",
                       "priority":"normal",
                       "confidence":0.95
@@ -484,6 +492,10 @@ public class IntentAgentService {
             TravelState.NEEDS_ITINERARY,
             previousItinerary || plan.isNeedsItinerary());
 
+    updates.put(
+            TravelState.NEEDS_KNOWLEDGE,
+            plan.isNeedsKnowledge());
+
 
     /*
      * ============================================================
@@ -608,6 +620,7 @@ public class IntentAgentService {
                               "needsWeather":false,
                               "needsBudget":false,
                               "needsItinerary":false,
+                              "needsKnowledge":false,
                               "strategy":"",
                               "priority":"",
                               "confidence":0.0
@@ -624,6 +637,8 @@ public class IntentAgentService {
                               cost or expense requests.
                             - needsItinerary=true only for itinerary
                               or schedule requests.
+                            - needsKnowledge=true for durable travel knowledge; false for purely live flight, hotel, weather or airport lookups.
+                            - needsKnowledge=true for durable travel knowledge such as destination guidance, culture, packing, safety, planning rules, visa guidance, or knowledge-backed recommendations; false for purely live flight/hotel/weather lookups.
 
                             Do not activate a specialist merely because
                             it would be useful.
@@ -691,6 +706,7 @@ public class IntentAgentService {
             llm.setNeedsWeather(true);
             llm.setNeedsBudget(true);
             llm.setNeedsItinerary(true);
+            llm.setNeedsKnowledge(true);
         }
 
         return llm;
@@ -715,6 +731,7 @@ public class IntentAgentService {
         plan.setNeedsWeather(false);
         plan.setNeedsBudget(false);
         plan.setNeedsItinerary(false);
+        plan.setNeedsKnowledge(false);
 
         plan.setStrategy("none");
         plan.setPriority("none");

@@ -40,9 +40,13 @@ public class WeatherTool {
     }
 
     public WeatherForecast forecast(String destination, LocalDate start, LocalDate end) {
+        return forecast(destination, start, end, "Weather forecast for " + destination);
+    }
+
+    public WeatherForecast forecast(String destination, LocalDate start, LocalDate end, String userInput) {
         McpWeatherClient client = mcpWeatherClient.getIfAvailable();
         if (client != null) {
-            return client.forecast(destination, start, end);
+            return client.forecast(destination, start, end, userInput);
         }
         LocalDate from = start == null ? LocalDate.now() : start;
         LocalDate to = end == null ? from.plusDays(5) : end;

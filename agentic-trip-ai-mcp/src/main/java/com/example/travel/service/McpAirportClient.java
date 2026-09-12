@@ -18,7 +18,7 @@ public class McpAirportClient {
 
     public String resolve(String cityOrCode) {
         try {
-            JsonNode root = client.call("resolve_airport", Map.of("cityOrCode", cityOrCode == null ? "" : cityOrCode));
+            JsonNode root = client.callByUserInput("Resolve an airport or IATA code", "Resolve airport/IATA for: " + (cityOrCode == null ? "" : cityOrCode), Map.of("cityOrCode", cityOrCode == null ? "" : cityOrCode));
             return root.path("iata").asString("");
         } catch (Exception exception) {
             return "";

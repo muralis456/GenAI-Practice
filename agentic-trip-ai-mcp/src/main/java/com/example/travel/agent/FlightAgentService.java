@@ -49,7 +49,7 @@ public class FlightAgentService {
         McpFlightSearchClient mcpClient = mcpFlightSearchClient.getIfAvailable();
         List<FlightOption> flights = mcpClient == null
                 ? flightSearchTool.search(originIata, destinationIata, state.departureDate())
-                : mcpClient.search(originIata, destinationIata, state.departureDate(), state.travelers());
+                : mcpClient.search(originIata, destinationIata, state.departureDate(), state.travelers(), state.userRequest());
         if (flights == null || flights.isEmpty()) {
             return new FlightSearchResult(originIata, destinationIata, List.of());
         }

@@ -81,6 +81,7 @@ public final class TravelStateKeys {
         public static final String NEEDS_WEATHER = "needsWeather";
         public static final String NEEDS_BUDGET = "needsBudget";
         public static final String NEEDS_ITINERARY = "needsItinerary";
+        public static final String NEEDS_KNOWLEDGE = "needsKnowledge";
 
         private Needs() {
         }
@@ -116,6 +117,31 @@ public final class TravelStateKeys {
         public static final String PLAN_QUALITY = "planQuality";
 
         private Validation() {
+        }
+    }
+
+
+    public static final class Rag {
+        public static final String RAG_ENABLED = "ragEnabled";
+        public static final String RAG_DECISION = "ragDecision";
+        public static final String RAG_QUERY = "ragQuery";
+        public static final String RAG_CONTEXT = "ragContext";
+        public static final String RAG_SOURCES = "ragSources";
+        public static final String RAG_ITERATIONS = "ragIterations";
+        public static final String RAG_SUFFICIENT = "ragSufficient";
+        public static final String RAG_RETRIEVAL_METHOD = "ragRetrievalMethod";
+        public static final String RAG_CANDIDATE_COUNT = "ragCandidateCount";
+        public static final String RAG_RERANKED_COUNT = "ragRerankedCount";
+        public static final String RAG_CONTEXT_CHARS = "ragContextChars";
+        public static final String RAG_EVIDENCE_SCORE = "ragEvidenceScore";
+        public static final String RAG_GROUNDEDNESS = "ragGroundedness";
+        public static final String RAG_JUDGE_PASS = "ragJudgePass";
+        public static final String RAG_JUDGE_REASON = "ragJudgeReason";
+        public static final String RAG_DESTINATION = "ragDestination";
+        public static final String RAG_COUNTRY = "ragCountry";
+        public static final String RAG_TOPICS = "ragTopics";
+
+        private Rag() {
         }
     }
 

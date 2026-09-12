@@ -702,6 +702,20 @@ public class TravelPlannerAgentService {
                 "intentConfidence",
                 state.intentConfidence());
 
+        body.put("ragDecision", state.ragDecision());
+        body.put("ragQuery", state.ragQuery());
+        body.put("ragSources", state.ragSources());
+        body.put("ragIterations", state.ragIterations());
+        body.put("ragSufficient", state.ragSufficient());
+        body.put("ragRetrievalMethod", state.ragRetrievalMethod());
+        body.put("ragCandidateCount", state.ragCandidateCount());
+        body.put("ragRerankedCount", state.ragRerankedCount());
+        body.put("ragContextChars", state.ragContextChars());
+        body.put("ragEvidenceScore", state.ragEvidenceScore());
+        body.put("ragGroundedness", state.ragGroundedness());
+        body.put("ragJudgePass", state.ragJudgePass());
+        body.put("ragJudgeReason", state.ragJudgeReason());
+
         body.put(
                 "validationErrors",
                 state.validationErrors());

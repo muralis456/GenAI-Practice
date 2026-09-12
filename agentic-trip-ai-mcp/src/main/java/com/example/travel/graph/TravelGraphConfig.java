@@ -13,6 +13,7 @@ import com.example.travel.graph.node.IntentNode;
 import com.example.travel.graph.node.ItineraryNode;
 import com.example.travel.graph.node.PlannerNode;
 import com.example.travel.graph.node.ReplanNode;
+import com.example.travel.graph.node.RagNode;
 import com.example.travel.graph.node.ResearchNode;
 import com.example.travel.graph.node.RouterNode;
 import com.example.travel.graph.node.SupervisorNode;
@@ -99,6 +100,7 @@ public class TravelGraphConfig {
     @Bean
     public StateGraph<TravelState> travelStateGraph(IntentNode intentNode,
             PlannerNode plannerNode,
+            RagNode ragNode,
             RouterNode routerNode,
             AirportResolverNode airportResolverNode,
             FanOutNode fanOutNode,
@@ -120,6 +122,7 @@ public class TravelGraphConfig {
         return new StateGraph<>(TravelState.SCHEMA, travelStateSerializer)
                 .addNode(TravelGraphNodes.INTENT, async(TravelGraphNodes.INTENT, intentNode))
                 .addNode(TravelGraphNodes.PLANNER, async(TravelGraphNodes.PLANNER, plannerNode))
+                .addNode(TravelGraphNodes.RAG, async(TravelGraphNodes.RAG, ragNode))
                 .addNode(TravelGraphNodes.ROUTER, command_async((state, config) -> {
                     GraphExecutionLogger.nodeStart(TravelGraphNodes.ROUTER, state);
                     long started = System.nanoTime();
@@ -158,7 +161,13 @@ public class TravelGraphConfig {
                 .addNode(TravelGraphNodes.CANCEL, async(TravelGraphNodes.CANCEL, cancelNode))
                 .addEdge(START, TravelGraphNodes.INTENT)
                 .addEdge(TravelGraphNodes.INTENT, TravelGraphNodes.PLANNER)
-                .addEdge(TravelGraphNodes.PLANNER, TravelGraphNodes.ROUTER)
+                .addConditionalEdges(TravelGraphNodes.PLANNER,
+                        edge_async(state -> state.needsKnowledge() ? TravelGraphNodes.RAG : TravelGraphNodes.ROUTER),
+                        EdgeMappings.builder()
+                                .to(TravelGraphNodes.RAG, TravelGraphNodes.RAG)
+                                .to(TravelGraphNodes.ROUTER, TravelGraphNodes.ROUTER)
+                                .build())
+                .addEdge(TravelGraphNodes.RAG, TravelGraphNodes.ROUTER)
                 .addConditionalEdges(TravelGraphNodes.AIRPORT,
                         edge_async(SpecialistRouter::afterAirport),
                         EdgeMappings.builder()

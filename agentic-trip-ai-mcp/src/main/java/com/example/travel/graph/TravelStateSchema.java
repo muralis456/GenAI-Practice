@@ -36,6 +36,7 @@ import static com.example.travel.graph.TravelStateKeys.Planning;
 import static com.example.travel.graph.TravelStateKeys.Preferences;
 import static com.example.travel.graph.TravelStateKeys.Request;
 import static com.example.travel.graph.TravelStateKeys.Results;
+import static com.example.travel.graph.TravelStateKeys.Rag;
 import static com.example.travel.graph.TravelStateKeys.Trip;
 import static com.example.travel.graph.TravelStateKeys.Validation;
 
@@ -84,6 +85,7 @@ public final class TravelStateSchema {
         schema.put(Needs.NEEDS_WEATHER, Channels.base(() -> Boolean.FALSE));
         schema.put(Needs.NEEDS_BUDGET, Channels.base(() -> Boolean.FALSE));
         schema.put(Needs.NEEDS_ITINERARY, Channels.base(() -> Boolean.FALSE));
+        schema.put(Needs.NEEDS_KNOWLEDGE, Channels.base(() -> Boolean.FALSE));
         schema.put(Run.RUN_FLIGHTS, Channels.base(() -> Boolean.FALSE));
         schema.put(Run.RUN_HOTELS, Channels.base(() -> Boolean.FALSE));
         schema.put(Run.RUN_RESEARCH, Channels.base(() -> Boolean.FALSE));
@@ -109,6 +111,24 @@ public final class TravelStateSchema {
         schema.put(Validation.SEMANTIC_VALIDATION, Channels.base(SemanticValidationResult::new));
         schema.put(Control.SUPERVISOR_ASSESSMENT, Channels.base(SupervisorAssessment::new));
         schema.put(Control.NODE_FAILURE, Channels.base(NodeFailureInfo::new));
+        schema.put(Rag.RAG_ENABLED, Channels.base(() -> Boolean.FALSE));
+        schema.put(Rag.RAG_DECISION, Channels.base(() -> "skip"));
+        schema.put(Rag.RAG_QUERY, Channels.base(() -> ""));
+        schema.put(Rag.RAG_CONTEXT, Channels.base(() -> ""));
+        schema.put(Rag.RAG_SOURCES, Channels.base(() -> new ArrayList<String>()));
+        schema.put(Rag.RAG_ITERATIONS, Channels.base(() -> 0));
+        schema.put(Rag.RAG_SUFFICIENT, Channels.base(() -> Boolean.FALSE));
+        schema.put(Rag.RAG_RETRIEVAL_METHOD, Channels.base(() -> "none"));
+        schema.put(Rag.RAG_CANDIDATE_COUNT, Channels.base(() -> 0));
+        schema.put(Rag.RAG_RERANKED_COUNT, Channels.base(() -> 0));
+        schema.put(Rag.RAG_CONTEXT_CHARS, Channels.base(() -> 0));
+        schema.put(Rag.RAG_EVIDENCE_SCORE, Channels.base(() -> 0.0d));
+        schema.put(Rag.RAG_GROUNDEDNESS, Channels.base(() -> 0.0d));
+        schema.put(Rag.RAG_JUDGE_PASS, Channels.base(() -> Boolean.TRUE));
+        schema.put(Rag.RAG_JUDGE_REASON, Channels.base(() -> "not_applicable"));
+        schema.put(Rag.RAG_DESTINATION, Channels.base(() -> ""));
+        schema.put(Rag.RAG_COUNTRY, Channels.base(() -> ""));
+        schema.put(Rag.RAG_TOPICS, Channels.base(() -> new ArrayList<String>()));
         SCHEMA = Collections.unmodifiableMap(schema);
     }
 

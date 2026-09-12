@@ -15,11 +15,20 @@ spring:
               url: ${TRAVEL_MCP_SERVER_URL:http://localhost:8090}
               endpoint: ${TRAVEL_MCP_SERVER_ENDPOINT:/mcp}
     ollama:
-      base-url: http://localhost:11434
+      base-url: ${OLLAMA_BASE_URL:http://localhost:11434}
       chat:
         model: llama3.2:3b
         temperature: 0.2
         num-predict: 600
+      embedding:
+        model: ${TRAVEL_EMBEDDING_MODEL:nomic-embed-text}
+    vectorstore:
+      pgvector:
+        index-type: HNSW
+        distance-type: COSINE_DISTANCE
+        initialize-schema: true
+        max-document-batch-size: 1000
+        dimensions: 768
   datasource:
     url: jdbc:postgresql://localhost:5432/travel_agent
     username: ${DB_USERNAME:postgres}
@@ -52,6 +61,18 @@ travel:
     client:
       enabled: ${TRAVEL_MCP_CLIENT_ENABLED:true}
       max-attempts: ${TRAVEL_MCP_CLIENT_MAX_ATTEMPTS:2}
+  rag:
+    enabled: ${TRAVEL_RAG_ENABLED:true}
+    top-k: ${TRAVEL_RAG_TOP_K:5}
+    similarity-threshold: ${TRAVEL_RAG_SIMILARITY_THRESHOLD:0.55}
+    max-iterations: ${TRAVEL_RAG_MAX_ITERATIONS:2}
+    hybrid:
+      enabled: ${TRAVEL_RAG_HYBRID_ENABLED:true}
+    rerank:
+      enabled: ${TRAVEL_RAG_RERANK_ENABLED:true}
+    compression:
+      enabled: ${TRAVEL_RAG_COMPRESSION_ENABLED:true}
+    seed-on-empty: ${TRAVEL_RAG_SEED_ON_EMPTY:true}
   graph:
     max-retries: 5
     max-llm-calls: 20

@@ -8,6 +8,7 @@ import com.example.travel.graph.TravelState;
 import com.example.travel.model.PlanQualityScore;
 import com.example.travel.model.SemanticValidationResult;
 import com.example.travel.service.PlanQualityScorer;
+import com.example.travel.rag.eval.RagLlmJudgeService;
 import org.bsc.langgraph4j.action.NodeAction;
 import org.springframework.stereotype.Component;
 
@@ -22,13 +23,16 @@ public class ValidatorNode implements NodeAction<TravelState> {
     private final ValidatorAgentService validatorAgentService;
     private final SemanticValidatorService semanticValidatorService;
     private final PlanQualityScorer planQualityScorer;
+    private final RagLlmJudgeService ragLlmJudgeService;
 
     public ValidatorNode(ValidatorAgentService validatorAgentService,
                           SemanticValidatorService semanticValidatorService,
-                          PlanQualityScorer planQualityScorer) {
+                          PlanQualityScorer planQualityScorer,
+                          RagLlmJudgeService ragLlmJudgeService) {
         this.validatorAgentService = validatorAgentService;
         this.semanticValidatorService = semanticValidatorService;
         this.planQualityScorer = planQualityScorer;
+        this.ragLlmJudgeService = ragLlmJudgeService;
     }
 
     @Override
@@ -37,14 +41,23 @@ public class ValidatorNode implements NodeAction<TravelState> {
         SemanticValidationResult semantic = semanticValidatorService.review(state);
         List<String> semanticNotes = semanticValidatorService.issueNotes(semantic);
         PlanQualityScore quality = planQualityScorer.score(state, semantic);
+        RagLlmJudgeService.JudgeResult ragJudge = ragLlmJudgeService.judge(state);
+        if (state.ragSufficient() && !ragJudge.pass()) {
+            errors.add("RAG groundedness failed: " + ragJudge.reason());
+        }
 
         Map<String, Object> updates = new LinkedHashMap<>();
         updates.put(TravelState.VALIDATION_ERRORS, errors);
         updates.put(TravelState.SEMANTIC_NOTES, semanticNotes);
         updates.put(TravelState.SEMANTIC_VALIDATION, semantic);
         updates.put(TravelState.PLAN_QUALITY, quality);
+        updates.put(TravelState.RAG_GROUNDEDNESS, ragJudge.groundedness());
+        updates.put(TravelState.RAG_JUDGE_PASS, ragJudge.pass());
+        updates.put(TravelState.RAG_JUDGE_REASON, ragJudge.reason());
 
-        String detail = "overall=" + String.format("%.2f", quality.getOverall());
+        String detail = "overall=" + String.format("%.2f", quality.getOverall())
+                + " | ragGroundedness=" + String.format("%.2f", ragJudge.groundedness())
+                + " | ragJudge=" + (ragJudge.pass() ? "PASS" : "FAIL");
         if (!errors.isEmpty()) {
             detail += " | " + String.join("; ", errors);
         }

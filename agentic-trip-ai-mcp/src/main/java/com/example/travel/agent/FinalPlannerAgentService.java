@@ -126,6 +126,13 @@ public class FinalPlannerAgentService {
         if (state.includeWeatherInReport() && state.weather() != null) {
             sb.append("\n**Weather**\n").append(state.weather().toDisplay()).append('\n');
         }
+        if (!state.ragContext().isBlank()) {
+            sb.append("\n**Knowledge used by Agentic RAG**\n");
+            if (!state.ragSources().isEmpty()) {
+                sb.append("Sources: ").append(String.join(", ", state.ragSources())).append('\n');
+            }
+            sb.append(state.ragContext()).append('\n');
+        }
         if (!state.semanticNotes().isEmpty()) {
             sb.append("\n**Semantic review**\n");
             for (String note : state.semanticNotes()) {
@@ -156,12 +163,16 @@ public class FinalPlannerAgentService {
                             Weather: %s
                             Attractions: %s
                             Research: %s
+                            Knowledge context: %s
+                            Knowledge sources: %s
                             """.formatted(
                             state.destination(),
                             state.travelStyle(),
                             state.weather() == null ? "" : state.weather().toDisplay(),
                             state.attractions().stream().map(a -> a.toDisplay()).toList(),
-                            state.research().stream().map(r -> r.toDisplay()).limit(4).toList()));
+                            state.research().stream().map(r -> r.toDisplay()).limit(4).toList(),
+                            state.ragContext(),
+                            state.ragSources()));
             if (tips != null && !tips.isBlank()) {
                 return tips.trim();
             }

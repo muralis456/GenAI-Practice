@@ -6,6 +6,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -23,11 +24,18 @@ public class McpFlightSearchClient {
     private static final Logger log = LoggerFactory.getLogger(McpFlightSearchClient.class);
 
     private final McpToolClient mcpToolClient;
-    public McpFlightSearchClient(McpToolClient mcpToolClient) {
+    private final ObjectMapper objectMapper;
+
+    public McpFlightSearchClient(McpToolClient mcpToolClient, ObjectMapper objectMapper) {
         this.mcpToolClient = mcpToolClient;
+        this.objectMapper = objectMapper;
     }
 
     public List<FlightOption> search(String origin, String destination, LocalDate departureDate, int passengers) {
+        return search(origin, destination, departureDate, passengers, "Flight search for " + origin + " to " + destination);
+    }
+
+    public List<FlightOption> search(String origin, String destination, LocalDate departureDate, int passengers, String userInput) {
         try {
                 Map<String, Object> input = Map.of(
                     "origin", origin,
@@ -35,7 +43,7 @@ public class McpFlightSearchClient {
                     "departureDate", departureDate == null ? "" : departureDate.toString(),
                     "returnDate", "",
                     "passengers", Math.max(1, passengers));
-                return parse(mcpToolClient.call("search_flights", input));
+                return parse(mcpToolClient.callByUserInput("Live flight schedule search", userInput, input));
         } catch (Exception exception) {
             log.warn("MCP search_flights failed for {} -> {}: {}", origin, destination, exception.getMessage());
             return List.of(unavailable("MCP flight search is unavailable: " + safeMessage(exception)));

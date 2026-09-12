@@ -18,7 +18,8 @@ public class RouterNode implements NodeAction<TravelState> {
         Map<String, Object> updates = new LinkedHashMap<>();
         updates.put(TravelState.DISPATCH_ROUTE, dest);
         updates.putAll(TravelState.trace(TravelGraphNodes.ROUTER, "ok",
-                "goto=" + dest + " specialists=" + SpecialistRouter.plannedSpecialists(state)));
+                "goto=" + dest + " specialists=" + SpecialistRouter.plannedSpecialists(state)
+                        + " knowledge=" + state.needsKnowledge()));
         return updates;
     }
 }

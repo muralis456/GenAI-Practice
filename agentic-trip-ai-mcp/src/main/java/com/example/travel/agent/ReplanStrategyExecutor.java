@@ -74,11 +74,10 @@ public class ReplanStrategyExecutor {
                                          */
                                 }
 
-                                case GET_BUDGET_BREAKDOWN, GET_WEATHER_DETAILS, GET_HOTEL_DETAILS -> {
+                                case GET_BUDGET_BREAKDOWN, GET_HOTEL_DETAILS,
+                                                GET_WEATHER_DETAILS -> {
                                         /*
-                                         * Informational requests do not change
-                                         * semantic trip state. Their specialist
-                                         * routing is applied by
+                                         * Information requests are handled by
                                          * applySelectiveRouting().
                                          */
                                 }

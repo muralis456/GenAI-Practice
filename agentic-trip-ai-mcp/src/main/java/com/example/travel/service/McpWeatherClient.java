@@ -19,8 +19,12 @@ public class McpWeatherClient {
     }
 
     public WeatherForecast forecast(String destination, LocalDate start, LocalDate end) {
+        return forecast(destination, start, end, "Weather forecast for " + destination);
+    }
+
+    public WeatherForecast forecast(String destination, LocalDate start, LocalDate end, String userInput) {
         try {
-            JsonNode root = client.call("get_weather", Map.of(
+            JsonNode root = client.callByUserInput("Weather forecast for a travel destination", userInput, Map.of(
                     "destination", destination == null ? "" : destination,
                     "startDate", start == null ? "" : start.toString(),
                     "endDate", end == null ? "" : end.toString()));

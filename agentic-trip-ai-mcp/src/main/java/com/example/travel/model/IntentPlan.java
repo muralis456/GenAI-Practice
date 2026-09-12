@@ -24,6 +24,7 @@ public class IntentPlan implements Serializable {
     private boolean needsWeather = true;
     private boolean needsBudget = true;
     private boolean needsItinerary = true;
+    private boolean needsKnowledge = true;
     private String strategy = "parallel_search";
     private String priority = "balanced";
     private double confidence = 0.5;
@@ -43,6 +44,7 @@ public class IntentPlan implements Serializable {
         plan.needsWeather = false;
         plan.needsBudget = false;
         plan.needsItinerary = false;
+        plan.needsKnowledge = false;
         plan.strategy = "flight_only";
         plan.priority = "flights";
         plan.confidence = 0.92;
@@ -58,6 +60,7 @@ public class IntentPlan implements Serializable {
         plan.needsWeather = false;
         plan.needsBudget = false;
         plan.needsItinerary = false;
+        plan.needsKnowledge = false;
         plan.strategy = "hotel_only";
         plan.priority = "hotels";
         plan.confidence = 0.9;
@@ -88,6 +91,7 @@ public class IntentPlan implements Serializable {
         plan.needsWeather = true;
         plan.needsBudget = false;
         plan.needsItinerary = false;
+        plan.needsKnowledge = false;
         plan.strategy = "weather_only";
         plan.priority = "weather";
         plan.confidence = 0.92;
@@ -142,6 +146,10 @@ public class IntentPlan implements Serializable {
         this.needsBudget = needsBudget;
     }
 
+    public boolean isNeedsKnowledge() { return needsKnowledge; }
+
+    public void setNeedsKnowledge(boolean needsKnowledge) { this.needsKnowledge = needsKnowledge; }
+
     public boolean isNeedsItinerary() {
         return needsItinerary;
     }
@@ -177,7 +185,7 @@ public class IntentPlan implements Serializable {
     public String summary() {
         return requestType + " flights=" + needsFlights + " hotels=" + needsHotels
                 + " research=" + needsResearch + " weather=" + needsWeather
-                + " budget=" + needsBudget + " itinerary=" + needsItinerary
+                + " budget=" + needsBudget + " itinerary=" + needsItinerary + " knowledge=" + needsKnowledge
                 + " confidence=" + confidence;
     }
 }
