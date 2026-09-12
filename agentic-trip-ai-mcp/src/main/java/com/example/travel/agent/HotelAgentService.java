@@ -6,11 +6,14 @@ import com.example.travel.graph.model.HotelExtraction;
 import com.example.travel.model.HotelOption;
 import com.example.travel.model.SearchHit;
 import com.example.travel.service.RoutedLlm;
+import com.example.travel.service.McpHotelSearchClient;
 import com.example.travel.support.JsonSupport;
+import com.example.travel.support.TripSlotHeuristics;
 import com.example.travel.tool.HotelSearchTool;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.ObjectProvider;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -36,20 +39,26 @@ public class HotelAgentService {
     private final RoutedLlm routedLlm;
     private final HotelSearchTool hotelSearchTool;
     private final JsonSupport jsonSupport;
+    private final ObjectProvider<McpHotelSearchClient> mcpHotelSearchClient;
 
     public HotelAgentService(
             RoutedLlm routedLlm,
             HotelSearchTool hotelSearchTool,
-            JsonSupport jsonSupport) {
+            JsonSupport jsonSupport,
+            ObjectProvider<McpHotelSearchClient> mcpHotelSearchClient) {
 
         this.routedLlm = routedLlm;
         this.hotelSearchTool = hotelSearchTool;
         this.jsonSupport = jsonSupport;
+        this.mcpHotelSearchClient = mcpHotelSearchClient;
     }
 
     public HotelSearchResult search(TravelState state) {
 
-        String destination = state.destination();
+        String destinationCandidate = TravelState.firstNonBlank(
+                TripSlotHeuristics.extractDestinationHint(state.userRequest()),
+                state.destination());
+        final String destination = TripSlotHeuristics.normalizePlace(destinationCandidate);
         boolean cheaper = state.hotelCheaper();
 
         log.info(
@@ -57,6 +66,32 @@ public class HotelAgentService {
                 destination,
                 cheaper
         );
+
+        if (TravelState.isBlank(destination)) {
+            log.warn("Hotel search skipped because destination is missing from current request");
+            return fallback("", cheaper);
+        }
+
+        // When the MCP hotel client is available, use its structured result directly.
+        // Do not send the destination through a second LLM tool-selection round; that
+        // round can lose the slot and return unrelated hotels.
+        McpHotelSearchClient mcpClient = mcpHotelSearchClient.getIfAvailable();
+        if (mcpClient != null && !TravelState.isBlank(destination)) {
+            List<HotelOption> directHotels = mcpClient.search(
+                    destination, state.travelStyle(), cheaper);
+            directHotels = directHotels.stream()
+                    .filter(this::hasHotelName)
+                    .filter(hotel -> isRelevantToDestination(hotel, destination))
+                    .toList();
+            if (!directHotels.isEmpty()) {
+                log.info("Hotel agent using structured MCP results destination={} count={}",
+                        destination, directHotels.size());
+                return new HotelSearchResult(new ArrayList<>(directHotels), List.of());
+            }
+            log.warn("MCP hotel results were empty or unrelated for destination={}; using safe fallback",
+                    destination);
+            return fallback(destination, cheaper);
+        }
 
         String user =
                 "Destination=" + destination
@@ -210,6 +245,38 @@ public class HotelAgentService {
                 new ArrayList<>(hotels),
                 List.of()
         );
+    }
+
+    private boolean hasHotelName(HotelOption hotel) {
+        return hotel != null && !TravelState.isBlank(hotel.getName());
+    }
+
+    private boolean isRelevantToDestination(HotelOption hotel, String destination) {
+        String target = normalize(destination);
+        if (target.isBlank()) {
+            return true;
+        }
+        String haystack = normalize(String.join(" ",
+                safe(hotel.getName()),
+                safe(hotel.getArea()),
+                safe(hotel.getNotes()),
+                safe(hotel.getSuitableFor())));
+
+        // Destination names that are common in the hotel metadata are sufficient.
+        // For Dubai also accept the UAE label because hotel records often use it.
+        if (target.equals("dubai")) {
+            return haystack.contains("dubai") || haystack.contains("uae")
+                    || haystack.contains("united arab emirates");
+        }
+        return haystack.contains(target);
+    }
+
+    private String normalize(String value) {
+        return value == null ? "" : value.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private String safe(String value) {
+        return value == null ? "" : value;
     }
 
     private HotelOption scrubPlaceholders(HotelOption hotel) {

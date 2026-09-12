@@ -302,14 +302,14 @@ public class TravelPlannerAgentService {
                     threadId,
                     ex);
 
+            // Never send exception messages, class names, or stack-trace details
+            // to the browser. Full diagnostics stay in server logs only.
             graphProgressHub.emit(
                     threadId,
                     "failed",
                     Map.of(
                             "error",
-                            ex.getMessage() == null
-                                    ? ex.getClass().getSimpleName()
-                                    : ex.getMessage()));
+                            "We couldn't complete your travel plan. Please try again."));
 
         } finally {
 

@@ -5,6 +5,7 @@ import com.example.travel.model.FlightOption;
 import com.example.travel.tool.AirportLookupTool;
 import com.example.travel.tool.FlightSearchTool;
 import com.example.travel.service.McpFlightSearchClient;
+import com.example.travel.support.TripSlotHeuristics;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
@@ -30,17 +31,22 @@ public class FlightAgentService {
     }
 
     public FlightSearchResult search(TravelState state) {
-        String originIata = TravelState.firstNonBlank(state.originIata(), airportLookupTool.resolveIata(state.origin()));
+        String originQuery = TravelState.firstNonBlank(state.origin(), state.preferredAirport(), "Bengaluru");
+        String destinationHint = TripSlotHeuristics.extractDestinationHint(state.userRequest());
+        String destinationQuery = TripSlotHeuristics.normalizePlace(
+                resolveDestinationQuery(state.destination(), destinationHint));
+
+        String originIata = TravelState.firstNonBlank(state.originIata(), airportLookupTool.resolveIata(originQuery));
         String destinationIata = TravelState.firstNonBlank(state.destinationIata(),
-                airportLookupTool.resolveIata(state.destination()));
+                airportLookupTool.resolveIata(destinationQuery));
 
         if (TravelState.isBlank(destinationIata)) {
-            log.warn("No airport found for destination={}", state.destination());
+            log.warn("No airport found for destination={}", destinationQuery);
             return FlightSearchResult.unavailable(originIata, destinationIata,
-                    "No airport could be resolved for " + state.destination() + ". Flight options are unavailable.");
+                    "No airport could be resolved for " + destinationQuery + ". Flight options are unavailable.");
         }
         if (TravelState.isBlank(originIata)) {
-            log.warn("No departure city found for flight search to destination={}", state.destination());
+            log.warn("No departure city found for flight search to destination={}", destinationQuery);
             return FlightSearchResult.unavailable(originIata, destinationIata,
                     "No departure city was provided, so flight options are unavailable.");
         }
@@ -54,6 +60,17 @@ public class FlightAgentService {
             return new FlightSearchResult(originIata, destinationIata, List.of());
         }
         return new FlightSearchResult(originIata, destinationIata, flights);
+    }
+
+    private String resolveDestinationQuery(String destination, String hint) {
+        // A destination extracted from the CURRENT request is authoritative.
+        // It prevents stale/over-broad planner text such as
+        // "dubai within the budget 2L" from reaching airport lookup.
+        String requestDestination = TripSlotHeuristics.normalizePlace(hint);
+        if (!TravelState.isBlank(requestDestination)) {
+            return requestDestination;
+        }
+        return TripSlotHeuristics.normalizePlace(destination);
     }
 
     /** Explicit result type (IDE-friendly; avoids flaky nested-record resolution). */

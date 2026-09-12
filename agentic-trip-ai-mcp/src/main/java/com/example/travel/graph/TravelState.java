@@ -18,6 +18,7 @@ import com.example.travel.model.TravelAttraction;
 import com.example.travel.model.TravelResearch;
 import com.example.travel.model.TripRequirements;
 import com.example.travel.model.WeatherForecast;
+import com.example.travel.support.TripSlotHeuristics;
 import lombok.extern.slf4j.Slf4j;
 import org.bsc.langgraph4j.state.AgentState;
 import org.bsc.langgraph4j.state.Channel;
@@ -144,8 +145,18 @@ public class TravelState extends AgentState {
         input.put(USER_ID, firstNonBlank(request.getUserId(), "anonymous"));
         input.put(SELECTED_MODEL, blankToEmpty(request.getSelectedModel()));
         input.put(HISTORY_CONTEXT, historyContext == null ? "" : historyContext);
-        input.put(ORIGIN, blankToEmpty(request.getDepartureCity()));
-        input.put(DESTINATION, blankToEmpty(request.getDestination()));
+        // Seed route slots from the CURRENT prompt before the graph starts.
+        // API clients often send only prompt/preferences and leave DTO slots blank.
+        // Every downstream specialist must see the same deterministic route; never
+        // let an LLM/tool-selection pass turn a known destination into an empty slot.
+        String requestedOrigin = firstNonBlank(
+                request.getDepartureCity(),
+                TripSlotHeuristics.extractOriginHint(prompt));
+        String requestedDestination = firstNonBlank(
+                request.getDestination(),
+                TripSlotHeuristics.extractDestinationHint(prompt));
+        input.put(ORIGIN, TripSlotHeuristics.normalizePlace(requestedOrigin));
+        input.put(DESTINATION, TripSlotHeuristics.normalizePlace(requestedDestination));
         input.put(DEPARTURE_DATE, parseDate(request.getDepartureDate(), today));
         input.put(RETURN_DATE, parseDate(request.getReturnDate(), today.plusDays(5)));
         input.put(TRAVELERS, Math.max(travelers, 1));

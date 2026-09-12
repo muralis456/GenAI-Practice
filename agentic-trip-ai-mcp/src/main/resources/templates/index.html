@@ -46,7 +46,10 @@
         }
 
         .sidebar {
-            width: 290px;
+            /* Keep the original two-pane application layout. The sidebar is part
+               of the desktop UI; the main conversation fills all remaining space. */
+            display: block;
+            width: 300px;
             padding: 22px 18px 18px;
             background: rgba(9, 17, 31, 0.75);
             border-right: 1px solid var(--border);
@@ -155,12 +158,13 @@
         .content {
             display: flex;
             flex-direction: column;
-            flex: 1;
+            flex: 1 1 auto;
+            min-width: 0;
             min-height: 0;
-            max-width: 860px;
+            max-width: none;
             width: 100%;
-            margin: 0 auto;
-            padding: 24px 24px 0;
+            margin: 0;
+            padding: 24px 28px 0;
         }
 
         .messages-pane {
@@ -771,15 +775,19 @@
         }
 
         .composer-input-wrap {
-            flex: 1;
+            flex: 1 1 auto;
             min-width: 0;
-            padding: 6px 4px;
+            padding: 2px 4px;
+            display: flex;
+            align-items: flex-end;
         }
 
         .composer-bar textarea {
+            display: block;
             width: 100%;
+            height: 28px;
             min-height: 28px;
-            max-height: 168px;
+            max-height: 220px;
             resize: none;
             overflow-y: hidden;
             border: none;
@@ -936,7 +944,7 @@
         .result-chip.success { background:rgba(50,205,120,.11); border-color:rgba(50,205,120,.25); color:#baf3ce; }
         .result-chip.warn { background:rgba(255,190,90,.10); border-color:rgba(255,190,90,.24); color:#ffe0a8; }
         .result-body { padding:0 24px 22px; }
-        .result-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; margin-top:16px; }
+        .result-grid { display:grid; grid-template-columns:1fr; gap:12px; margin-top:16px; }
         .result-panel { background:rgba(255,255,255,.028); border:1px solid rgba(255,255,255,.075); border-radius:16px; padding:16px; }
         .result-panel.full { grid-column:1/-1; }
         .result-panel-title { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:12px; font-size:13px; font-weight:800; color:#cfe3ff; letter-spacing:.07em; text-transform:uppercase; }
@@ -1214,16 +1222,58 @@
             height: 0;
         }
 
-        /* More breathing room and a calmer ChatGPT-like conversation width. */
+        /* =============================================================
+           DESKTOP TWO-PANE LAYOUT
+           Keep the sidebar visible and let the conversation occupy every
+           remaining pixel. Do not introduce a centered/max-width column.
+           ============================================================= */
+        .layout {
+            display: flex !important;
+            width: 100%;
+            height: 100vh;
+            height: 100dvh;
+        }
+
+        .layout > .sidebar {
+            display: block !important;
+            flex: 0 0 300px;
+            width: 300px;
+            max-width: 300px;
+        }
+
+        .layout > .main {
+            flex: 1 1 auto;
+            width: calc(100% - 300px);
+            max-width: none;
+            min-width: 0;
+        }
+
+        /* Main conversation must use the complete area to the right of the sidebar. */
         .content {
-            max-width: 920px;
-            padding-left: 28px;
-            padding-right: 28px;
+            max-width: none;
+            width: 100%;
+            padding-left: 24px;
+            padding-right: 24px;
         }
 
         .messages-pane {
             padding-bottom: 28px;
         }
+        .content,
+        .messages-pane,
+        .chat-thread,
+        .chat-msg,
+        .chat-msg.assistant,
+        .chat-msg.assistant .chat-bubble {
+            max-width: none;
+            width: 100%;
+        }
+
+        .composer-wrap {
+            width: 100%;
+            max-width: none;
+        }
+
 
         .chat-thread {
             gap: 22px;
@@ -1248,7 +1298,7 @@
         }
 
         .live-response-card {
-            width: min(100%, 760px);
+            width: 100%;
             padding: 14px 16px;
             border: 1px solid rgba(255,255,255,.075);
             border-radius: 18px;
@@ -1388,7 +1438,7 @@
         }
 
         @media (max-width: 980px) {
-            .content { max-width: 860px; }
+            .content { max-width: none; }
             .hero { min-height: 58vh; }
         }
 
@@ -1531,21 +1581,32 @@
     const DEFAULT_PROMPT = '';
 
     const resizePrompt = () => {
-        const maxHeight = 168;
+        // Let the browser recalculate the textarea's natural height first.
+        // Using height=0 can be unreliable when the textarea also has a
+        // min-height/flex parent, which is why long prompts were not growing.
+        const minHeight = 28;
+        const maxHeight = 220;
+
         promptInput.style.height = 'auto';
-        const nextHeight = Math.min(Math.max(promptInput.scrollHeight, 28), maxHeight);
+        promptInput.style.overflowY = 'hidden';
+
+        const contentHeight = Math.max(promptInput.scrollHeight, minHeight);
+        const nextHeight = Math.min(contentHeight, maxHeight);
         promptInput.style.height = nextHeight + 'px';
 
-        const overflowing = promptInput.scrollHeight > maxHeight + 1;
+        const overflowing = contentHeight > maxHeight + 1;
         promptInput.classList.toggle('has-overflow', overflowing);
+        promptInput.style.overflowY = overflowing ? 'auto' : 'hidden';
         if (overflowing) {
             promptInput.scrollTop = promptInput.scrollHeight;
         }
     };
 
     const updateComposerState = () => {
-        if (!submitButton.disabled) {
-            submitButton.disabled = !promptInput.value.trim();
+        // The submit handler already ignores blank requests. Keep the send/Enter
+        // control enabled while the composer is idle, including after New Chat.
+        if (!loadingState.classList.contains('visible')) {
+            submitButton.disabled = false;
         }
     };
 
@@ -1795,7 +1856,8 @@
         renderHistoryList();
         promptInput.value = '';
         resizePrompt();
-        updateComposerState();
+        loadingState.classList.remove('visible');
+        submitButton.disabled = false;
         promptInput.focus();
     });
 
@@ -1808,7 +1870,11 @@
     promptInput.addEventListener('input', () => {
         resizePrompt();
         updateComposerState();
+        requestAnimationFrame(resizePrompt);
     });
+
+    // Recalculate after fonts/layout settle and when the viewport changes.
+    window.addEventListener('resize', resizePrompt);
 
     const markChatActive = () => {
         layout.classList.add('has-chat');
@@ -2037,12 +2103,15 @@
         return '<details class="agent-details"><summary>🔎 Agent execution & sources</summary>' + body + '</details>';
     };
 
+    const safeUiErrorMessage = () =>
+        "We couldn\'t complete your travel plan. Please try again.";
+
     const buildPlanCardHtml = (data, userRequest) => {
         const plan = data.plan || {};
         const trip = plan.trip || {};
         const tips = plan.tips || data.finalPlan || '';
         if (data.status === 'ERROR' || (tips && String(tips).startsWith('Error:'))) {
-            return '<div class="result-card"><div class="result-hero"><div class="result-eyebrow">Agent response</div><h2 class="result-title">Something went wrong</h2></div><div class="result-body"><div class="validation-banner">⚠ ' + escapeHtml(tips || 'Something went wrong.') + '</div></div></div>';
+            return '<div class="result-card"><div class="result-hero"><div class="result-eyebrow">Agent response</div><h2 class="result-title">Something went wrong</h2></div><div class="result-body"><div class="validation-banner">⚠ ' + escapeHtml(safeUiErrorMessage()) + '</div></div></div>';
         }
 
         const hasFlights = Array.isArray(plan.flights) && plan.flights.length;
@@ -2350,7 +2419,7 @@
                     removeLiveResponse(liveResponse);
                     try {
                         const data = JSON.parse(evt.data);
-                        reject(new Error(data.error || 'Plan failed'));
+                        reject(new Error(safeUiErrorMessage()));
                     } catch (error) {
                         reject(error);
                     }
@@ -2360,14 +2429,14 @@
                         return;
                     }
                     es.close();
-                    reject(new Error('Lost connection to the agent stream'));
+                    reject(new Error(safeUiErrorMessage()));
                 };
             });
         } catch (error) {
             removeLiveResponse(liveResponse);
             appendAssistantMessage({
                 status: 'ERROR',
-                finalPlan: 'Error: ' + error.message,
+                finalPlan: safeUiErrorMessage(),
                 awaitingApproval: false,
                 pipeline: []
             });
@@ -2399,7 +2468,7 @@
             });
             const data = await res.json();
             if (!res.ok) {
-                throw new Error(data.error || 'Request failed');
+                throw new Error(safeUiErrorMessage());
             }
             if (notes) {
                 appendUserMessage(notes);
@@ -2412,7 +2481,7 @@
         } catch (error) {
             appendAssistantMessage({
                 status: 'ERROR',
-                finalPlan: 'Error: ' + error.message,
+                finalPlan: safeUiErrorMessage(),
                 awaitingApproval: false,
                 pipeline: []
             });
@@ -2423,13 +2492,23 @@
     };
 
     promptInput.addEventListener('keydown', (event) => {
-        if (event.key === 'Enter' && !event.shiftKey) {
-            event.preventDefault();
-            form.requestSubmit();
+        if (event.key !== 'Enter' || event.shiftKey || event.isComposing) {
+            return;
+        }
+
+        // Enter submits the same way as clicking the visible send button.
+        // Use click() rather than requestSubmit() so this remains reliable
+        // across browsers and does not depend on form submitter resolution.
+        event.preventDefault();
+        event.stopPropagation();
+
+        if (!submitButton.disabled && promptInput.value.trim()) {
+            submitButton.click();
         }
     });
 
     resizePrompt();
+    requestAnimationFrame(resizePrompt);
     renderHistoryList();
     const storeOnLoad = loadStore();
     if (storeOnLoad.chats.length) {

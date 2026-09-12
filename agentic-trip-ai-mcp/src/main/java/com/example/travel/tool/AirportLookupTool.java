@@ -30,6 +30,9 @@ public class AirportLookupTool {
             + "Examples: Bengaluru→BLR, Japan→NRT, Mumbai→BOM. Never invent codes.")
     public String resolveIata(
             @ToolParam(description = "City, country, or airport name/code to resolve") String cityOrCode) {
+        if (cityOrCode == null || cityOrCode.isBlank()) {
+            return "";
+        }
         McpAirportClient client = mcpAirportClient.getIfAvailable();
         if (client != null) {
             String iata = client.resolve(cityOrCode);

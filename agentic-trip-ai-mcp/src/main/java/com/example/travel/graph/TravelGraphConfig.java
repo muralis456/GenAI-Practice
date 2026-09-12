@@ -162,10 +162,14 @@ public class TravelGraphConfig {
                 .addEdge(START, TravelGraphNodes.INTENT)
                 .addConditionalEdges(TravelGraphNodes.INTENT,
                         edge_async(state -> {
-                            // Planner is only for requests that need trip-slot execution.
-                            // Knowledge/research requests can resolve their destination
-                            // through RAG and must never invent dates, budget or routes.
-                            if (state.needsKnowledge() || state.needsResearch()) {
+                            // Pure knowledge/research requests can go directly to RAG.
+                            // IMPORTANT: execution requests may also receive needsKnowledge=true
+                            // from semantic arbitration. They still MUST pass through Planner so
+                            // origin/destination/date slots are extracted before airport/flight/hotel
+                            // execution. Otherwise a prompt-only request has a blank destination
+                            // in TravelState and the airport resolver gets called with "".
+                            if ((state.needsKnowledge() || state.needsResearch())
+                                    && !hasTripExecutionCapability(state)) {
                                 return TravelGraphNodes.RAG;
                             }
                             if (!hasAnyIntentCapability(state)) {
@@ -325,6 +329,14 @@ public class TravelGraphConfig {
         return RunnableConfig.builder()
                 .addParallelNodeExecutor(TravelGraphNodes.FAN_OUT, travelParallelExecutor)
                 .build();
+    }
+
+    private static boolean hasTripExecutionCapability(TravelState state) {
+        return state != null && (state.needsFlights()
+                || state.needsHotels()
+                || state.needsWeather()
+                || state.needsBudget()
+                || state.needsItinerary());
     }
 
     private static boolean hasAnyIntentCapability(TravelState state) {

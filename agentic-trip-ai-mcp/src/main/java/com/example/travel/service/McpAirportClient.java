@@ -21,6 +21,10 @@ public class McpAirportClient {
     }
 
     public String resolve(String cityOrCode) {
+        if (cityOrCode == null || cityOrCode.isBlank()) {
+            log.warn("mcp.client.skip client=McpAirportClient operation=resolve reason=blankAirportQuery");
+            return "";
+        }
         try {
             JsonNode root = client.callByUserInput("Resolve an airport or IATA code", "Resolve airport/IATA for: " + (cityOrCode == null ? "" : cityOrCode), Map.of("cityOrCode", cityOrCode == null ? "" : cityOrCode));
             return root.path("iata").asString("");

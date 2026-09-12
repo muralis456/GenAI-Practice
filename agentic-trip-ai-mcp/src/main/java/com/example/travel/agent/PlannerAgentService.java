@@ -69,11 +69,15 @@ public class PlannerAgentService {
                 state.origin(),
                 state.preferredAirport(),
                 "Bengaluru");
-        String destination = first(extraction == null ? null : extraction.getDestination(),
+        // Deterministic destination hints from the CURRENT request take precedence
+        // over an LLM slot that may contain a typo such as "dubaig". This prevents
+        // downstream flight/hotel agents from receiving an invalid destination.
+        String requestDestinationHint = TripSlotHeuristics.extractDestinationHint(state.userRequest());
+        String destinationCandidate = first(requestDestinationHint,
+                extraction == null ? null : extraction.getDestination(),
                 routeGroup(state.userRequest(), 2),
-                state.destination(),
-                TripSlotHeuristics.extractDestinationHint(state.userRequest()));
-        destination = TripSlotHeuristics.normalizePlace(destination);
+                state.destination());
+        final String destination = TripSlotHeuristics.normalizePlace(destinationCandidate);
         origin = TripSlotHeuristics.normalizePlace(origin);
         if (TravelState.isBlank(origin)) {
             origin = "Bengaluru";

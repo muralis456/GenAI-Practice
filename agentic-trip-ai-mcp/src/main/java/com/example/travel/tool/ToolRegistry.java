@@ -8,7 +8,7 @@ public final class ToolRegistry {
 
     public static final String FLIGHT_AGENT = "AirportLookup, FlightSearch";
     public static final String RESEARCH_AGENT = "Tavily, Weather";
-    public static final String HOTEL_AGENT = "HotelSearch (Tavily)";
+    public static final String HOTEL_AGENT = "HotelSearch (MCP)";
     public static final String BUDGET_AGENT = "Currency, BudgetCalculator";
     public static final String ITINERARY_AGENT = "none";
 
