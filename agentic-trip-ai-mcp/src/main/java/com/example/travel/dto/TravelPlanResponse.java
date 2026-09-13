@@ -16,6 +16,12 @@ public class TravelPlanResponse {
 
     private String status;
 
+    /** Semantic request type for dynamic UI rendering, e.g. WEATHER or TRIP_PLANNING. */
+    private String requestType = "TRIP_PLANNING";
+
+    /** True only when the request represents a persisted trip plan workflow. */
+    private boolean tripPlanning;
+
     private boolean awaitingApproval;
 
     private String userId;
@@ -65,6 +71,22 @@ public class TravelPlanResponse {
     }
 
 
+
+    public String getRequestType() {
+        return requestType;
+    }
+
+    public void setRequestType(String requestType) {
+        this.requestType = requestType == null ? "GENERAL" : requestType;
+    }
+
+    public boolean isTripPlanning() {
+        return tripPlanning;
+    }
+
+    public void setTripPlanning(boolean tripPlanning) {
+        this.tripPlanning = tripPlanning;
+    }
 
     public boolean isAwaitingApproval() {
 

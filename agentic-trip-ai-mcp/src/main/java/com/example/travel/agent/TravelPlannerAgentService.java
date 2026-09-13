@@ -62,6 +62,7 @@ public class TravelPlannerAgentService {
     private final ExecutorService travelPlanExecutor;
     private final ConversationMemoryService conversationMemoryService;
     private final TripPlanAssembler tripPlanAssembler;
+    private final com.example.travel.service.TripHistoryService tripHistoryService;
     private final int maxRetries;
 
     public TravelPlannerAgentService(
@@ -78,6 +79,7 @@ public class TravelPlannerAgentService {
             @org.springframework.beans.factory.annotation.Qualifier("travelPlanExecutor") ExecutorService travelPlanExecutor,
             ConversationMemoryService conversationMemoryService,
             TripPlanAssembler tripPlanAssembler,
+            com.example.travel.service.TripHistoryService tripHistoryService,
             @Value("${travel.graph.max-retries:2}") int maxRetries) {
 
         this.travelGraph = travelGraph;
@@ -93,6 +95,7 @@ public class TravelPlannerAgentService {
         this.travelPlanExecutor = travelPlanExecutor;
         this.conversationMemoryService = conversationMemoryService;
         this.tripPlanAssembler = tripPlanAssembler;
+        this.tripHistoryService = tripHistoryService;
         this.maxRetries = maxRetries;
     }
 
@@ -193,6 +196,12 @@ public class TravelPlannerAgentService {
 
         graphProgressHub.open(threadId);
 
+        // Bind the first user message to the new graph thread. This makes each
+        // trip independently discoverable in the database and avoids races
+        // between the async graph and conversation persistence.
+        String query = TravelState.firstNonBlank(request.getPrompt(), request.getPreferences());
+        conversationMemoryService.saveMessage(userId, threadId, "user", query);
+
         GraphExecutionLogger.runContext(
                 "plan-start",
                 threadId,
@@ -277,7 +286,7 @@ public class TravelPlannerAgentService {
 
             conversationMemoryService.saveUiMessage(
                     userId,
-                    userId,
+                    threadId,
                     "assistant",
                     plan.getPlan() != null
                             && plan.getPlan().getTrip() != null
@@ -285,6 +294,7 @@ public class TravelPlannerAgentService {
                                             plan.getPlan().getTrip().getTitle(),
                                             "Plan ready")
                                     : "Plan ready");
+            tripHistoryService.saveOrUpdate(userId, plan);
 
             Map<String, Object> done = new LinkedHashMap<>();
 
@@ -391,6 +401,9 @@ public class TravelPlannerAgentService {
 
         response.setStatus("COMPLETE");
         response.setAwaitingApproval(false);
+        response.getPlan().getTrip().setStatus("COMPLETE");
+        response.getPlan().getTrip().setAwaitingApproval(false);
+        tripHistoryService.saveOrUpdate(userId, response);
 
         return response;
     }
@@ -592,10 +605,12 @@ public class TravelPlannerAgentService {
 
         boolean pending = isAwaitingHitl(key);
 
-        return toResponse(
+        TravelPlanResponse response = toResponse(
                 state,
                 key,
                 pending);
+        tripHistoryService.saveOrUpdate(userId, response);
+        return response;
     }
 
     public TravelPlanResponse reject(
@@ -666,6 +681,9 @@ public class TravelPlannerAgentService {
 
         response.setStatus("REJECTED");
         response.setAwaitingApproval(false);
+        response.getPlan().getTrip().setStatus("REJECTED");
+        response.getPlan().getTrip().setAwaitingApproval(false);
+        tripHistoryService.saveOrUpdate(userId, response);
 
         return response;
     }
@@ -1083,6 +1101,13 @@ public class TravelPlannerAgentService {
         response.setStatus(
                 status);
 
+        response.setRequestType(
+                TravelState.firstNonBlank(state.requestType(), "GENERAL"));
+        // Human approval is required only for an actual trip plan workflow.
+        // Specialist lookups (weather, flights, hotels, research, budget) and
+        // knowledge answers are informational and complete automatically.
+        response.setTripPlanning(requiresTripPlanning(state));
+
         response.setPlan(
                 plan);
 
@@ -1090,6 +1115,23 @@ public class TravelPlannerAgentService {
                 execution);
 
         return response;
+    }
+
+    private boolean requiresTripPlanning(TravelState state) {
+        if (state == null) {
+            return false;
+        }
+        if (state.needsItinerary()) {
+            return true;
+        }
+        boolean hasExecutionCapability = state.needsFlights()
+                || state.needsHotels()
+                || state.needsResearch()
+                || state.needsWeather()
+                || state.needsBudget()
+                || state.needsKnowledge();
+        return hasExecutionCapability
+                && "TRIP_PLANNING".equalsIgnoreCase(state.requestType());
     }
 
     private String configuredModelsLabel() {

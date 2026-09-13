@@ -23,29 +23,27 @@ public class FinalizationNode implements NodeAction<TravelState> {
 
     @Override
     public Map<String, Object> apply(TravelState state) {
-        String tips;
-        boolean knowledgeOnlyResponse = state.ragSufficient()
-                && !state.ragAnswer().isBlank()
-                && !state.needsFlights()
-                && !state.needsHotels()
-                && !state.needsWeather()
-                && !state.needsBudget()
-                && !state.needsItinerary();
-        if (knowledgeOnlyResponse) {
-            tips = state.ragAnswer();
-        } else {
+        boolean requiresApproval = state.needsItinerary()
+                || ("TRIP_PLANNING".equalsIgnoreCase(state.requestType())
+                    && (state.needsFlights() || state.needsHotels() || state.needsResearch()
+                        || state.needsWeather() || state.needsBudget() || state.needsKnowledge()));
+
+        String tips = "";
+        if (requiresApproval) {
+            // Keep durable RAG knowledge separate from generated trip tips.
+            // The API exposes RAG guidance as plan.knowledge so the UI can
+            // label it clearly and show its provenance without mixing it into
+            // the generic Travel Notes section.
             tips = finalPlannerAgentService.buildTips(state);
-            if ((tips == null || tips.isBlank()) && !state.ragAnswer().isBlank()) {
-                tips = state.ragAnswer();
-            }
         }
+
         Map<String, Object> updates = new LinkedHashMap<>();
-        updates.put(TravelState.AWAITING_APPROVAL, Boolean.TRUE);
-        updates.put(TravelState.FINAL_TIPS, tips);
+        updates.put(TravelState.AWAITING_APPROVAL, requiresApproval);
+        updates.put(TravelState.FINAL_TIPS, tips == null ? "" : tips);
         updates.putAll(TravelState.trace(TravelGraphNodes.FINAL, "ok",
                 state.validationErrors().isEmpty()
-                        ? "tips generated"
-                        : "tips generated (with caveats)"));
+                        ? (requiresApproval ? "trip plan ready for approval" : "informational response complete")
+                        : (requiresApproval ? "trip plan ready with caveats" : "informational response complete with caveats")));
         return updates;
     }
 }

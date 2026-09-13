@@ -1121,6 +1121,46 @@
         }
     
 
+
+        /* ---------- User-facing Agentic RAG guidance ---------- */
+        .knowledge-guidance-card {
+            border: 1px solid rgba(91, 140, 255, .20);
+            background: linear-gradient(145deg, rgba(25, 43, 75, .96), rgba(12, 22, 40, .98));
+        }
+        .knowledge-guidance-card .knowledge-answer {
+            max-height: none;
+            overflow: visible;
+            padding: 0;
+        }
+        .knowledge-guidance-head {
+            display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;
+            margin-bottom:12px;
+        }
+        .knowledge-guidance-badge {
+            display:inline-flex; align-items:center; gap:6px;
+            border:1px solid rgba(103, 178, 255, .25);
+            background:rgba(65, 123, 218, .12);
+            color:#a9c8ff; border-radius:999px; padding:6px 10px;
+            font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.07em;
+        }
+        .knowledge-topics { display:flex; flex-wrap:wrap; gap:7px; margin:0 0 12px; }
+        .knowledge-topic {
+            padding:5px 9px; border-radius:999px;
+            background:rgba(255,255,255,.055); border:1px solid rgba(255,255,255,.08);
+            color:#b9c9e2; font-size:11px; font-weight:700;
+        }
+        .knowledge-sources {
+            display:flex; flex-wrap:wrap; gap:7px; margin-top:14px; padding-top:12px;
+            border-top:1px solid rgba(255,255,255,.07);
+        }
+        .knowledge-source {
+            padding:5px 9px; border-radius:8px;
+            background:rgba(0,0,0,.14); color:#91a5c5; font-size:11px;
+        }
+        .knowledge-query { margin-top:9px; color:#8194b3; font-size:11px; }
+        .specialist-answer-card.knowledge-guidance-card { padding:22px; }
+        .specialist-answer-card.knowledge-guidance-card .specialist-card-title { margin-bottom:8px; }
+
         .rag-observability {
             border: 1px solid rgba(91, 140, 255, 0.22);
             border-radius: 14px;
@@ -1506,6 +1546,10 @@
         .status-name { display:flex; align-items:center; gap:7px; font-size:12px; }
         .status-dot { width:8px; height:8px; border-radius:50%; background:#39dc8a; box-shadow:0 0 10px rgba(57,220,138,.5); }
         .status-value { color:#65e7a3; font-size:11px; font-weight:800; }
+        .status-dot.complete { background:#63b5ff; box-shadow:0 0 10px rgba(99,181,255,.45); }
+        .status-value.complete { color:#7fc0ff; }
+        .status-dot.rejected { background:#ef6b74; box-shadow:0 0 10px rgba(239,107,116,.4); }
+        .status-value.rejected { color:#ff9da4; }
         .final-decision { border:1px solid rgba(82,160,255,.20); background:linear-gradient(180deg,rgba(17,39,66,.96),rgba(9,22,39,.96)); border-radius:16px; padding:16px; margin-top:14px; }
         .final-decision h3 { margin:0 0 5px; font-size:15px; }
         .final-decision p { margin:0 0 12px; color:#8fa9c5; font-size:12px; }
@@ -1657,6 +1701,54 @@
         .ui-toast.visible { opacity:1; transform:translateY(0); }
         @media (max-width:900px) { .final-decision .final-actions { grid-template-columns:1fr; } }
 
+
+        /* V8 trip history / navigation experience */
+        .trips-view { display:none; padding:4px 0 110px; }
+        .trips-view.visible { display:block; }
+        .trips-view-head { display:flex; align-items:flex-end; justify-content:space-between; gap:16px; margin:4px 0 18px; }
+        .trips-view-eyebrow { color:#6e9ed4; font-size:10px; text-transform:uppercase; letter-spacing:.12em; font-weight:800; }
+        .trips-view-title { margin:5px 0 4px; font-size:28px; letter-spacing:-.03em; color:#eef6ff; }
+        .trips-view-sub { color:#829ab8; font-size:12px; }
+        .trips-refresh { border:1px solid rgba(101,158,225,.18); background:rgba(255,255,255,.035); color:#cfe2f7; border-radius:10px; padding:9px 12px; font-weight:750; cursor:pointer; }
+        .trips-refresh:hover { background:rgba(76,139,220,.10); }
+        .trips-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
+        .trip-history-card { border:1px solid rgba(101,151,211,.14); background:linear-gradient(145deg,rgba(22,40,66,.88),rgba(11,24,42,.92)); border-radius:16px; padding:16px; transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease; }
+        .trip-history-card:hover { transform:translateY(-2px); border-color:rgba(91,154,229,.28); box-shadow:0 16px 35px rgba(0,0,0,.18); }
+        .trip-history-top { display:flex; justify-content:space-between; gap:10px; align-items:flex-start; }
+        .trip-history-route { font-size:16px; font-weight:800; color:#eef6ff; }
+        .trip-history-date { margin-top:5px; color:#8198b3; font-size:11px; }
+        .trip-history-status { flex:0 0 auto; padding:5px 8px; border-radius:999px; font-size:10px; font-weight:800; border:1px solid rgba(80,220,147,.16); background:rgba(47,194,125,.08); color:#85e3af; }
+        .trip-history-status.pending { border-color:rgba(86,158,242,.18); background:rgba(70,143,235,.09); color:#9ec9ff; }
+        .trip-history-status.rejected { border-color:rgba(229,92,101,.18); background:rgba(220,75,85,.08); color:#ff9da4; }
+        .trip-history-meta { display:flex; flex-wrap:wrap; gap:7px; margin:13px 0; }
+        .trip-history-chip { padding:6px 8px; border-radius:8px; background:rgba(255,255,255,.035); color:#9db3cc; font-size:10px; }
+        .trip-history-open { width:100%; border:1px solid rgba(81,149,229,.22); background:rgba(50,121,214,.10); color:#bcdcff; border-radius:10px; padding:9px 11px; font-weight:800; cursor:pointer; }
+        .trip-history-open:hover { background:rgba(50,121,214,.17); }
+        .trips-empty { padding:38px 20px; text-align:center; border:1px dashed rgba(101,151,211,.16); border-radius:16px; color:#8098b4; background:rgba(255,255,255,.018); }
+        .trips-empty strong { display:block; color:#dce9f7; margin-bottom:6px; font-size:14px; }
+        .chat-history-item .db-status { font-size:9px; font-weight:800; color:#75dca1; margin-left:5px; }
+        @media (max-width:900px) { .trips-grid{grid-template-columns:1fr;} }
+
+        .specialist-dashboard { max-width: 1040px; margin: 0 auto; display: grid; gap: 14px; }
+        .specialist-card { border: 1px solid rgba(125, 158, 210, .16); border-radius: 22px; background: linear-gradient(145deg, rgba(23, 38, 66, .94), rgba(12, 22, 40, .96)); box-shadow: 0 18px 45px rgba(0,0,0,.18); overflow: hidden; }
+        .specialist-hero { padding: 26px 28px; display: flex; gap: 18px; align-items: center; }
+        .specialist-icon { width: 56px; height: 56px; border-radius: 16px; display:flex; align-items:center; justify-content:center; background: rgba(77, 133, 244, .15); border:1px solid rgba(107, 154, 255, .24); font-size: 25px; flex: 0 0 auto; }
+        .specialist-eyebrow { color:#91b5ef; font-size:12px; font-weight:800; text-transform:uppercase; letter-spacing:.12em; margin-bottom:7px; }
+        .specialist-hero h2 { margin:0; font-size:29px; line-height:1.15; color:#f2f6ff; }
+        .specialist-hero p { margin:7px 0 0; color:#93a6c5; font-size:14px; }
+        .specialist-content { padding: 22px; }
+        .specialist-card-head { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:16px; }
+        .specialist-card-head strong { display:block; color:#edf3ff; font-size:17px; }
+        .specialist-card-head span:not(.complete-badge) { display:block; margin-top:4px; color:#8295b4; font-size:12px; }
+        .complete-badge { padding:7px 11px; border-radius:999px; background:rgba(55, 196, 128, .12); border:1px solid rgba(83, 210, 146, .22); color:#7de0a9; font-size:12px; font-weight:800; white-space:nowrap; }
+        .specialist-answer-card { padding:22px; }
+        .specialist-card-title { font-size:16px; font-weight:800; color:#eef4ff; margin-bottom:12px; }
+        .specialist-answer { color:#d5deee; font-size:15px; line-height:1.75; }
+        .specialist-answer p { margin:0 0 12px; }
+        .specialist-answer ul { margin:0 0 12px 20px; }
+        .specialist-empty { padding:22px; text-align:center; color:#8295b4; border:1px dashed rgba(125,158,210,.18); border-radius:16px; }
+        .specialist-content .weather-card { margin:0; }
+        @media (max-width: 760px) { .specialist-hero { padding:20px; } .specialist-hero h2 { font-size:24px; } .specialist-content { padding:17px; } }
 </style>
 </head>
 <body>
@@ -1710,6 +1802,14 @@
                     <div class="city-card dubai" data-prompt="From Bengaluru to Dubai for 5 days under ₹1.2 lakh — family trip.">Dubai</div>
                 </div>
             </div>
+
+            <section id="tripsView" class="trips-view" aria-label="My trips">
+                <div class="trips-view-head">
+                    <div><div class="trips-view-eyebrow">Your travel workspace</div><h2 class="trips-view-title">My Trips</h2><div class="trips-view-sub">Saved plans are loaded directly from the database.</div></div>
+                    <button type="button" id="tripsRefresh" class="trips-refresh">↻ Refresh</button>
+                </div>
+                <div id="tripsGrid" class="trips-grid"><div class="trips-empty"><strong>Loading your trips…</strong>Please wait.</div></div>
+            </section>
 
             <div id="chatThread" class="chat-thread" aria-live="polite">
                 <div class="chat-empty">Your trip plans will appear here and stay as you chat.</div>
@@ -1768,6 +1868,10 @@
     const loadingState = document.getElementById('loadingState');
     const newChatBtn = document.getElementById('newChatBtn');
     const composerNewChat = document.getElementById('composerNewChat');
+    const tripsView = document.getElementById('tripsView');
+    const tripsGrid = document.getElementById('tripsGrid');
+    const tripsRefresh = document.getElementById('tripsRefresh');
+    let dbTrips = [];
 
     const showToast = (message) => {
         let toast = document.getElementById('uiToast');
@@ -1788,31 +1892,50 @@
             item.classList.toggle('active', item.dataset.nav === name));
     };
 
+    const showHomeView = () => {
+        tripsView.classList.remove('visible');
+        chatThread.style.display = '';
+        const welcome = document.querySelector('.welcome-block');
+        if (welcome) welcome.style.display = '';
+        setActiveNav('home');
+    };
+
+    const showTripsView = async () => {
+        tripsView.classList.add('visible');
+        chatThread.style.display = 'none';
+        const welcome = document.querySelector('.welcome-block');
+        if (welcome) welcome.style.display = 'none';
+        setActiveNav('trips');
+        await loadDbTrips(true);
+        messagesPane.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
     document.querySelectorAll('.sidebar-nav-item').forEach(item => {
-        item.addEventListener('click', () => {
+        item.addEventListener('click', async () => {
             const nav = item.dataset.nav;
-            setActiveNav(nav);
-            if (nav === 'home') {
+            if (nav === 'trips') {
+                await showTripsView();
+            } else if (nav === 'home') {
+                showHomeView();
                 messagesPane.scrollTo({ top: 0, behavior: 'smooth' });
-            } else if (nav === 'trips') {
-                chatHistoryList.scrollTo({ top: 0, behavior: 'smooth' });
-                chatHistoryList.querySelector('.chat-history-item')?.focus();
             } else if (nav === 'tools') {
+                showHomeView();
                 promptInput.focus();
-                showToast('Travel Tools: describe what you need — flights, hotels, weather, itinerary, or budget.');
+                showToast('Travel Tools: describe flights, hotels, weather, itinerary, budget, or a complete trip.');
             } else if (nav === 'saved') {
-                showToast('Saved Places is ready for a future saved-place integration.');
+                showHomeView();
+                showToast('Saved Places will be connected to your saved destinations next.');
             } else if (nav === 'settings') {
+                showHomeView();
                 userIdField.focus();
                 userIdField.select();
                 showToast('Settings: update the session user ID here.');
             } else if (nav === 'help') {
-                showToast('Tip: use New Trip to start fresh. Review the plan, then Approve, Modify, or Reject.');
+                showHomeView();
+                showToast('Use New Trip to start fresh. Review the plan, then approve, modify, or reject it.');
             }
         });
     });
-
-    const DEFAULT_PROMPT = '';
 
     const resizePrompt = () => {
         // Let the browser recalculate the textarea's natural height first.
@@ -2017,34 +2140,109 @@
         }
     };
 
+    const tripStatusLabel = (trip) => {
+        const status = String(trip?.status || '').toUpperCase();
+        if (trip?.awaitingApproval || status === 'PENDING_APPROVAL') return 'Pending approval';
+        if (status === 'REJECTED') return 'Rejected';
+        if (status === 'COMPLETE') return 'Confirmed';
+        return status ? status.replaceAll('_', ' ') : 'Saved';
+    };
+
+    const renderDbTripsView = () => {
+        if (!dbTrips.length) {
+            tripsGrid.innerHTML = '<div class="trips-empty" style="grid-column:1/-1"><strong>No trips saved yet</strong>Create a new trip and your completed/pending plan will appear here automatically.</div>';
+            return;
+        }
+        tripsGrid.innerHTML = dbTrips.map(t => {
+            const route = [t.origin, t.destination].filter(Boolean).join(' → ') || t.title || 'Trip';
+            const dates = formatDateRange(t.departureDate, t.returnDate);
+            const status = tripStatusLabel(t);
+            const statusClass = status === 'Rejected' ? ' rejected' : status === 'Pending approval' ? ' pending' : '';
+            const meta = [dates, t.travelers ? `${t.travelers} traveler${Number(t.travelers) === 1 ? '' : 's'}` : '', t.budgetLabel || '', t.qualityScore ? `Quality ${t.qualityScore}/100` : ''].filter(Boolean);
+            return '<article class="trip-history-card">'
+                + '<div class="trip-history-top"><div><div class="trip-history-route">' + escapeHtml(route) + '</div><div class="trip-history-date">Updated ' + escapeHtml(t.updatedAt ? new Date(t.updatedAt).toLocaleString() : '') + '</div></div>'
+                + '<span class="trip-history-status' + statusClass + '">' + escapeHtml(status) + '</span></div>'
+                + '<div class="trip-history-meta">' + meta.map(m => '<span class="trip-history-chip">' + escapeHtml(m) + '</span>').join('') + '</div>'
+                + '<button type="button" class="trip-history-open" data-trip-id="' + escapeHtml(String(t.id)) + '">Open saved plan →</button>'
+                + '</article>';
+        }).join('');
+    };
+
+    const loadDbTrips = async (renderView = false) => {
+        const userId = userIdField.value.trim() || 'aaro_hi_user';
+        try {
+            const res = await fetch('/api/trips?userId=' + encodeURIComponent(userId) + '&limit=50');
+            if (!res.ok) throw new Error('Unable to load trips');
+            const items = await res.json();
+            dbTrips = Array.isArray(items) ? items : [];
+            if (renderView) renderDbTripsView();
+            renderHistoryList();
+        } catch (e) {
+            if (renderView) tripsGrid.innerHTML = '<div class="trips-empty" style="grid-column:1/-1"><strong>Could not load My Trips</strong>Refresh and try again.</div>';
+            console.warn('Could not load database trips', e);
+        }
+    };
+
+    const openSavedTrip = async (id) => {
+        try {
+            const userId = userIdField.value.trim() || 'aaro_hi_user';
+            const res = await fetch('/api/trips/' + encodeURIComponent(id) + '?userId=' + encodeURIComponent(userId));
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data.error || safeUiErrorMessage());
+            showHomeView();
+            clearThreadDom();
+            appendAssistantMessage(data, false);
+            scrollChat();
+        } catch (e) {
+            showToast(e?.message || safeUiErrorMessage());
+        }
+    };
+
+    tripsGrid.addEventListener('click', event => {
+        const btn = event.target.closest('[data-trip-id]');
+        if (btn) openSavedTrip(btn.getAttribute('data-trip-id'));
+    });
+    tripsRefresh.addEventListener('click', () => loadDbTrips(true));
+
     const renderHistoryList = () => {
-        const store = loadStore();
         chatHistoryList.innerHTML = '';
+        if (dbTrips.length) {
+            dbTrips.slice(0, 20).forEach(trip => {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'chat-history-item';
+                const title = document.createElement('span');
+                title.textContent = [trip.origin, trip.destination].filter(Boolean).join(' → ') || trip.title || 'Saved trip';
+                const status = document.createElement('span');
+                status.className = 'db-status';
+                status.textContent = 'DB';
+                title.appendChild(status);
+                const meta = document.createElement('span');
+                meta.className = 'meta';
+                meta.textContent = tripStatusLabel(trip) + ' · ' + (trip.updatedAt ? new Date(trip.updatedAt).toLocaleDateString() : '');
+                btn.appendChild(title);
+                btn.appendChild(meta);
+                btn.onclick = () => openSavedTrip(trip.id);
+                chatHistoryList.appendChild(btn);
+            });
+            return;
+        }
+        const store = loadStore();
         if (!store.chats.length) {
             const empty = document.createElement('div');
             empty.className = 'chat-history-empty';
-            empty.textContent = 'No chats in this browser yet. Send a plan here — Edge history is separate from Chrome.';
+            empty.textContent = 'No saved trips yet. Create a New Trip to get started.';
             chatHistoryList.appendChild(empty);
             return;
         }
-        store.chats
-            .slice()
-            .sort((a, b) => b.updatedAt - a.updatedAt)
-            .forEach(chat => {
-                const btn = document.createElement('button');
-                btn.type = 'button';
-                btn.className = 'chat-history-item' + (chat.id === currentChatId ? ' active' : '');
-                const when = new Date(chat.updatedAt).toLocaleString();
-                const title = document.createElement('span');
-                title.textContent = chat.title || 'Untitled chat';
-                const meta = document.createElement('span');
-                meta.className = 'meta';
-                meta.textContent = when + ' · ' + (chat.messages || []).length + ' msgs';
-                btn.appendChild(title);
-                btn.appendChild(meta);
-                btn.onclick = () => openChat(chat.id);
-                chatHistoryList.appendChild(btn);
-            });
+        store.chats.slice().sort((a,b)=>b.updatedAt-a.updatedAt).slice(0,12).forEach(chat => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'chat-history-item' + (chat.id === currentChatId ? ' active' : '');
+            const title = document.createElement('span'); title.textContent = chat.title || 'Untitled trip';
+            const meta = document.createElement('span'); meta.className='meta'; meta.textContent = new Date(chat.updatedAt).toLocaleDateString();
+            btn.appendChild(title); btn.appendChild(meta); btn.onclick=()=>openChat(chat.id); chatHistoryList.appendChild(btn);
+        });
     };
 
     const clearThreadDom = () => {
@@ -2059,6 +2257,7 @@
     };
 
     const openChat = (chatId) => {
+        showHomeView();
         const store = loadStore();
         const chat = store.chats.find(c => c.id === chatId);
         if (!chat) {
@@ -2356,6 +2555,152 @@
     const safeUiErrorMessage = () =>
         "We couldn\'t complete your travel plan. Please try again.";
 
+    const humanizeKnowledgeSource = (source) => {
+        const raw = String(source || '').trim();
+        if (!raw) return '';
+        return raw
+            .replace(/^.*[\\/]/, '')
+            .replace(/\\.(md|txt|pdf)$/i, '')
+            .replace(/[-_]+/g, ' ')
+            .replace(/\\b\\w/g, ch => ch.toUpperCase());
+    };
+
+    const buildKnowledgeGuidanceSection = (data, plan) => {
+        const exec = data.execution || {};
+        const knowledge = plan.knowledge || {};
+        const answer = String(knowledge.answer || exec.ragAnswer || data.ragAnswer || '').trim();
+        const available = knowledge.available === true || !!answer;
+        if (!available || !answer) return '';
+
+        const topics = Array.isArray(knowledge.topics) && knowledge.topics.length
+            ? knowledge.topics
+            : [];
+        const sources = Array.isArray(knowledge.sources) && knowledge.sources.length
+            ? knowledge.sources
+            : (Array.isArray(exec.ragSources) ? exec.ragSources : []);
+        const destination = String(knowledge.destination || '').trim();
+        const title = String(knowledge.title || (destination
+            ? 'Travel Knowledge & Guidance for ' + destination
+            : 'Travel Knowledge & Guidance')).trim();
+        const query = String(knowledge.query || exec.ragQuery || '').trim();
+
+        let html = '<section id="section-knowledge" class="workspace-card full knowledge-guidance-card">'
+            + '<div class="workspace-card-head"><div>'
+            + '<div class="workspace-card-title">🧠 ' + escapeHtml(title) + '</div>'
+            + '<div class="workspace-card-sub">Durable travel guidance from the knowledge base</div>'
+            + '</div><span class="knowledge-guidance-badge">✓ Grounded guidance</span></div>';
+
+        if (topics.length) {
+            html += '<div class="knowledge-topics">' + topics.slice(0, 8).map(topic =>
+                '<span class="knowledge-topic">' + escapeHtml(String(topic).replace(/[_-]+/g, ' ')) + '</span>'
+            ).join('') + '</div>';
+        }
+        html += '<div class="workspace-content knowledge-answer">' + formatKnowledgeText(answer) + '</div>';
+        if (sources.length) {
+            html += '<div class="knowledge-sources">' + sources.slice(0, 6).map(source =>
+                '<span class="knowledge-source">' + escapeHtml(humanizeKnowledgeSource(source)) + '</span>'
+            ).join('') + '</div>';
+        }
+        if (query) html += '<div class="knowledge-query">Knowledge query: ' + escapeHtml(query) + '</div>';
+        html += '</section>';
+        return html;
+    };
+
+    const buildSpecialistKnowledgeCard = (data, plan) => {
+        const exec = data.execution || {};
+        const knowledge = plan.knowledge || {};
+        const answer = String(knowledge.answer || exec.ragAnswer || data.ragAnswer || '').trim();
+        if (!answer) return '';
+        const sources = Array.isArray(knowledge.sources) && knowledge.sources.length
+            ? knowledge.sources : (Array.isArray(exec.ragSources) ? exec.ragSources : []);
+        const topics = Array.isArray(knowledge.topics) ? knowledge.topics : [];
+        let html = '<section class="specialist-card specialist-answer-card knowledge-guidance-card">'
+            + '<div class="knowledge-guidance-head"><div class="specialist-card-title">🧠 Knowledge & Practical Guidance</div>'
+            + '<span class="knowledge-guidance-badge">✓ Grounded</span></div>';
+        if (topics.length) {
+            html += '<div class="knowledge-topics">' + topics.slice(0, 8).map(topic =>
+                '<span class="knowledge-topic">' + escapeHtml(String(topic).replace(/[_-]+/g, ' ')) + '</span>'
+            ).join('') + '</div>';
+        }
+        html += '<div class="specialist-answer">' + formatKnowledgeText(answer) + '</div>';
+        if (sources.length) {
+            html += '<div class="knowledge-sources">' + sources.slice(0, 6).map(source =>
+                '<span class="knowledge-source">' + escapeHtml(humanizeKnowledgeSource(source)) + '</span>'
+            ).join('') + '</div>';
+        }
+        html += '</section>';
+        return html;
+    };
+
+    const buildSpecialistResponseHtml = (data, userRequest) => {
+        const plan = data.plan || {};
+        const trip = plan.trip || {};
+        const type = String(data.requestType || trip.requestType || 'GENERAL').toUpperCase();
+        const location = String(
+            (plan.weather && plan.weather.location) || trip.destination || data.destination || ''
+        ).trim();
+        const weather = plan.weather;
+        const flights = Array.isArray(plan.flights) ? plan.flights : [];
+        const hotels = Array.isArray(plan.hotels) ? plan.hotels : [];
+        const budget = plan.budget;
+        const exec = data.execution || {};
+        const answer = String(exec.ragAnswer || data.ragAnswer || plan.tips || data.finalPlan || '').trim();
+
+        let title = 'Travel information';
+        let subtitle = 'Answer based on your latest request';
+        let body = '';
+        let icon = '✦';
+
+        if (type === 'WEATHER') {
+            title = location ? 'Weather in ' + location : 'Weather details';
+            subtitle = 'Current or forecast conditions';
+            icon = '☀️';
+            body = buildWeatherSection(weather);
+        } else if (type === 'FLIGHT_SEARCH') {
+            title = location ? 'Flight options for ' + location : 'Flight options';
+            subtitle = 'Available flight results';
+            icon = '✈️';
+            body = buildFlightsSection(flights);
+        } else if (type === 'HOTEL_SEARCH') {
+            title = location ? 'Hotels in ' + location : 'Hotel options';
+            subtitle = 'Accommodation recommendations';
+            icon = '🏨';
+            body = buildHotelsSection(hotels);
+        } else if (type === 'BUDGET') {
+            title = 'Travel budget';
+            subtitle = 'Cost estimate for your request';
+            icon = '💰';
+            body = buildBudgetTable(budget);
+        } else if (type === 'RESEARCH') {
+            title = location ? 'Things to do in ' + location : 'Travel research';
+            subtitle = 'Destination recommendations and current research';
+            icon = '🔎';
+            body = answer ? '<div class="specialist-answer">' + formatKnowledgeText(answer) + '</div>' : '';
+        } else {
+            title = location ? 'Travel information for ' + location : 'Travel information';
+            subtitle = 'Knowledge-backed answer to your question';
+            body = answer ? '<div class="specialist-answer">' + formatKnowledgeText(answer) + '</div>' : '';
+        }
+
+        if (!body) {
+            body = '<div class="specialist-empty">No additional structured details were returned for this request.</div>';
+        }
+
+        return '<div class="specialist-dashboard">'
+            + '<section class="specialist-card specialist-hero">'
+            + '<div class="specialist-icon">' + icon + '</div>'
+            + '<div><div class="specialist-eyebrow">AgenticTripAI · ' + escapeHtml(type.replace(/_/g, ' ')) + '</div>'
+            + '<h2>' + escapeHtml(title) + '</h2><p>' + escapeHtml(subtitle) + '</p></div>'
+            + '</section>'
+            + '<section class="specialist-card specialist-content">'
+            + '<div class="specialist-card-head"><div><strong>' + escapeHtml(title) + '</strong><span>Requested information</span></div>'
+            + '<span class="complete-badge">✓ Complete</span></div>'
+            + body
+            + '</section>'
+            + ((type === 'RESEARCH' || type === 'GENERAL' || type === 'TRAVEL_INFORMATION') ? '' : buildSpecialistKnowledgeCard(data, plan))
+            + '</div>';
+    };
+
     const buildPlanCardHtml = (data, userRequest) => {
         const plan = data.plan || {};
         const trip = plan.trip || {};
@@ -2363,11 +2708,22 @@
         if (data.status === 'ERROR' || (tips && String(tips).startsWith('Error:'))) {
             return '<div class="result-card"><div class="result-hero"><div class="result-eyebrow">Agent response</div><h2 class="result-title">Something went wrong</h2></div><div class="result-body"><div class="validation-banner">⚠ ' + escapeHtml(safeUiErrorMessage()) + '</div></div></div>';
         }
+
+        const hasItineraryData = !!(plan.itinerary && Array.isArray(plan.itinerary.days) && plan.itinerary.days.length);
+        const isTripPlan = data.tripPlanning === true || hasItineraryData;
+        const requestType = String(data.requestType || trip.requestType || '').toUpperCase();
+        if (!isTripPlan && requestType !== 'TRIP_PLANNING') {
+            return buildSpecialistResponseHtml(data, userRequest);
+        }
+
         const hasFlights = Array.isArray(plan.flights) && plan.flights.length;
         const hasHotels = Array.isArray(plan.hotels) && plan.hotels.length;
-        const hasItinerary = !!(plan.itinerary && Array.isArray(plan.itinerary.days) && plan.itinerary.days.length);
+        const hasItinerary = hasItineraryData;
         const hasBudget = !!(plan.budget && Array.isArray(plan.budget.lineItems) && plan.budget.lineItems.length);
         const hasWeather = !!(plan.weather && (plan.weather.summary || plan.weather.location));
+        const knowledge = plan.knowledge || {};
+        const exec = data.execution || {};
+        const hasKnowledge = !!(knowledge.available === true || knowledge.answer || exec.ragAnswer || data.ragAnswer);
         const quality = trip.qualityScore != null ? trip.qualityScore : (plan.validation && plan.validation.quality && plan.validation.quality.overall > 0 ? Math.round(plan.validation.quality.overall * 100) : null);
         const responseStatus = String(data.status || '').toUpperCase();
         const tripStatus = String(trip.status || '').toUpperCase();
@@ -2378,7 +2734,6 @@
             || tripStatus === 'PENDING_APPROVAL'
         );
         const complete = !awaitingApproval && (responseStatus === 'COMPLETE' || tripStatus === 'COMPLETE');
-        const title = trip.title || tripTitle(data);
         const origin = trip.origin || data.origin || '';
         const destination = trip.destination || data.destination || '';
         const route = origin && destination ? origin + ' → ' + destination : (destination || 'Travel plan');
@@ -2395,14 +2750,15 @@
         if (budgetLabel) html += '<span class="trip-fact">💰 ' + escapeHtml(budgetLabel) + '</span>';
         if (quality != null) html += '<span class="trip-fact">✓ Quality ' + escapeHtml(String(quality)) + '/100</span>';
         html += '</div></div>';
-        html += '<div class="workspace-tabs"><button type="button" class="workspace-tab active" data-section-target="overview">Overview</button>' + (hasFlights ? '<button type="button" class="workspace-tab" data-section-target="flights">✈ Flights</button>' : '') + (hasHotels ? '<button type="button" class="workspace-tab" data-section-target="hotels">🏨 Hotels</button>' : '') + (hasItinerary ? '<button type="button" class="workspace-tab" data-section-target="itinerary">🗓 Itinerary</button>' : '') + (hasWeather ? '<button type="button" class="workspace-tab" data-section-target="weather">☀ Weather</button>' : '') + (hasBudget ? '<button type="button" class="workspace-tab" data-section-target="budget">💰 Budget</button>' : '') + '</div>';
+        html += '<div class="workspace-tabs"><button type="button" class="workspace-tab active" data-section-target="overview">Overview</button>' + (hasFlights ? '<button type="button" class="workspace-tab" data-section-target="flights">✈ Flights</button>' : '') + (hasHotels ? '<button type="button" class="workspace-tab" data-section-target="hotels">🏨 Hotels</button>' : '') + (hasItinerary ? '<button type="button" class="workspace-tab" data-section-target="itinerary">🗓 Itinerary</button>' : '') + (hasWeather ? '<button type="button" class="workspace-tab" data-section-target="weather">☀ Weather</button>' : '') + (hasBudget ? '<button type="button" class="workspace-tab" data-section-target="budget">💰 Budget</button>' : '') + (hasKnowledge ? '<button type="button" class="workspace-tab" data-section-target="knowledge">🧠 Knowledge</button>' : '') + '</div>';
         html += '<div class="workspace-grid">';
-        if (hasFlights) html += '<section id="section-flights" class="workspace-card"><div class="workspace-card-head"><div><div class="workspace-card-title">✈️ Flights</div><div class="workspace-card-sub">Best available flight options</div></div><span class="ready-badge">✓ Ready</span></div><div class="workspace-content">' + buildFlightsSection(plan.flights) + '</div></section>';
-        if (hasHotels) html += '<section id="section-hotels" class="workspace-card"><div class="workspace-card-head"><div><div class="workspace-card-title">🏨 Hotels</div><div class="workspace-card-sub">Accommodation recommendations</div></div><span class="ready-badge">✓ Ready</span></div><div class="workspace-content">' + buildHotelsSection(plan.hotels) + '</div></section>';
-        if (hasWeather) html += '<section id="section-weather" class="workspace-card"><div class="workspace-card-head"><div><div class="workspace-card-title">☀️ Weather</div><div class="workspace-card-sub">Travel-date forecast</div></div><span class="ready-badge">✓ Ready</span></div><div class="workspace-content">' + buildWeatherSection(plan.weather) + '</div></section>';
-        if (hasBudget) html += '<section id="section-budget" class="workspace-card"><div class="workspace-card-head"><div><div class="workspace-card-title">💰 Budget</div><div class="workspace-card-sub">Estimated trip cost</div></div><span class="ready-badge">✓ Ready</span></div><div class="workspace-content">' + buildBudgetTable(plan.budget) + '</div></section>';
-        if (hasItinerary) html += '<section id="section-itinerary" class="workspace-card full"><div class="workspace-card-head"><div><div class="workspace-card-title">🗓️ Day-wise Itinerary</div><div class="workspace-card-sub">Your planned activities by day</div></div><span class="ready-badge">✓ Ready</span></div><div class="workspace-content itin-compact">' + buildItinerarySection(plan.itinerary) + '</div></section>';
-        if (tips) html += '<section class="workspace-card full"><div class="workspace-card-head"><div><div class="workspace-card-title">💡 Travel Notes</div><div class="workspace-card-sub">Additional guidance from the agent</div></div></div><div class="workspace-content knowledge-answer">' + formatKnowledgeText(tips) + '</div></section>';
+        if (hasFlights) html += '<section id="section-flights" class="workspace-card"><div class="workspace-card-head"><div><div class="workspace-card-title">✈️ Flights</div><div class="workspace-card-sub">Best available flight options</div></div><span class="ready-badge">✓ ' + (complete ? 'Complete' : 'Ready') + '</span></div><div class="workspace-content">' + buildFlightsSection(plan.flights) + '</div></section>';
+        if (hasHotels) html += '<section id="section-hotels" class="workspace-card"><div class="workspace-card-head"><div><div class="workspace-card-title">🏨 Hotels</div><div class="workspace-card-sub">Accommodation recommendations</div></div><span class="ready-badge">✓ ' + (complete ? 'Complete' : 'Ready') + '</span></div><div class="workspace-content">' + buildHotelsSection(plan.hotels) + '</div></section>';
+        if (hasWeather) html += '<section id="section-weather" class="workspace-card"><div class="workspace-card-head"><div><div class="workspace-card-title">☀️ Weather</div><div class="workspace-card-sub">Travel-date forecast</div></div><span class="ready-badge">✓ ' + (complete ? 'Complete' : 'Ready') + '</span></div><div class="workspace-content">' + buildWeatherSection(plan.weather) + '</div></section>';
+        if (hasBudget) html += '<section id="section-budget" class="workspace-card"><div class="workspace-card-head"><div><div class="workspace-card-title">💰 Budget</div><div class="workspace-card-sub">Estimated trip cost</div></div><span class="ready-badge">✓ ' + (complete ? 'Complete' : 'Ready') + '</span></div><div class="workspace-content">' + buildBudgetTable(plan.budget) + '</div></section>';
+        if (hasItinerary) html += '<section id="section-itinerary" class="workspace-card full"><div class="workspace-card-head"><div><div class="workspace-card-title">🗓️ Day-wise Itinerary</div><div class="workspace-card-sub">Your planned activities by day</div></div><span class="ready-badge">✓ ' + (complete ? 'Complete' : 'Ready') + '</span></div><div class="workspace-content itin-compact">' + buildItinerarySection(plan.itinerary) + '</div></section>';
+        html += buildKnowledgeGuidanceSection(data, plan);
+        if (tips) html += '<section class="workspace-card full"><div class="workspace-card-head"><div><div class="workspace-card-title">💡 Travel Tips</div><div class="workspace-card-sub">Practical trip-specific suggestions</div></div></div><div class="workspace-content knowledge-answer">' + formatKnowledgeText(tips) + '</div></section>';
         html += '</div>';
         if (data.validationErrors?.length || data.semanticNotes?.length || data.ragJudge) html += '<section class="workspace-card full" style="margin-top:14px"><div class="workspace-card-title">✅ Validation</div><div class="workspace-content" style="margin-top:10px">' + buildPlanReview(data, userRequest) + '</div></section>';
         html += '</div><aside class="travel-side">';
@@ -2413,17 +2769,19 @@
         if (budgetLabel) html += '<div class="summary-row"><span>Budget</span><strong>' + escapeHtml(budgetLabel) + '</strong></div>';
         if (quality != null) html += '<div class="summary-row"><span>Quality</span><strong>' + escapeHtml(String(quality)) + '/100</strong></div>';
         html += '</section>';
+        const componentStatus = responseStatus === 'REJECTED' ? 'Rejected' : complete ? 'Complete' : 'Ready';
+        const componentClass = responseStatus === 'REJECTED' ? ' rejected' : complete ? ' complete' : '';
         html += '<section class="trip-side-card"><div class="trip-side-title">⚙ Plan Status</div><div class="status-list">';
-        if (hasFlights) html += '<div class="status-row"><span class="status-name"><i class="status-dot"></i>Flights</span><span class="status-value">Ready</span></div>';
-        if (hasHotels) html += '<div class="status-row"><span class="status-name"><i class="status-dot"></i>Hotels</span><span class="status-value">Ready</span></div>';
-        if (hasWeather) html += '<div class="status-row"><span class="status-name"><i class="status-dot"></i>Weather</span><span class="status-value">Ready</span></div>';
-        if (hasBudget) html += '<div class="status-row"><span class="status-name"><i class="status-dot"></i>Budget</span><span class="status-value">Ready</span></div>';
-        if (hasItinerary) html += '<div class="status-row"><span class="status-name"><i class="status-dot"></i>Itinerary</span><span class="status-value">Ready</span></div>';
+        if (hasFlights) html += '<div class="status-row"><span class="status-name"><i class="status-dot' + componentClass + '"></i>Flights</span><span class="status-value' + componentClass + '">' + componentStatus + '</span></div>';
+        if (hasHotels) html += '<div class="status-row"><span class="status-name"><i class="status-dot' + componentClass + '"></i>Hotels</span><span class="status-value' + componentClass + '">' + componentStatus + '</span></div>';
+        if (hasWeather) html += '<div class="status-row"><span class="status-name"><i class="status-dot' + componentClass + '"></i>Weather</span><span class="status-value' + componentClass + '">' + componentStatus + '</span></div>';
+        if (hasBudget) html += '<div class="status-row"><span class="status-name"><i class="status-dot' + componentClass + '"></i>Budget</span><span class="status-value' + componentClass + '">' + componentStatus + '</span></div>';
+        if (hasItinerary) html += '<div class="status-row"><span class="status-name"><i class="status-dot' + componentClass + '"></i>Itinerary</span><span class="status-value' + componentClass + '">' + componentStatus + '</span></div>';
         html += '</div></section>';
-        if (awaitingApproval && data.threadId) {
+        if (awaitingApproval && data.threadId && data.tripPlanning !== false) {
             html += '<section class="final-decision"><div class="decision-status pending"><i class="decision-dot"></i> Waiting for your decision</div><h3>Ready to finalize?</h3><p>Review the complete plan. Approve it, request a change, or reject it.</p><div class="final-actions"><button type="button" class="final-approve" data-plan-action="approve">✓ Approve</button><button type="button" class="final-modify" data-plan-action="modify">✎ Modify</button><button type="button" class="final-reject" data-plan-action="reject">✕ Reject</button></div></section>';
         } else if (complete) {
-            html += '<section class="final-decision"><div class="decision-status"><i class="decision-dot"></i> Plan confirmed</div><h3>✓ Trip plan confirmed</h3><p>This plan has already been finalized. Create a new trip or use Modify from a pending plan.</p></section>';
+            html += '<section class="final-decision"><div class="decision-status"><i class="decision-dot"></i> Plan confirmed</div><h3>✓ Trip plan confirmed</h3><p>This plan has already been finalized.</p></section>';
         }
         html += '</aside></div>';
         return html;
@@ -2673,6 +3031,7 @@
                         } catch (ignored) {}
                         removeLiveResponse(liveResponse);
                         appendAssistantMessage(data);
+                        loadDbTrips(false);
                         resolve();
                     } catch (error) {
                         reject(error);
@@ -2758,6 +3117,7 @@
                 appendUserMessage('Approved this plan.');
             }
             appendAssistantMessage(payload);
+            loadDbTrips(false);
         } catch (error) {
             if (sourceRow) {
                 sourceRow.querySelectorAll('[data-plan-action]').forEach(btn => {
@@ -2791,6 +3151,7 @@
     resizePrompt();
     requestAnimationFrame(resizePrompt);
     renderHistoryList();
+    loadDbTrips(false);
     const storeOnLoad = loadStore();
     if (storeOnLoad.chats.length) {
         openChat(storeOnLoad.chats.slice().sort((a, b) => b.updatedAt - a.updatedAt)[0].id);

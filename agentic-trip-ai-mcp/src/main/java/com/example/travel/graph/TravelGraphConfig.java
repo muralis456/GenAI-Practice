@@ -183,7 +183,17 @@ public class TravelGraphConfig {
                                 .to(TravelGraphNodes.FINAL, TravelGraphNodes.FINAL)
                                 .build())
                 .addConditionalEdges(TravelGraphNodes.PLANNER,
-                        edge_async(state -> state.needsKnowledge() ? TravelGraphNodes.RAG : TravelGraphNodes.ROUTER),
+                        edge_async(state -> {
+                            // Every real trip plan gets a durable-knowledge pass as well as
+                            // live MCP data. The RAG router may still decide that retrieval is
+                            // unnecessary, but this gives trip plans a chance to add grounded
+                            // packing, culture, safety, seasonality and local-planning guidance.
+                            boolean tripPlan = state != null
+                                    && "TRIP_PLANNING".equalsIgnoreCase(state.requestType());
+                            return (state.needsKnowledge() || tripPlan)
+                                    ? TravelGraphNodes.RAG
+                                    : TravelGraphNodes.ROUTER;
+                        }),
                         EdgeMappings.builder()
                                 .to(TravelGraphNodes.RAG, TravelGraphNodes.RAG)
                                 .to(TravelGraphNodes.ROUTER, TravelGraphNodes.ROUTER)
@@ -264,14 +274,12 @@ public class TravelGraphConfig {
                 .addEdge(TravelGraphNodes.REPLAN, TravelGraphNodes.ROUTER)
                 .addConditionalEdges(TravelGraphNodes.FINAL,
                         edge_async(state -> {
-                            boolean informationalOnly = state != null
-                                    && !state.runFlights()
-                                    && !state.runHotels()
-                                    && !state.runWeather()
-                                    && !state.runBudget()
-                                    && !state.runItinerary()
-                                    && state.ragSufficient()
-                                    && !state.ragAnswer().isBlank();
+                            boolean requiresApproval = state != null
+                                    && (state.needsItinerary()
+                                        || ("TRIP_PLANNING".equalsIgnoreCase(state.requestType())
+                                            && (state.needsFlights() || state.needsHotels() || state.needsResearch()
+                                                || state.needsWeather() || state.needsBudget() || state.needsKnowledge())));
+                            boolean informationalOnly = !requiresApproval;
                             String next = informationalOnly
                                     ? TravelGraphNodes.COMPLETE
                                     : TravelGraphNodes.HITL;

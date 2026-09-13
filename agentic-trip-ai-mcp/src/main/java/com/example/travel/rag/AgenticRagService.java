@@ -161,7 +161,10 @@ public class AgenticRagService {
                 Decide whether INTERNAL KNOWLEDGE retrieval is needed.
                 Use retrieval for durable knowledge such as destination guidance, travel rules,
                 packing, culture, safety, planning policies and document-backed facts.
-                Do NOT retrieve for live flight availability, hotel prices, live weather, currency rates,
+                For a real TRIP_PLANNING request, prefer retrieval of concise, useful common
+                destination guidance when a destination is known (for example packing, culture,
+                safety, local transport, seasonality, etiquette, or practical planning advice).
+                Do NOT retrieve live flight availability, hotel prices, live weather, currency rates,
                 or airport resolution; those are handled by MCP/tools.
                 Return JSON only: {"retrieve":true|false,"query":"concise semantic query","reason":"short reason","destination":"city or destination","country":"country","topics":["culture","food"]}
                 """,

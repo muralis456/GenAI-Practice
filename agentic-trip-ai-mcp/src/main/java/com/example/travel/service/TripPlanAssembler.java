@@ -3,6 +3,7 @@ package com.example.travel.service;
 
 
 import com.example.travel.dto.AgentExecutionDetails;
+import com.example.travel.dto.KnowledgeGuidance;
 
 import com.example.travel.dto.PlanValidationView;
 
@@ -107,6 +108,7 @@ public class TripPlanAssembler {
         }
 
         result.setValidation(buildValidation(state));
+        result.setKnowledge(buildKnowledgeGuidance(state));
 
         return result;
 
@@ -139,6 +141,24 @@ public class TripPlanAssembler {
     }
 
 
+
+    private KnowledgeGuidance buildKnowledgeGuidance(TravelState state) {
+        KnowledgeGuidance guidance = new KnowledgeGuidance();
+        guidance.setAvailable(state.ragSufficient() && !state.ragAnswer().isBlank());
+        guidance.setAnswer(state.ragAnswer());
+        guidance.setQuery(state.ragQuery());
+        guidance.setDestination(state.ragDestination());
+        guidance.setCountry(state.ragCountry());
+        guidance.setTopics(state.ragTopics());
+        guidance.setSources(state.ragSources());
+        guidance.setEvidenceScore(state.ragEvidenceScore());
+
+        String destination = TravelState.firstNonBlank(state.ragDestination(), state.destination());
+        if (!destination.isBlank()) {
+            guidance.setTitle("Travel Knowledge & Guidance for " + destination);
+        }
+        return guidance;
+    }
 
     private TripHeader buildHeader(TravelState state, String status, boolean awaitingApproval) {
 

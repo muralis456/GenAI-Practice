@@ -27,6 +27,7 @@ public class TripPlanResult implements Serializable {
     private WeatherForecast weather = new WeatherForecast("", "", false);
     private PlanValidationView validation = new PlanValidationView();
     private String tips = "";
+    private KnowledgeGuidance knowledge = new KnowledgeGuidance();
 
     public TripHeader getTrip() {
         return trip;
@@ -90,5 +91,13 @@ public class TripPlanResult implements Serializable {
 
     public void setTips(String tips) {
         this.tips = tips == null ? "" : tips;
+    }
+
+    public KnowledgeGuidance getKnowledge() {
+        return knowledge;
+    }
+
+    public void setKnowledge(KnowledgeGuidance knowledge) {
+        this.knowledge = knowledge == null ? new KnowledgeGuidance() : knowledge;
     }
 }
