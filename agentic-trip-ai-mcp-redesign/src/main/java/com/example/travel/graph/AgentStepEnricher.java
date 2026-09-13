@@ -14,15 +14,21 @@ public final class AgentStepEnricher {
     private AgentStepEnricher() {
     }
 
-    public static Map<String, Object> apply(NodeAction<TravelState> node, TravelState state) throws Exception {
+    public static Map<String, Object> apply(NodeAction<TravelState> node, TravelState state, String nodeName) throws Exception {
         long started = System.currentTimeMillis();
         Map<String, Object> result = new LinkedHashMap<>(node.apply(state));
-        attach(result, state, System.currentTimeMillis() - started);
+        long durationMs = System.currentTimeMillis() - started;
+        List<LlmExecutionResult> llmCalls = LlmCallContext.consume();
+        attach(result, state, durationMs, llmCalls);
+        GraphExecutionLogger.llmStage(nodeName, state, llmCalls, durationMs);
         return result;
     }
 
     public static void attach(Map<String, Object> result, TravelState state, long durationMs) {
-        List<LlmExecutionResult> llmCalls = LlmCallContext.consume();
+        attach(result, state, durationMs, LlmCallContext.consume());
+    }
+
+    private static void attach(Map<String, Object> result, TravelState state, long durationMs, List<LlmExecutionResult> llmCalls) {
         Object pipeline = result.get(TravelState.PIPELINE);
         if (!(pipeline instanceof List<?> steps)) {
             return;

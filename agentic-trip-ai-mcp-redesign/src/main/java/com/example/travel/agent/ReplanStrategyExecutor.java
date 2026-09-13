@@ -205,6 +205,15 @@ public class ReplanStrategyExecutor {
                 updates,
                 state);
 
+        // A deliberate hotel replan is a new attempt. Clear the terminal
+        // fallback marker so the hotel specialist may try the provider again.
+        if (Boolean.TRUE.equals(updates.get(TravelState.RUN_HOTELS))
+                && actions.stream().anyMatch(action ->
+                    action == ReplanAction.REDUCE_HOTEL_BUDGET
+                    || action == ReplanAction.HOTEL_UPGRADE)) {
+            updates.put(TravelState.HOTEL_FALLBACK_EXHAUSTED, Boolean.FALSE);
+        }
+
         // The canonical AgentPlan remains the source of truth even during a
         // selective recovery pass. Project the newly selected specialist set
         // onto it so the dynamic router does not accidentally fan out the

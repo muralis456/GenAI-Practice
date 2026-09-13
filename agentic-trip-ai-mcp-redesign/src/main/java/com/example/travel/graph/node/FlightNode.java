@@ -25,7 +25,7 @@ public class FlightNode implements NodeAction<TravelState> {
 
     @Override
     public Map<String, Object> apply(TravelState state) {
-        if (!state.runFlights()) {
+        if (!state.shouldExecuteTask("flights")) {
             Map<String, Object> skip = new LinkedHashMap<>();
             skip.put(TravelState.FLIGHTS, List.of());
             skip.putAll(TravelState.trace(TravelGraphNodes.FLIGHT, "skip", "not requested"));

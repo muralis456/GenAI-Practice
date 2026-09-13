@@ -21,7 +21,7 @@ public class BudgetNode implements NodeAction<TravelState> {
 
     @Override
     public Map<String, Object> apply(TravelState state) {
-        if (!state.runBudget()) {
+        if (!state.shouldExecuteTask("budget")) {
             BudgetSummary skipped = new BudgetSummary();
             skipped.setWithinBudget(true);
             skipped.setAssessment("Budget not requested for this query.");

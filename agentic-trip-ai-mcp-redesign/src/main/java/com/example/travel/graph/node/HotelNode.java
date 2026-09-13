@@ -27,7 +27,7 @@ public class HotelNode implements NodeAction<TravelState> {
 
     @Override
     public Map<String, Object> apply(TravelState state) {
-        if (!state.runHotels()) {
+        if (!state.shouldExecuteTask("hotels")) {
             Map<String, Object> skip = new LinkedHashMap<>();
             skip.put(TravelState.HOTELS, List.of());
             skip.putAll(TravelState.trace(TravelGraphNodes.HOTEL, "skip", "not requested"));
@@ -37,6 +37,7 @@ public class HotelNode implements NodeAction<TravelState> {
             HotelAgentService.HotelSearchResult result = hotelAgentService.search(state);
             Map<String, Object> updates = new LinkedHashMap<>();
             updates.put(TravelState.HOTELS, result.hotels());
+            updates.put(TravelState.HOTEL_FALLBACK_EXHAUSTED, result.fallbackExhausted());
             String outcome = result.hotels().isEmpty() ? "no_verified_results" : "ok";
             String traceReason = result.hotels().isEmpty()
                     ? "hotel search completed but returned no verified properties"

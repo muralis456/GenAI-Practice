@@ -134,7 +134,7 @@ public class TravelGraphConfig {
                     emitNodeStarted(state, TravelGraphNodes.ROUTER);
                     long started = System.nanoTime();
                     try {
-                        Map<String, Object> updates = enrich(routerNode, state);
+                        Map<String, Object> updates = enrich(routerNode, state, TravelGraphNodes.ROUTER);
                         String next = SpecialistRouter.afterPlanner(state);
                         GraphExecutionLogger.nodeComplete(TravelGraphNodes.ROUTER, state, elapsedMs(started));
                         return new Command(next, updates);
@@ -384,6 +384,7 @@ public class TravelGraphConfig {
             NodeAction<TravelState> node) {
         return node_async(state -> {
             GraphExecutionLogger.nodeStart(nodeName, state);
+            GraphExecutionLogger.stageState(nodeName, state, "before");
             emitNodeStarted(state, nodeName);
             long started = System.nanoTime();
             String threadId = state.graphThreadId();
@@ -394,7 +395,8 @@ public class TravelGraphConfig {
             }
             ModelRoutingContext.setComplexity(complexity(state));
             try {
-                Map<String, Object> updates = enrich(node, state);
+                Map<String, Object> updates = enrich(node, state, nodeName);
+                GraphExecutionLogger.stageState(nodeName, state, "after");
                 GraphExecutionLogger.nodeComplete(nodeName, state, elapsedMs(started));
                 return updates;
             } catch (Exception ex) {
@@ -445,8 +447,8 @@ public class TravelGraphConfig {
         return (System.nanoTime() - startedNanos) / 1_000_000L;
     }
 
-    private Map<String, Object> enrich(org.bsc.langgraph4j.action.NodeAction<TravelState> node, TravelState state)
+    private Map<String, Object> enrich(org.bsc.langgraph4j.action.NodeAction<TravelState> node, TravelState state, String nodeName)
             throws Exception {
-        return AgentStepEnricher.apply(node, state);
+        return AgentStepEnricher.apply(node, state, nodeName);
     }
 }

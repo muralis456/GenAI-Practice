@@ -3,7 +3,7 @@ server:
 
 spring:
   application:
-    name: agentic-trip-ai-mcp-redesign
+    name: agentic-trip-ai-mcp
   ai:
     mcp:
       client:

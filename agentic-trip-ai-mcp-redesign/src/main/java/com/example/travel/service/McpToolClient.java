@@ -160,7 +160,7 @@ public class McpToolClient {
         long started = System.nanoTime();
         for (int attempt = 1; attempt <= maxAttempts; attempt++) {
             try {
-                log.info("mcp.client.invocation-start tool={} attempt={} purpose=dynamic-mcp-selection",
+                log.info("mcp.client.invocation-start tool={} attempt={}",
                         callback.getToolDefinition().name(), attempt);
                 String response = callback.call(objectMapper.writeValueAsString(arguments));
                 JsonNode result = responseTree(response);
@@ -208,6 +208,15 @@ public class McpToolClient {
     }
 
     private boolean isRetryable(Exception exception) {
+        // A malformed JSON-RPC frame is a protocol/payload failure, not a transient
+        // tool failure. Retrying the same malformed response only adds latency and
+        // duplicates noisy stack traces; the domain client can move to its fallback.
+        String message = safeExceptionMessage(exception).toLowerCase(java.util.Locale.ROOT);
+        if (message.contains("error parsing json-rpc message")
+                || message.contains("unexpected end-of-input")
+                || message.contains("failed to read value")) {
+            return false;
+        }
         return !(exception instanceof IllegalArgumentException || exception instanceof IllegalStateException);
     }
 

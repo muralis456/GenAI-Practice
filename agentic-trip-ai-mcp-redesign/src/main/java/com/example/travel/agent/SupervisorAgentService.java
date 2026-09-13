@@ -103,8 +103,12 @@ public class SupervisorAgentService {
         }
 
         if (state.runHotels() && state.hotels().isEmpty()) {
-            log.warn("Supervisor: current hotel run has no result");
-            return TravelGraphNodes.ROUTE_RETRY;
+            if (state.hotelFallbackExhausted()) {
+                log.warn("Supervisor: hotel provider and independent fallback exhausted; not retrying MCP hotel call");
+            } else {
+                log.warn("Supervisor: current hotel run has no result");
+                return TravelGraphNodes.ROUTE_RETRY;
+            }
         }
 
         if (state.runResearch()

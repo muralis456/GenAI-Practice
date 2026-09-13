@@ -55,6 +55,9 @@ public class ReplanAgentService {
                 ReplanStrategy modificationStrategy = fromModification(modification);
                 Map<String, Object> updates = replanStrategyExecutor.apply(
                         state, modificationStrategy);
+                if (Boolean.TRUE.equals(updates.get(TravelState.RUN_HOTELS))) {
+                    updates.put(TravelState.HOTEL_FALLBACK_EXHAUSTED, Boolean.FALSE);
+                }
                 // A user modification is not a failed retry.
                 updates.put(TravelState.RETRY_COUNT, state.retryCount());
                 updates.put(TravelState.REQUEST_TYPE, com.example.travel.model.IntentPlan.TRIP_PLANNING);
@@ -71,6 +74,9 @@ public class ReplanAgentService {
                 // modification. The dashboard may therefore preserve old results
                 // without scheduling their specialists again.
                 intentUpdates.put(TravelState.REQUEST_TYPE, com.example.travel.model.IntentPlan.TRIP_PLANNING);
+                if (Boolean.TRUE.equals(intentUpdates.get(TravelState.RUN_HOTELS))) {
+                    intentUpdates.put(TravelState.HOTEL_FALLBACK_EXHAUSTED, Boolean.FALSE);
+                }
                 // Consume the HITL modification marker. The next Supervisor retry
                 // must NOT interpret the same user request again.
                 intentUpdates.put(TravelState.HITL_DECISION, "");
@@ -171,11 +177,15 @@ public class ReplanAgentService {
         updates.put(TravelState.RUN_FLIGHTS, state.runFlights()
             && !state.hasUsableFlights()
             && !hasPermanentFlightFailure(state));
-        updates.put(TravelState.RUN_HOTELS, state.runHotels() && state.hotels().isEmpty());
+        updates.put(TravelState.RUN_HOTELS, state.runHotels()
+            && state.hotels().isEmpty()
+            && !state.hotelFallbackExhausted());
         updates.put(TravelState.RUN_RESEARCH, state.runResearch()
             && state.research().isEmpty() && state.attractions().isEmpty());
         updates.put(TravelState.RUN_WEATHER, state.runWeather()
-            && (state.weather() == null || TravelState.isBlank(state.weather().getSummary())));
+            && (state.weather() == null
+                || (TravelState.isBlank(state.weather().getSummary())
+                    && (state.weather().getDays() == null || state.weather().getDays().isEmpty()))));
         updates.put(TravelState.RUN_BUDGET, state.runBudget());
         updates.put(TravelState.RUN_ITINERARY, state.runItinerary());
 

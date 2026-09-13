@@ -28,7 +28,7 @@ public class ResearchNode implements NodeAction<TravelState> {
 
     @Override
     public Map<String, Object> apply(TravelState state) {
-        if (!state.runResearch()) {
+        if (!state.shouldExecuteTask("research")) {
             Map<String, Object> skip = new LinkedHashMap<>();
             skip.putAll(TravelState.trace(TravelGraphNodes.RESEARCH, "skip", "not requested"));
             return skip;

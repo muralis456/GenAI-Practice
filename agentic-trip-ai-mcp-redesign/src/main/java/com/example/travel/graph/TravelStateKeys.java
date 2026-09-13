@@ -154,6 +154,8 @@ public final class TravelStateKeys {
     }
 
     public static final class Control {
+        /** True when the hotel specialist already exhausted its independent fallback for this pass. */
+        public static final String HOTEL_FALLBACK_EXHAUSTED = "hotelFallbackExhausted";
         public static final String RETRY_COUNT = "retryCount";
         public static final String MAX_RETRIES = "maxRetries";
         public static final String PIPELINE = "pipeline";

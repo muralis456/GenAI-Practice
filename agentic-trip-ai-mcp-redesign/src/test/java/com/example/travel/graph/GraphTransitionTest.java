@@ -173,6 +173,19 @@ class GraphTransitionTest {
     }
 
     @Test
+    void supervisorDoesNotRetryHotelAfterFallbackIsExhausted() {
+        TravelState state = state(Map.of(
+                TravelState.RUN_HOTELS, Boolean.TRUE,
+                TravelState.HOTELS, List.of(),
+                TravelState.HOTEL_FALLBACK_EXHAUSTED, Boolean.TRUE,
+                TravelState.RETRY_COUNT, 0,
+                TravelState.MAX_RETRIES, 2));
+
+        assertEquals(TravelGraphNodes.ROUTE_PROCEED,
+                new SupervisorAgentService(null, null).decide(state));
+    }
+
+    @Test
     void supervisorRetriesWhenRequiredFlightsMissing() {
         TravelState state = state(Map.of(
                 TravelState.NEEDS_FLIGHTS, Boolean.TRUE,

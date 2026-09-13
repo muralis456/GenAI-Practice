@@ -90,8 +90,9 @@ public final class TravelIntentNormalizer {
         plan.setNeedsItinerary(itinerary);
         plan.setNeedsKnowledge(knowledge);
 
-        // A trip does not imply flights, hotels, budget or weather. Only the
-        // user's objectives can activate those capabilities.
+        // Trip-planning is normalized into the complete dashboard contract by
+        // AgentPlan.fromIntent(). Keep this classifier focused on semantics;
+        // do not duplicate execution-policy expansion here.
         if (planning) {
             plan.setRequestType(IntentPlan.TRIP_PLANNING);
             plan.setStrategy("adaptive_execution");

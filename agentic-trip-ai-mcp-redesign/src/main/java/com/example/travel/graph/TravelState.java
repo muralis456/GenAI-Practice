@@ -116,6 +116,7 @@ public class TravelState extends AgentState {
     public static final String SEMANTIC_VALIDATION = TravelStateKeys.Validation.SEMANTIC_VALIDATION;
     public static final String SUPERVISOR_ASSESSMENT = TravelStateKeys.Control.SUPERVISOR_ASSESSMENT;
     public static final String NODE_FAILURE = TravelStateKeys.Control.NODE_FAILURE;
+    public static final String HOTEL_FALLBACK_EXHAUSTED = TravelStateKeys.Control.HOTEL_FALLBACK_EXHAUSTED;
     public static final String RAG_ENABLED = Rag.RAG_ENABLED;
     public static final String RAG_DECISION = Rag.RAG_DECISION;
     public static final String RAG_QUERY = Rag.RAG_QUERY;
@@ -183,6 +184,7 @@ public class TravelState extends AgentState {
         input.put(COST_FACTOR, BigDecimal.ONE);
         input.put(HOTEL_CHEAPER, Boolean.FALSE);
         input.put(HOTEL_BUDGET, UNSET_BUDGET);
+        input.put(HOTEL_FALLBACK_EXHAUSTED, Boolean.FALSE);
         input.put(FLIGHT_PREFERENCE, "balanced");
 
         // Every routing flag is explicitly initialized. Missing flags must never
@@ -553,18 +555,8 @@ public class TravelState extends AgentState {
 
     public static void applyIntentAndRun(Map<String, Object> updates, com.example.travel.model.IntentPlan intent) {
         if (intent == null) intent = new com.example.travel.model.IntentPlan();
-        boolean tripPlanning = com.example.travel.model.IntentPlan.TRIP_PLANNING.equalsIgnoreCase(intent.getRequestType())
-                || intent.isNeedsItinerary();
-        if (tripPlanning) {
-            intent.setRequestType(com.example.travel.model.IntentPlan.TRIP_PLANNING);
-            intent.setNeedsFlights(true);
-            intent.setNeedsHotels(true);
-            intent.setNeedsResearch(true);
-            intent.setNeedsWeather(true);
-            intent.setNeedsBudget(true);
-            intent.setNeedsItinerary(true);
-            intent.setNeedsKnowledge(true);
-        }
+        // AgentPlan is the sole normalization boundary. It owns the semantic
+        // trip-planning contract; legacy flags below are only a projection.
         AgentPlan plan = AgentPlan.fromIntent(intent);
         updates.put(AGENT_PLAN, plan);
         updates.put(NEEDS_FLIGHTS, intent.isNeedsFlights());
@@ -592,8 +584,31 @@ public class TravelState extends AgentState {
         if (Boolean.TRUE.equals(updates.getOrDefault(RUN_HOTELS, state.runHotels()))) active.add("hotels");
         if (Boolean.TRUE.equals(updates.getOrDefault(RUN_RESEARCH, state.runResearch()))) active.add("research");
         if (Boolean.TRUE.equals(updates.getOrDefault(RUN_WEATHER, state.runWeather()))) active.add("weather");
+        if (Boolean.TRUE.equals(updates.getOrDefault(RUN_BUDGET, state.runBudget()))) active.add("budget");
+        if (Boolean.TRUE.equals(updates.getOrDefault(RUN_ITINERARY, state.runItinerary()))) active.add("itinerary");
         plan.selectForExecution(active);
         updates.put(AGENT_PLAN, plan);
+    }
+
+    /**
+     * Canonical task guard used by graph nodes. Older checkpoints may not contain
+     * an AgentPlan, so they fall back to their persisted RUN_* projection instead
+     * of being silently skipped during checkpoint migration.
+     */
+    public boolean shouldExecuteTask(String taskId) {
+        AgentPlan plan = agentPlan();
+        if (plan != null && !plan.getTasks().isEmpty()) {
+            return plan.shouldExecute(taskId);
+        }
+        return switch (taskId == null ? "" : taskId) {
+            case "flights" -> runFlights();
+            case "hotels" -> runHotels();
+            case "research" -> runResearch();
+            case "weather" -> runWeather();
+            case "budget" -> runBudget();
+            case "itinerary" -> runItinerary();
+            default -> false;
+        };
     }
 
     /** Whether flight results exist in state (independent of selective replan routing flags). */
@@ -630,7 +645,9 @@ public class TravelState extends AgentState {
 
     public boolean includeWeatherInReport() {
         WeatherForecast forecast = weather();
-        return needsWeather() || (forecast != null && !TravelState.isBlank(forecast.getSummary()));
+        return needsWeather() || (forecast != null
+                && (!TravelState.isBlank(forecast.getSummary())
+                    || (forecast.getDays() != null && !forecast.getDays().isEmpty())));
     }
 
     public String planStrategy() {
@@ -672,6 +689,15 @@ public class TravelState extends AgentState {
 
     public boolean hotelCheaper() {
         return Boolean.TRUE.equals(this.<Boolean>value(HOTEL_CHEAPER).orElse(Boolean.FALSE));
+    }
+
+    /**
+     * True means the hotel specialist has already attempted its independent
+     * fallback and exhausted it for the current pass. An empty hotel result
+     * is therefore a terminal provider outcome, not a reason to call MCP again.
+     */
+    public boolean hotelFallbackExhausted() {
+        return Boolean.TRUE.equals(this.<Boolean>value(HOTEL_FALLBACK_EXHAUSTED).orElse(Boolean.FALSE));
     }
 
     public BigDecimal hotelBudget() {

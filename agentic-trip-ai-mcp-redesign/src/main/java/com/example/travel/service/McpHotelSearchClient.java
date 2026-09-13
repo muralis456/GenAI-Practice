@@ -64,8 +64,19 @@ public class McpHotelSearchClient {
             }
             return hotels;
         } catch (Exception exception) {
-            log.error("mcp.client.error client=McpHotelSearchClient operation=search destination={} cheaper={} errorType={} errorMessage={}",
-                    destination, cheaper, exception.getClass().getName(), safeMessage(exception), exception);
+            String message = safeMessage(exception);
+            boolean protocolFailure = isProtocolFailure(exception);
+            if (protocolFailure) {
+                // The MCP server has returned a malformed/truncated JSON-RPC frame.
+                // Do not leak the giant provider payload into the application log and
+                // do not retry it here; HotelAgentService will use its independent
+                // research fallback.
+                log.warn("mcp.hotel.protocol-failure destination={} cheaper={} action=fallback reason={}",
+                        destination, cheaper, abbreviate(message));
+            } else {
+                log.warn("mcp.hotel.provider-failure destination={} cheaper={} action=fallback errorType={} reason={}",
+                        destination, cheaper, exception.getClass().getSimpleName(), abbreviate(message));
+            }
             return List.of();
         }
     }
@@ -82,6 +93,24 @@ public class McpHotelSearchClient {
         List<JsonNode> result = new ArrayList<>();
         candidates.forEach(result::add);
         return result;
+    }
+
+
+    private boolean isProtocolFailure(Throwable exception) {
+        Throwable current = exception;
+        while (current != null) {
+            String message = current.getMessage();
+            if (message != null) {
+                String normalized = message.toLowerCase(java.util.Locale.ROOT);
+                if (normalized.contains("error parsing json-rpc message")
+                        || normalized.contains("unexpected end-of-input")
+                        || normalized.contains("failed to read value")) {
+                    return true;
+                }
+            }
+            current = current.getCause();
+        }
+        return false;
     }
 
     private String abbreviate(String value) {

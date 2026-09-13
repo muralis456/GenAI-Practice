@@ -20,7 +20,7 @@ public class ItineraryNode implements NodeAction<TravelState> {
 
     @Override
     public Map<String, Object> apply(TravelState state) {
-        if (!state.runItinerary()) {
+        if (!state.shouldExecuteTask("itinerary")) {
             Map<String, Object> skip = new LinkedHashMap<>();
             skip.put(TravelState.ITINERARY, new com.example.travel.model.Itinerary());
             skip.putAll(TravelState.trace(TravelGraphNodes.ITINERARY, "skip", "not requested"));

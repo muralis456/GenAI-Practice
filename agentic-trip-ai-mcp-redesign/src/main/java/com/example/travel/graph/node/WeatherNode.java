@@ -25,7 +25,7 @@ public class WeatherNode implements NodeAction<TravelState> {
 
     @Override
     public Map<String, Object> apply(TravelState state) {
-        if (!state.runWeather()) {
+        if (!state.shouldExecuteTask("weather")) {
             Map<String, Object> skip = new LinkedHashMap<>();
             skip.putAll(TravelState.trace(TravelGraphNodes.WEATHER, "skip", "not requested"));
             return skip;

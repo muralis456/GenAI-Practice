@@ -143,6 +143,15 @@ public class TravelPlannerAgentService {
                 executionBudget.capture(),
                 policy);
 
+        long runStarted = System.currentTimeMillis();
+        GraphExecutionLogger.runStart(threadId, userId,
+                String.valueOf(input.get(TravelState.REQUEST_TYPE)),
+                String.valueOf(input.get(TravelState.DESTINATION)),
+                String.valueOf(input.get(TravelState.ORIGIN)),
+                String.valueOf(input.get(TravelState.DEPARTURE_DATE)),
+                String.valueOf(input.get(TravelState.RETURN_DATE)),
+                ((Number) input.getOrDefault(TravelState.TRAVELERS, 1)).intValue(),
+                String.valueOf(input.get(TravelState.BUDGET_LABEL)), policy);
         try {
             travelGraph.invoke(input, config);
         } finally {
@@ -161,6 +170,7 @@ public class TravelPlannerAgentService {
 
         boolean pending = isAwaitingHitl(threadId);
 
+        GraphExecutionLogger.runComplete(state, System.currentTimeMillis() - runStarted, pending);
         log.info(
                 "Graph paused for HITL={} threadId={}",
                 pending,
@@ -237,6 +247,15 @@ public class TravelPlannerAgentService {
                 executionBudget.capture(),
                 policy);
 
+        long runStarted = System.currentTimeMillis();
+        GraphExecutionLogger.runStart(threadId, userId,
+                String.valueOf(input.get(TravelState.REQUEST_TYPE)),
+                String.valueOf(input.get(TravelState.DESTINATION)),
+                String.valueOf(input.get(TravelState.ORIGIN)),
+                String.valueOf(input.get(TravelState.DEPARTURE_DATE)),
+                String.valueOf(input.get(TravelState.RETURN_DATE)),
+                ((Number) input.getOrDefault(TravelState.TRAVELERS, 1)).intValue(),
+                String.valueOf(input.get(TravelState.BUDGET_LABEL)), policy);
         try {
 
             graphProgressHub.emit(
@@ -301,6 +320,8 @@ public class TravelPlannerAgentService {
                     plan);
             tripHistoryService.saveOrUpdate(userId, plan);
 
+            GraphExecutionLogger.runComplete(state, System.currentTimeMillis() - runStarted, pending);
+
             Map<String, Object> done = new LinkedHashMap<>();
 
             done.put("plan", plan);
@@ -312,6 +333,7 @@ public class TravelPlannerAgentService {
 
         } catch (Exception ex) {
 
+            GraphExecutionLogger.runFailed(threadId, System.currentTimeMillis() - runStarted, ex);
             log.warn(
                     "Streaming plan failed threadId={}",
                     threadId,

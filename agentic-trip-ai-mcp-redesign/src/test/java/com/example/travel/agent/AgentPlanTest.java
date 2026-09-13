@@ -5,6 +5,8 @@ import com.example.travel.model.AgentTask;
 import com.example.travel.model.IntentPlan;
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 class AgentPlanTest {
@@ -13,6 +15,8 @@ class AgentPlanTest {
         AgentPlan plan = AgentPlan.fromIntent(IntentPlan.fullTrip());
 
         assertEquals("TRIP_PLANNING", plan.getGoal());
+        assertFalse(plan.isSelectiveExecution());
+        assertEquals(List.of("flight", "hotel", "research", "weather"), plan.executablePreSupervisorAgents());
         assertTrue(plan.has("flights"));
         assertTrue(plan.has("hotels"));
         assertTrue(plan.has("research"));
@@ -21,17 +25,25 @@ class AgentPlanTest {
         assertTrue(plan.has("itinerary"));
         assertTrue(plan.ready("flights"));
         assertFalse(plan.ready("itinerary"));
-        assertEquals(4, plan.preSupervisorTasks().size());
     }
 
     @Test
-    void specialistRequestDoesNotAcquireUnrequestedTasks() {
+    void specialistRequestRemainsSelectiveByContentButExecutableOnInitialPass() {
         AgentPlan plan = AgentPlan.fromIntent(IntentPlan.hotelsOnly());
+        assertFalse(plan.isSelectiveExecution());
+        assertEquals(List.of("hotel"), plan.executablePreSupervisorAgents());
         assertTrue(plan.has("hotels"));
         assertFalse(plan.has("flights"));
         assertFalse(plan.has("weather"));
-        assertEquals(1, plan.preSupervisorTasks().size());
-        assertTrue(plan.ready("hotels"));
+    }
+
+    @Test
+    void selectiveRecoveryCannotFallBackToStaleTasks() {
+        AgentPlan plan = AgentPlan.fromIntent(IntentPlan.fullTrip());
+        plan.selectForExecution(List.of("hotels"));
+        assertTrue(plan.isSelectiveExecution());
+        assertEquals(List.of("hotel"), plan.executablePreSupervisorAgents());
+        assertEquals(AgentTask.Status.SKIPPED, plan.task("flights").getStatus());
     }
 
     @Test
@@ -44,4 +56,38 @@ class AgentPlanTest {
         plan.markFailed("weather", "provider timeout");
         assertFalse(plan.hasRetryableFailure(2));
     }
+
+    @Test
+    void selectiveRecoveryPreservesDownstreamTasks() {
+        AgentPlan plan = AgentPlan.fromIntent(IntentPlan.fullTrip());
+        plan.selectForExecution(List.of("hotels"));
+
+        assertTrue(plan.shouldExecute("hotels"));
+        assertFalse(plan.shouldExecute("flights"));
+        assertTrue(plan.shouldExecute("budget"));
+        assertTrue(plan.shouldExecute("itinerary"));
+    }
+
+    @Test
+    void initialPlanExecutesPendingTasksFromCanonicalPlan() {
+        AgentPlan plan = AgentPlan.fromIntent(IntentPlan.fullTrip());
+        assertTrue(plan.shouldExecute("flights"));
+        assertTrue(plan.shouldExecute("hotels"));
+        assertTrue(plan.shouldExecute("weather"));
+        assertTrue(plan.shouldExecute("budget"));
+        assertTrue(plan.shouldExecute("itinerary"));
+    }
+
+    @Test
+    void recoveryDependencyClosureIsTransitive() {
+        AgentPlan plan = AgentPlan.fromIntent(IntentPlan.fullTrip());
+        plan.selectForExecution(List.of("flights"));
+
+        assertTrue(plan.shouldExecute("flights"));
+        assertTrue(plan.shouldExecute("budget"));
+        assertTrue(plan.shouldExecute("itinerary"));
+        assertFalse(plan.shouldExecute("hotels"));
+        assertFalse(plan.shouldExecute("weather"));
+    }
+
 }

@@ -106,7 +106,7 @@ public class HotelAgentService {
             if (!directHotels.isEmpty()) {
                 log.info("Hotel agent using structured MCP results destination={} count={}",
                         destination, directHotels.size());
-                return new HotelSearchResult(new ArrayList<>(directHotels), List.of());
+                return new HotelSearchResult(new ArrayList<>(directHotels), List.of(), false);
             }
             log.warn("Hotel provider returned no verified structured hotels destination={} — switching to independent travel-research fallback",
                     destination);
@@ -298,7 +298,8 @@ public class HotelAgentService {
 
         return new HotelSearchResult(
                 new ArrayList<>(hotels),
-                List.of()
+                List.of(),
+                false
         );
     }
 
@@ -426,17 +427,19 @@ public class HotelAgentService {
 
         // Never fabricate a hotel-shaped record when research/tool output is not structured.
         // The UI will render the empty state instead of turning an article title into a hotel.
-        return new HotelSearchResult(new ArrayList<>(), List.of());
+        return new HotelSearchResult(new ArrayList<>(), List.of(), true);
     }
 
     public static final class HotelSearchResult {
 
         private final List<HotelOption> hotels;
         private final List<SearchHit> hits;
+        private final boolean fallbackExhausted;
 
         public HotelSearchResult(
                 List<HotelOption> hotels,
-                List<SearchHit> hits) {
+                List<SearchHit> hits,
+                boolean fallbackExhausted) {
 
             this.hotels =
                     hotels == null
@@ -447,6 +450,7 @@ public class HotelAgentService {
                     hits == null
                             ? List.of()
                             : hits;
+            this.fallbackExhausted = fallbackExhausted;
         }
 
         public List<HotelOption> hotels() {
@@ -455,6 +459,10 @@ public class HotelAgentService {
 
         public List<SearchHit> hits() {
             return hits;
+        }
+
+        public boolean fallbackExhausted() {
+            return fallbackExhausted;
         }
     }
 }
