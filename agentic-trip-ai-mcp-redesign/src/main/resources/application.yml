@@ -97,8 +97,11 @@ travel:
     # Free plans reject flight_date with 403 function_access_restricted.
     include-flight-date: false
   weather:
-    geocode-url: https://geocoding-api.open-meteo.com/v1/search
-    forecast-url: https://api.open-meteo.com/v1/forecast
+    provider: ${WEATHER_PROVIDER:openweather}
+    api-key: ${OPENWEATHER_API_KEY:}
+    geocode-url: ${OPENWEATHER_GEOCODE_URL:https://api.openweathermap.org/geo/1.0/direct}
+    current-url: ${OPENWEATHER_CURRENT_URL:https://api.openweathermap.org/data/2.5/weather}
+    forecast-url: ${OPENWEATHER_FORECAST_URL:https://api.openweathermap.org/data/2.5/forecast}
   currency:
     rates-url: https://api.frankfurter.app/latest
 

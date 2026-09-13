@@ -168,6 +168,9 @@ public class McpToolClient {
                     boolean success = result.path("success").asBoolean();
                     String errorCode = result.path("errorCode").asString("");
                     String message = result.path("message").asString("");
+                    if (message.isBlank()) {
+                        message = result.path("summary").asString("");
+                    }
                     if (success) {
                         log.info("mcp.client.response tool={} success=true errorCode={} message={}",
                                 toolName, errorCode, message);

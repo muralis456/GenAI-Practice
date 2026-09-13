@@ -25,8 +25,11 @@ travel:
     api-url: ${TAVILY_API_URL:https://api.tavily.com/search}
     api-key: ${TAVILY_API_KEY:}
   weather:
-    geocode-url: ${WEATHER_GEOCODE_URL:https://geocoding-api.open-meteo.com/v1/search}
-    forecast-url: ${WEATHER_FORECAST_URL:https://api.open-meteo.com/v1/forecast}
+    provider: ${WEATHER_PROVIDER:openweather}
+    api-key: ${OPENWEATHER_API_KEY:}
+    geocode-url: ${OPENWEATHER_GEOCODE_URL:https://api.openweathermap.org/geo/1.0/direct}
+    current-url: ${OPENWEATHER_CURRENT_URL:https://api.openweathermap.org/data/2.5/weather}
+    forecast-url: ${OPENWEATHER_FORECAST_URL:https://api.openweathermap.org/data/2.5/forecast}
   mcp:
     allowed-tools: ${MCP_ALLOWED_TOOLS:search_flights,search_hotels,get_weather,resolve_airport,search_travel_research}
     security:

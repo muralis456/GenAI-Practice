@@ -1571,6 +1571,17 @@
         .weather-day-card{min-width:105px;padding:11px 9px;border-radius:11px;background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.055);text-align:center}
         .weather-day-date{font-size:10px;font-weight:800;color:#9eb8d5;text-transform:uppercase;letter-spacing:.06em}.weather-day-icon{font-size:26px;margin:8px 0 4px}.weather-day-condition{height:29px;font-size:10px;color:#c9d9eb;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.weather-day-temp{margin-top:5px;font-size:12px}.weather-day-temp strong{font-size:16px;color:#f3f8ff}.weather-day-temp span{color:#8da5bf}.weather-day-rain{margin-top:6px;font-size:10px;color:#8fbdf1}
         .weather-insight{display:flex;gap:9px;margin-top:10px;padding:10px 11px;border-radius:10px;background:rgba(75,151,235,.08);border:1px solid rgba(75,151,235,.15);color:#a9c4e2;font-size:11px;line-height:1.5}.weather-insight strong{display:block;color:#dcecff;margin-bottom:2px}.weather-insight-icon{font-size:16px}
+        .weather-current{display:grid;grid-template-columns:minmax(190px,1.25fr) minmax(0,2fr);gap:12px;margin-bottom:12px}
+        .weather-current-main{position:relative;overflow:hidden;padding:16px;border-radius:13px;background:linear-gradient(145deg,rgba(46,110,177,.25),rgba(16,38,61,.72));border:1px solid rgba(104,177,255,.20)}
+        .weather-current-main:after{content:'';position:absolute;width:150px;height:150px;right:-65px;top:-75px;border-radius:50%;background:rgba(111,190,255,.10);filter:blur(2px)}
+        .weather-current-label{font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#8eb9e5}
+        .weather-current-condition{display:flex;align-items:center;gap:8px;margin-top:8px}.weather-current-icon{width:54px;height:54px;object-fit:contain}.weather-current-temp{font-size:36px;font-weight:850;letter-spacing:-.04em;color:#f5faff;line-height:1}.weather-current-temp small{font-size:17px;font-weight:700;color:#a9c3dd}.weather-current-desc{margin-top:5px;color:#c5d9ed;font-size:12px;text-transform:capitalize}.weather-current-feels{margin-top:8px;color:#8fa9c3;font-size:11px}
+        .weather-metrics{display:grid;grid-template-columns:repeat(4,minmax(92px,1fr));gap:7px}.weather-metric{padding:10px 9px;border-radius:10px;background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.055)}.weather-metric-label{font-size:9px;color:#7f9bb7;text-transform:uppercase;letter-spacing:.05em}.weather-metric-value{margin-top:5px;color:#e9f3fd;font-size:12px;font-weight:800}.weather-metric-sub{margin-top:2px;color:#718da8;font-size:9px}
+        .weather-sunline{display:flex;gap:7px;margin-top:8px}.weather-sun{flex:1;padding:8px 9px;border-radius:9px;background:rgba(255,255,255,.03);color:#9db6ce;font-size:10px}.weather-sun strong{display:block;color:#e7f2fc;font-size:11px;margin-top:2px}
+        .weather-source{margin-top:9px;color:#6f8ba6;font-size:9px}.weather-source strong{color:#88afd2}
+        .weather-forecast-title{margin:12px 0 8px;color:#cfe0f1;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.07em}
+        .weather-focused .weather-current{grid-template-columns:minmax(230px,1fr) minmax(0,2fr)}.weather-focused .weather-current-main{padding:20px}.weather-focused .weather-current-temp{font-size:44px}
+        @media(max-width:900px){.weather-current{grid-template-columns:1fr}.weather-metrics{grid-template-columns:repeat(2,minmax(100px,1fr))}.weather-focused .weather-current{grid-template-columns:1fr}}
         @media(max-width:760px){.weather-days-grid{grid-template-columns:repeat(5,105px)}.weather-dashboard-head{flex-direction:column}.weather-live-badge{align-self:flex-start}}
 
         /* ===== Final V5 visual design ===== */
@@ -3243,46 +3254,91 @@
         return html + '</div>';
     };
 
-    const buildWeatherSection = (weather) => {
-        if (!weather || (!weather.summary && !weather.location && !Array.isArray(weather.days))) return '';
+    const buildWeatherSection = (weather, options = {}) => {
+        if (!weather || (!weather.summary && !weather.location && !weather.current && !Array.isArray(weather.days))) return '';
+        const current = weather.current || {};
         const days = Array.isArray(weather.days) ? weather.days.filter(Boolean).slice(0, 7) : [];
+        const focused = !!options.focused;
         const fmtDate = (value) => {
             if (!value) return '';
             const d = new Date(value + (String(value).length === 10 ? 'T00:00:00' : ''));
             return Number.isNaN(d.getTime()) ? String(value) : d.toLocaleDateString(undefined, { month:'short', day:'numeric' });
         };
+        const fmtTime = (unix) => {
+            if (unix == null || unix === '') return '—';
+            const d = new Date(Number(unix) * 1000);
+            return Number.isNaN(d.getTime()) ? '—' : d.toLocaleTimeString(undefined, { hour:'numeric', minute:'2-digit' });
+        };
+        const num = (value, digits = 0) => value == null || value === '' || Number.isNaN(Number(value)) ? '—' : Number(value).toFixed(digits);
+        const km = (meters) => meters == null ? '—' : (Number(meters) / 1000).toFixed(1) + ' km';
+        const windDir = (deg) => {
+            if (deg == null || Number.isNaN(Number(deg))) return '—';
+            const dirs = ['N','NE','E','SE','S','SW','W','NW'];
+            return dirs[Math.round(Number(deg) / 45) % 8] + ' · ' + Math.round(Number(deg)) + '°';
+        };
+        const safeIcon = (icon) => /^[0-9]{2}[dn]$/.test(String(icon || ''))
+            ? '<img class="weather-current-icon" src="https://openweathermap.org/img/wn/' + escapeHtml(String(icon)) + '@2x.png" alt="Weather icon">'
+            : '<span class="weather-current-icon" style="display:flex;align-items:center;justify-content:center;font-size:34px">🌤️</span>';
         const dateRange = days.length ? fmtDate(days[0].date) + (days.length > 1 ? ' – ' + fmtDate(days[days.length - 1].date) : '') : '';
-        const cards = days.map(day => {
-            const high = day.high != null ? Math.round(Number(day.high)) + '°' : '—';
-            const low = day.low != null ? Math.round(Number(day.low)) + '°' : '—';
-            const rain = day.rainProbability != null ? 'Rain ' + Math.round(Number(day.rainProbability)) + '%' : 'Rain —';
-            return '<div class="weather-day-card">'
-                + '<div class="weather-day-date">' + escapeHtml(fmtDate(day.date)) + '</div>'
-                + '<div class="weather-day-icon">' + escapeHtml(day.icon || '🌤️') + '</div>'
-                + '<div class="weather-day-condition">' + escapeHtml(day.condition || 'Forecast') + '</div>'
-                + '<div class="weather-day-temp"><strong>' + escapeHtml(high) + '</strong> <span>' + escapeHtml(low) + '</span></div>'
-                + '<div class="weather-day-rain">' + escapeHtml(rain) + '</div>'
-                + '</div>';
-        }).join('');
-        let insight = '';
+        const hasCurrent = current.temperature != null;
+        let html = '<div class="weather-dashboard-card' + (focused ? ' weather-focused' : '') + '">';
+        html += '<div class="weather-dashboard-head"><div><div class="weather-location-title">🌤️ ' + escapeHtml(weather.location || 'Destination') + ' Weather</div>'
+            + '<div class="weather-location-sub">' + escapeHtml(dateRange || 'Current conditions') + '</div></div>'
+            + '<span class="weather-live-badge">OpenWeather · Live</span></div>';
+
+        if (hasCurrent) {
+            const desc = current.description || current.condition || 'Current conditions';
+            const rainNow = current.rain1h != null ? Number(current.rain1h).toFixed(1) + ' mm/h' : 'None reported';
+            const snowNow = current.snow1h != null ? Number(current.snow1h).toFixed(1) + ' mm/h' : 'None reported';
+            html += '<div class="weather-current">'
+                + '<div class="weather-current-main"><div class="weather-current-label">Current conditions</div>'
+                + '<div class="weather-current-condition">' + safeIcon(current.icon) + '<div><div class="weather-current-temp">' + num(current.temperature) + '°<small>C</small></div><div class="weather-current-desc">' + escapeHtml(desc) + '</div></div></div>'
+                + '<div class="weather-current-feels">Feels like ' + num(current.feelsLike) + '°C · Updated ' + escapeHtml(fmtTime(current.observedAt)) + '</div></div>'
+                + '<div><div class="weather-metrics">'
+                + metric('💧','Humidity', current.humidity != null ? Math.round(Number(current.humidity)) + '%' : '—')
+                + metric('🌡️','Pressure', current.pressure != null ? Math.round(Number(current.pressure)) + ' hPa' : '—')
+                + metric('💨','Wind gust', current.windGust != null ? num(current.windGust,1) + ' m/s' : '—')
+                + metric('☁️','Cloud cover', current.clouds != null ? Math.round(Number(current.clouds)) + '%' : '—')
+                + metric('💨','Wind', current.windSpeed != null ? num(current.windSpeed,1) + ' m/s' : '—', windDir(current.windDeg))
+                + metric('👁️','Visibility', km(current.visibilityMeters))
+                + metric('🌧️','Rain · 1h', rainNow)
+                + metric('❄️','Snow · 1h', snowNow)
+                + '</div><div class="weather-sunline">'
+                + '<div class="weather-sun">🌅 Sunrise<strong>' + escapeHtml(fmtTime(current.sunrise)) + '</strong></div>'
+                + '<div class="weather-sun">🌇 Sunset<strong>' + escapeHtml(fmtTime(current.sunset)) + '</strong></div>'
+                + '<div class="weather-sun">🌎 Timezone<strong>' + escapeHtml(current.timezone || 'Local') + '</strong></div>'
+                + '</div></div></div>';
+            html += '<div class="weather-source">Source: <strong>OpenWeather Free · Current Weather + 5-day / 3-hour Forecast</strong> · Provider values are displayed directly; recommendations may be generated separately.</div>';
+        }
+
         if (days.length) {
+            html += '<div class="weather-forecast-title">Travel-date outlook</div><div class="weather-days-grid">';
+            html += days.map(day => {
+                const high = day.high != null ? Math.round(Number(day.high)) + '°' : '—';
+                const low = day.low != null ? Math.round(Number(day.low)) + '°' : '—';
+                const rain = day.rainProbability != null ? 'Rain ' + Math.round(Number(day.rainProbability)) + '%' : 'Rain —';
+                return '<div class="weather-day-card"><div class="weather-day-date">' + escapeHtml(fmtDate(day.date)) + '</div>'
+                    + '<div class="weather-day-icon">' + escapeHtml(day.icon || '🌤️') + '</div>'
+                    + '<div class="weather-day-condition">' + escapeHtml(day.condition || 'Forecast') + '</div>'
+                    + '<div class="weather-day-temp"><strong>' + escapeHtml(high) + '</strong> <span>' + escapeHtml(low) + '</span></div>'
+                    + '<div class="weather-day-rain">' + escapeHtml(rain) + '</div></div>';
+            }).join('') + '</div>';
+            let insight = '';
             const wet = days.reduce((best, day) => Number(day.rainProbability || 0) > Number(best?.rainProbability || 0) ? day : best, null);
             const maxRain = Number(wet?.rainProbability || 0);
             if (maxRain >= 50) insight = 'Higher rain probability on ' + fmtDate(wet.date) + ' — consider keeping indoor activities such as museums for that day.';
             else if (maxRain >= 30) insight = 'Mostly good travel conditions, with a moderate chance of rain on ' + fmtDate(wet.date) + '. Keep a light rain layer handy.';
             else insight = 'Good travel conditions overall. Outdoor sightseeing should be comfortable across the forecast period.';
+            html += '<div class="weather-insight"><span class="weather-insight-icon">💡</span><div><strong>Travel Weather Insight</strong><div>' + escapeHtml(insight) + '</div></div></div>';
+        } else if (!hasCurrent) {
+            html += '<div class="weather-card"><div class="weather-icon">🌤️</div><div><div class="weather-main">' + escapeHtml(weather.summary || 'Weather information available') + '</div>'
+                + '<div class="weather-detail">' + escapeHtml(weather.location || '') + (weather.rainLikely ? ' · Rain may be likely' : '') + '</div></div></div>';
         }
-        if (!days.length) {
-            const detail = [weather.location, weather.rainLikely ? 'Rain may be likely' : ''].filter(Boolean).join(' · ');
-            return '<div class="weather-card"><div class="weather-icon">🌤️</div><div><div class="weather-main">' + escapeHtml(weather.summary || 'Weather information available') + '</div>'
-                + (detail ? '<div class="weather-detail">' + escapeHtml(detail) + '</div>' : '') + '</div></div>';
+        return html + '</div>';
+
+        function metric(icon, label, value, sub) {
+            return '<div class="weather-metric"><div class="weather-metric-label">' + icon + ' ' + escapeHtml(label) + '</div><div class="weather-metric-value">' + escapeHtml(String(value)) + '</div>' + (sub ? '<div class="weather-metric-sub">' + escapeHtml(String(sub)) + '</div>' : '') + '</div>';
         }
-        return '<div class="weather-dashboard-card">'
-            + '<div class="weather-dashboard-head"><div><div class="weather-location-title">🌤️ ' + escapeHtml(weather.location || 'Destination') + ' Weather</div>'
-            + '<div class="weather-location-sub">' + escapeHtml(dateRange || 'Travel-date forecast') + '</div></div><span class="weather-live-badge">Provider forecast</span></div>'
-            + '<div class="weather-days-grid">' + cards + '</div>'
-            + (insight ? '<div class="weather-insight"><span class="weather-insight-icon">💡</span><div><strong>Travel Weather Insight</strong><div>' + escapeHtml(insight) + '</div></div></div>' : '')
-            + '</div>';
     };
     const buildAgentDetails = (data) => {
         const exec = data.execution || {};
@@ -3486,7 +3542,7 @@
             title = location ? 'Weather in ' + location : 'Weather details';
             subtitle = 'Current or forecast conditions';
             icon = '☀️';
-            body = buildWeatherSection(weather);
+            body = buildWeatherSection(weather, { focused: true });
         } else if (type === 'FLIGHT_SEARCH') {
             title = location ? 'Flight options for ' + location : 'Flight options';
             subtitle = 'Available flight results';

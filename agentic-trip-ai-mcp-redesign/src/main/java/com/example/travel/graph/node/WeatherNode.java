@@ -37,11 +37,13 @@ public class WeatherNode implements NodeAction<TravelState> {
             updates.putAll(TravelState.trace(TravelGraphNodes.WEATHER,
                     weather != null && weather.isRainLikely() ? "warn" : "ok",
                     weather == null ? "no forecast" : weather.toDisplay()));
+            boolean hasWeatherData = weather != null && (weather.hasCurrentDetails() || !weather.getDays().isEmpty());
+            String status = hasWeatherData ? (weather.isRainLikely() ? "warn" : "ok") : "error";
             GraphExecutionLogger.specialistResult(TravelGraphNodes.WEATHER, state,
-                    weather != null && weather.isRainLikely() ? "warn" : "ok",
-                    weather == null ? "no forecast" : "rainLikely=" + weather.isRainLikely());
+                    status,
+                    weather == null ? "no forecast" : weather.toDisplay());
             updates.putAll(TravelState.provenance(new ProvenanceEvent(
-                    "weather", "Open-Meteo", "https://open-meteo.com/", 0,
+                    "weather", "OpenWeather Free Weather APIs", "https://openweathermap.org/price", 0,
                     state.destination())));
             return updates;
         } catch (Exception ex) {
