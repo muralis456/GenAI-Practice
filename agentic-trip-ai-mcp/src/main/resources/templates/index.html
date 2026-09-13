@@ -1804,7 +1804,7 @@
         .sidebar-nav-item:active { transform:translateY(1px); }
         .sidebar-nav-item.active { background:rgba(40,125,245,.16); }
         .sidebar-nav-item:focus-visible, .chat-history-item:focus-visible, .workspace-tab:focus-visible,
-        .hotel-more-btn:focus-visible, .final-actions button:focus-visible { outline:2px solid #5ca7ff; outline-offset:2px; }
+        .hotel-more-btn:focus-visible, .flight-more-btn:focus-visible, .final-actions button:focus-visible { outline:2px solid #5ca7ff; outline-offset:2px; }
         .sidebar-section-title { margin-top:2px; }
         .chat-history-list { min-height:0 !important; }
         .chat-history-item { min-height:54px; }
@@ -1888,7 +1888,7 @@
         .specialist-answer { color:#d5deee; font-size:15px; line-height:1.75; }
         .specialist-answer p { margin:0 0 12px; }
         .specialist-answer ul { margin:0 0 12px 20px; }
-        .specialist-empty { padding:22px; text-align:center; color:#8295b4; border:1px dashed rgba(125,158,210,.18); border-radius:16px; }
+        .specialist-empty { padding:16px 18px; text-align:center; color:#8295b4; border:1px dashed rgba(125,158,210,.18); border-radius:16px; }
         .specialist-subsection { padding:14px 0; border-bottom:1px solid rgba(255,255,255,.07); }
         .specialist-subsection:last-child { border-bottom:0; }
         .specialist-subsection h3 { margin:0 0 10px; font-size:14px; color:#eaf2ff; }
@@ -2027,6 +2027,11 @@
 .flight-group-title{display:flex;justify-content:space-between;align-items:center;margin:0 2px 7px;color:#b8cbe2;font-size:10px;font-weight:850;letter-spacing:.03em;text-transform:uppercase}
 .flight-group-title span:last-child{color:#7189a7;font-weight:700;text-transform:none;letter-spacing:0}
 .flight-more-note{padding:5px 2px 0;color:#7891ae;font-size:9px;font-weight:700;text-align:right}
+.flight-more-btn{width:100%;margin-top:7px;padding:8px 10px;border-radius:9px;border:1px dashed rgba(105,164,229,.28);background:rgba(65,133,214,.07);color:#9fc7f7;font-size:10px;font-weight:800;cursor:pointer;text-align:center}
+.flight-more-btn:hover{background:rgba(65,133,214,.13);border-color:rgba(105,164,229,.42)}
+.flight-more-btn:focus-visible{outline:2px solid #5ca7ff;outline-offset:2px}
+.flight-card.is-extra-flight{display:none!important}
+.flight-list.expanded .flight-card.is-extra-flight{display:block!important}
 
 .hotel-card{padding:10px 11px!important;min-height:0!important}
 .hotel-card-main{min-width:0}
@@ -3129,13 +3134,14 @@
         const usable = (flights || []).filter(f => f && String(f.status || '').toLowerCase() !== 'unavailable');
         if (!usable.length) return '<div class="specialist-empty">No confirmed flight options are available for the requested route/date.</div>';
 
-        const renderFlight = (f) => {
+        const renderFlight = (f, index) => {
             const direction = String(f.direction || 'outbound').toLowerCase() === 'return' ? 'RETURN' : 'OUTBOUND';
             const route = (f.origin && f.destination) ? f.origin + ' → ' + f.destination : '';
             const times = [f.departureTime, f.arrivalTime].filter(Boolean).join(' → ');
             const meta = [route, times].filter(Boolean).join(' · ');
             const dateNote = f.requestedDate ? 'Requested ' + f.requestedDate : '';
-            return '<div class="flight-card compact-flight-card">'
+            const extraClass = index >= 3 ? ' is-extra-flight' : '';
+            return '<div class="flight-card compact-flight-card' + extraClass + '">'
                 + '<div class="flight-topline"><span class="flight-direction">' + direction + '</span><div class="item-title">' + escapeHtml([f.airline, f.flightNumber].filter(Boolean).join(' · ') || 'Flight option') + '</div></div>'
                 + (meta ? '<div class="flight-route-line">' + escapeHtml(meta) + '</div>' : '')
                 + ((dateNote || f.notes) ? '<div class="item-note">' + escapeHtml([dateNote, f.notes].filter(Boolean).join(' · ')) + '</div>' : '')
@@ -3150,10 +3156,12 @@
         groups.forEach(([key, label]) => {
             const items = usable.filter(f => String(f.direction || 'outbound').toLowerCase() === key);
             if (!items.length) return;
+            const extraCount = Math.max(0, items.length - 3);
+            const listClass = extraCount ? ' flight-list has-extra-flights' : ' flight-list';
             html += '<div class="flight-group">'
                 + '<div class="flight-group-title"><span>' + label + '</span><span>' + items.length + ' option' + (items.length === 1 ? '' : 's') + '</span></div>'
-                + items.slice(0, 3).map(renderFlight).join('')
-                + (items.length > 3 ? '<div class="flight-more-note">+' + (items.length - 3) + ' more available options</div>' : '')
+                + '<div class="' + listClass.trim() + '">' + items.map(renderFlight).join('') + '</div>'
+                + (extraCount ? '<button type="button" class="flight-more-btn" data-flights-more>＋ ' + extraCount + ' more available option' + (extraCount === 1 ? '' : 's') + '</button>' : '')
                 + '</div>';
         });
         return html;
@@ -3167,7 +3175,7 @@
 
     const isLikelyHotelName = (value) => {
         const name = cleanHotelText(value);
-        if (name.length < 2 || name.length > 90) return false;
+        if (name.length < 2 || name.length > 120) return false;
         const lower = name.toLowerCase();
         if (/https?:\/\//i.test(name) || /\b20\d{2}\b/.test(name)) return false;
         if (/best areas|areas? & hotels?|hotels? to stay|where to stay|top hotels?|hotel guide|accommodation guide|travel guide|things to do|complete guide/.test(lower)) return false;
@@ -3179,9 +3187,14 @@
     };
 
     const buildHotelsSection = (hotels) => {
-        const usable = (hotels || []).filter(h => h && isLikelyHotelName(h.name)
-            && (h.area || h.priceRange || h.rating || h.suitableFor));
-        if (!usable.length) return '<div class="specialist-empty">No verified hotel options were returned. The research result was not treated as a hotel.</div>';
+        // Backend HotelAgentService is the single authoritative validation boundary.
+        // The browser MUST NOT re-validate hotel identity with its own lexical rules:
+        // provider hotel names can legitimately contain punctuation, brands,
+        // locations, languages, or long legal property names. A second UI filter
+        // previously rejected valid backend results and produced a false empty state.
+        const usable = (Array.isArray(hotels) ? hotels : [])
+            .filter(h => h && String(h.name || '').trim());
+        if (!usable.length) return '<div class="specialist-empty">No verified hotel properties were found for this request.</div>';
         const visibleCount = 4;
         const cards = usable.map((h, index) => {
             const meta = [h.area ? '📍 ' + h.area : '', h.priceRange ? '💰 ' + h.priceRange : '', h.rating ? '★ ' + h.rating : ''].filter(Boolean).join(' · ');
@@ -3361,15 +3374,15 @@
     };
 
     const buildSpecialistResponseHtml = (data, userRequest) => {
-        const plan = data.plan || {};
+        const plan = data.plan || data || {};
         const trip = plan.trip || {};
         const type = String(data.requestType || trip.requestType || 'GENERAL').toUpperCase();
         const location = String(
             (plan.weather && plan.weather.location) || trip.destination || data.destination || ''
         ).trim();
-        const weather = plan.weather;
-        const flights = Array.isArray(plan.flights) ? plan.flights : [];
-        const hotels = Array.isArray(plan.hotels) ? plan.hotels : [];
+        const weather = plan.weather || data.weather;
+        const flights = Array.isArray(plan.flights) ? plan.flights : (Array.isArray(data.flights) ? data.flights : []);
+        const hotels = Array.isArray(plan.hotels) ? plan.hotels : (Array.isArray(data.hotels) ? data.hotels : []);
         const budget = plan.budget;
         const exec = data.execution || {};
         const answer = String(exec.ragAnswer || data.ragAnswer || plan.tips || data.finalPlan || '').trim();
@@ -3842,14 +3855,27 @@
     });
 
     chatThread.addEventListener('click', (event) => {
-        const moreButton = event.target.closest('[data-hotels-more]');
-        if (!moreButton) return;
-        const list = moreButton.previousElementSibling;
-        if (!list || !list.classList.contains('hotel-list')) return;
-        const expanded = list.classList.toggle('expanded');
-        moreButton.textContent = expanded
-            ? '− Show fewer hotel options'
-            : '＋ Show more hotel options';
+        const hotelMoreButton = event.target.closest('[data-hotels-more]');
+        if (hotelMoreButton) {
+            const list = hotelMoreButton.previousElementSibling;
+            if (!list || !list.classList.contains('hotel-list')) return;
+            const expanded = list.classList.toggle('expanded');
+            hotelMoreButton.textContent = expanded
+                ? '− Show fewer hotel options'
+                : '＋ Show more hotel options';
+            return;
+        }
+
+        const flightMoreButton = event.target.closest('[data-flights-more]');
+        if (flightMoreButton) {
+            const list = flightMoreButton.previousElementSibling;
+            if (!list || !list.classList.contains('flight-list')) return;
+            const expanded = list.classList.toggle('expanded');
+            flightMoreButton.textContent = expanded
+                ? '− Show fewer flight options'
+                : '＋ ' + list.querySelectorAll('.is-extra-flight').length + ' more available option'
+                    + (list.querySelectorAll('.is-extra-flight').length === 1 ? '' : 's');
+        }
     });
 
     const decide = async (url, threadId, notes, sourceRow) => {

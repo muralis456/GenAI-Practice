@@ -134,7 +134,10 @@ public class IntentAgentService {
                            or information that needs current external research.
                 weather = current/forecast weather or weather-dependent conditions.
                 budget = calculating, estimating, comparing, constraining or optimizing
-                         travel cost/spend.
+                         the OVERALL trip cost/spend. A monetary ceiling attached to another
+                         specialist (for example hotels under X, flights under X, or activities
+                         under X) is a constraint for that specialist, NOT a budget capability.
+                         Return its scope separately as HOTEL, FLIGHT, ACTIVITY or OTHER.
                 itinerary = organizing a journey into a coherent schedule or day-by-day plan,
                             including a request to create or modify that schedule.
                 knowledge = durable/general travel guidance such as culture, customs, safety,
@@ -144,7 +147,8 @@ public class IntentAgentService {
                             the destination or from a generic travel mention.
 
                 Key semantic rule: infer the user's objective, not the presence or absence
-                of a particular word. For example, a person can clearly ask for a vacation
+                of a particular word. Distinguish an overall cost-analysis objective from a
+                price ceiling that merely constrains another specialist. For example, a person can clearly ask for a vacation
                 schedule without using the word "itinerary", and can ask for cost limits
                 without using the word "budget".
 
@@ -159,6 +163,7 @@ public class IntentAgentService {
                   "needsResearch":false,
                   "needsWeather":false,
                   "needsBudget":false,
+                  "budgetScope":"NONE",
                   "needsItinerary":false,
                   "needsKnowledge":false,
                   "strategy":"",
@@ -182,7 +187,8 @@ public class IntentAgentService {
                 - hotels: accommodation/lodging/rooms/stay options
                 - research: recommendations, attractions, activities or current destination research
                 - weather: current/forecast weather, temperature, precipitation or conditions
-                - budget: travel cost estimation, comparison, constraints or optimization
+                - budget: overall trip cost estimation, comparison, constraints or optimization. A price
+                  ceiling scoped to another requested capability is not a budget capability.
                 - itinerary: a coherent trip schedule, day-by-day journey plan, or schedule change
                 - knowledge: durable travel guidance such as culture, customs, safety, packing,
                   visa guidance, practical local advice or destination overview. It may be
@@ -196,9 +202,17 @@ public class IntentAgentService {
                 - A route plus a duration plus a travel objective can express trip planning even
                   when the user never says "plan" or "itinerary".
                 - A monetary constraint can express a budget objective even when the user never
-                  says "budget".
+                  says "budget", but only when the constraint applies to the overall trip.
+                - A monetary constraint scoped to a requested specialist is that specialist
+                  capability's input constraint, not a separate budget-agent request.
+                  Example: "best hotels under 50k" => hotels=true, budget=false, budgetScope=HOTEL.
                 - Multiple requested outcomes must remain multiple capabilities.
                 - Do not add flights, hotels, weather, research or budget simply because a trip exists.
+                - A monetary limit attached to another capability is an input constraint, not a
+                  request for the Budget Agent. For example, "best hotels in Bengaluru under 50k"
+                  means hotels=true, budget=false, budgetScope=HOTEL. "flights under 20k" means
+                  flights=true, budget=false, budgetScope=FLIGHT. A request such as "what will the
+                  whole trip cost" means budget=true, budgetScope=TRIP.
                 - Do not confuse durable knowledge with live research.
                 - If the request is genuinely ambiguous, return GENERAL with all capabilities false.
 
@@ -210,6 +224,7 @@ public class IntentAgentService {
                   "needsResearch":false,
                   "needsWeather":false,
                   "needsBudget":false,
+                  "budgetScope":"NONE",
                   "needsItinerary":false,
                   "needsKnowledge":false,
                   "strategy":"",
@@ -303,6 +318,27 @@ public class IntentAgentService {
         if (plan.getRequestType() == null || plan.getRequestType().isBlank()) {
             plan.setRequestType("GENERAL");
         }
+
+        String scope = plan.getBudgetScope();
+        if (scope == null || scope.isBlank()) scope = "NONE";
+        scope = scope.trim().toUpperCase(java.util.Locale.ROOT);
+        if (!java.util.Set.of("NONE", "TRIP", "HOTEL", "FLIGHT", "ACTIVITY", "OTHER").contains(scope)) {
+            scope = "NONE";
+        }
+        plan.setBudgetScope(scope);
+
+        // If a model explicitly selected the Budget capability but omitted its
+        // scope, the backward-compatible semantic default is a trip-wide budget.
+        // Otherwise a specialist-scoped ceiling belongs to that specialist and
+        // must not schedule the generic Budget Agent. This is semantic contract
+        // validation, not lexical intent detection.
+        if (plan.isNeedsBudget() && "NONE".equals(scope)) {
+            plan.setBudgetScope("TRIP");
+            scope = "TRIP";
+        }
+        if (!"TRIP".equals(scope)) {
+            plan.setNeedsBudget(false);
+        }
         return plan;
     }
 
@@ -387,6 +423,7 @@ public class IntentAgentService {
                       "needsResearch":false,
                       "needsWeather":false,
                       "needsBudget":false,
+                      "budgetScope":"NONE",
                       "needsItinerary":false,
                       "needsKnowledge":false,
                       "strategy":"",
@@ -416,9 +453,16 @@ public class IntentAgentService {
                     forecast, temperature, rain, or weather conditions.
 
                     needsBudget:
-                    TRUE only when the user explicitly asks for budget,
-                    cost, expenses, prices, affordability,
-                    cost estimation, or cost breakdown.
+                    TRUE only when the user explicitly asks for overall trip budget/cost,
+                    total expenses, affordability of the whole trip, cost estimation,
+                    or a trip-wide cost breakdown. A price ceiling that limits another
+                    specialist must NOT activate needsBudget.
+
+                    budgetScope:
+                    TRIP when the monetary objective applies to the overall trip; HOTEL when
+                    it applies to accommodation; FLIGHT when it applies to flights; ACTIVITY
+                    when it applies to activities; OTHER for another specific scope; NONE when
+                    there is no monetary constraint. The scope is semantic, not keyword-based.
 
                     needsItinerary:
                     TRUE only when the user asks for a day-by-day itinerary,
@@ -527,6 +571,7 @@ public class IntentAgentService {
                       "needsResearch":false,
                       "needsWeather":false,
                       "needsBudget":true,
+                      "budgetScope":"TRIP",
                       "needsItinerary":false,
                       "needsKnowledge":false,
                       "strategy":"none",
@@ -598,6 +643,7 @@ public class IntentAgentService {
                       "needsResearch":false,
                       "needsWeather":true,
                       "needsBudget":true,
+                      "budgetScope":"TRIP",
                       "needsItinerary":false,
                       "needsKnowledge":false,
                       "strategy":"none",
@@ -907,6 +953,7 @@ public class IntentAgentService {
         plan.setNeedsResearch(false);
         plan.setNeedsWeather(false);
         plan.setNeedsBudget(false);
+        plan.setBudgetScope("NONE");
         plan.setNeedsItinerary(false);
         plan.setNeedsKnowledge(false);
 

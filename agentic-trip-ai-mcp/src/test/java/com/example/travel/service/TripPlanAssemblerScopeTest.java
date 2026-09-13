@@ -2,10 +2,12 @@ package com.example.travel.service;
 
 import com.example.travel.dto.TripPlanResult;
 import com.example.travel.graph.TravelState;
+import com.example.travel.model.BudgetLineItem;
 import com.example.travel.model.BudgetSummary;
 import com.example.travel.model.WeatherForecast;
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -35,6 +37,29 @@ class TripPlanAssemblerScopeTest {
         assertTrue(result.getFlights().isEmpty());
         assertTrue(result.getHotels().isEmpty());
         assertTrue(result.getItinerary().isEmpty());
+    }
+
+
+    @Test
+    void hotelSpecialistResponsePreservesVerifiedHotelResult() {
+        TravelState state = new TravelState(TravelState.fromRequest(
+                new com.example.travel.dto.TravelRequest(), ""));
+        Map<String, Object> updates = new java.util.LinkedHashMap<>();
+        updates.put(TravelState.REQUEST_TYPE, "HOTEL_SEARCH");
+        updates.put(TravelState.RUN_HOTELS, true);
+        updates.put(TravelState.NEEDS_HOTELS, true);
+        com.example.travel.model.HotelOption hotel =
+                new com.example.travel.model.HotelOption("The Leela Palace Bengaluru", "HAL Road", "₹10,000-₹15,000", "Business and leisure");
+        updates.put(TravelState.HOTELS, java.util.List.of(hotel));
+        state = new TravelState(merge(state, updates));
+
+        TripPlanResult result = new TripPlanAssembler(new RequirementEvaluator())
+                .assemble(state, "COMPLETE", false);
+
+        assertEquals(1, result.getHotels().size());
+        assertEquals("The Leela Palace Bengaluru", result.getHotels().getFirst().getName());
+        assertTrue(result.getFlights().isEmpty());
+        assertTrue(result.getBudget() == null || result.getBudget().getLineItems().isEmpty());
     }
 
     private static Map<String, Object> merge(TravelState base, Map<String, Object> updates) {

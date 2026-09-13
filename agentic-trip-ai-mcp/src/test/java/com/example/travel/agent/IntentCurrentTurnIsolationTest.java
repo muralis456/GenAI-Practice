@@ -3,6 +3,8 @@ package com.example.travel.agent;
 import com.example.travel.model.IntentPlan;
 import org.junit.jupiter.api.Test;
 
+import java.util.Map;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 /** Regression contract: a new semantic turn must never inherit old capabilities. */

@@ -37,9 +37,12 @@ public class HotelNode implements NodeAction<TravelState> {
             HotelAgentService.HotelSearchResult result = hotelAgentService.search(state);
             Map<String, Object> updates = new LinkedHashMap<>();
             updates.put(TravelState.HOTELS, result.hotels());
-            updates.putAll(TravelState.trace(TravelGraphNodes.HOTEL, "ok",
-                    state.hotelCheaper() ? "cheaper hotel search" : "hotel search"));
-            GraphExecutionLogger.specialistResult(TravelGraphNodes.HOTEL, state, "ok",
+            String outcome = result.hotels().isEmpty() ? "no_verified_results" : "ok";
+            String traceReason = result.hotels().isEmpty()
+                    ? "hotel search completed but returned no verified properties"
+                    : (state.hotelCheaper() ? "cheaper hotel search" : "hotel search");
+            updates.putAll(TravelState.trace(TravelGraphNodes.HOTEL, outcome, traceReason));
+            GraphExecutionLogger.specialistResult(TravelGraphNodes.HOTEL, state, outcome,
                     "count=" + result.hotels().size());
             List<ProvenanceEvent> events = new ArrayList<>();
             for (SearchHit hit : result.hits()) {
@@ -48,8 +51,8 @@ public class HotelNode implements NodeAction<TravelState> {
                         hit.getScore(),
                         hit.getTitle()));
             }
-            if (events.isEmpty()) {
-                events.add(new ProvenanceEvent("hotels", "Tavily", "", 0, state.destination()));
+            if (events.isEmpty() && !result.hotels().isEmpty()) {
+                events.add(new ProvenanceEvent("hotels", "hotel-provider", "", 0, state.destination()));
             }
             updates.put(TravelState.PROVENANCE, events);
             return updates;

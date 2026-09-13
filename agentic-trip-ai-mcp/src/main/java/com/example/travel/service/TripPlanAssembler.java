@@ -22,6 +22,8 @@ import com.example.travel.model.ProvenanceEvent;
 import com.example.travel.model.TripRequirements;
 
 import org.springframework.stereotype.Service;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 
@@ -47,7 +49,7 @@ import java.util.Set;
 
 public class TripPlanAssembler {
 
-
+    private static final Logger log = LoggerFactory.getLogger(TripPlanAssembler.class);
 
     private final RequirementEvaluator requirementEvaluator;
 
@@ -85,11 +87,11 @@ public class TripPlanAssembler {
 
         }
 
-        if ((fullTripReport ? state.includeHotelsInReport() : state.runHotels())
-                && state.hasHotelResults()) {
-
+        boolean includeHotels = fullTripReport ? state.includeHotelsInReport() : state.runHotels();
+        log.info("Assembling plan requestType={} tripPlanning={} runHotels={} includeHotels={} stateHotelCount={}",
+                state.requestType(), fullTripReport, state.runHotels(), includeHotels, state.hotels().size());
+        if (includeHotels && state.hasHotelResults()) {
             result.setHotels(new ArrayList<>(state.hotels()));
-
         }
 
         if ((fullTripReport ? state.includeItineraryInReport() : state.runItinerary())

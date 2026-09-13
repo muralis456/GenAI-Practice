@@ -10,6 +10,7 @@ public class PlannerExtraction implements Serializable {
     private String returnDate;
     private Integer travelers;
     private String budget;
+    private String hotelBudget;
     private String travelStyle;
 
     public String getOrigin() {
@@ -58,6 +59,14 @@ public class PlannerExtraction implements Serializable {
 
     public void setBudget(String budget) {
         this.budget = budget;
+    }
+
+    public String getHotelBudget() {
+        return hotelBudget;
+    }
+
+    public void setHotelBudget(String hotelBudget) {
+        this.hotelBudget = hotelBudget;
     }
 
     public String getTravelStyle() {

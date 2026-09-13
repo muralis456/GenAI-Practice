@@ -23,6 +23,8 @@ public class IntentPlan implements Serializable {
     private boolean needsResearch = false;
     private boolean needsWeather = false;
     private boolean needsBudget = false;
+    /** Semantic scope of a monetary constraint: NONE, TRIP, HOTEL, FLIGHT, ACTIVITY, OTHER. */
+    private String budgetScope = "NONE";
     private boolean needsItinerary = false;
     private boolean needsKnowledge = false;
     private String strategy = "none";
@@ -37,6 +39,7 @@ public class IntentPlan implements Serializable {
         plan.needsResearch = true;
         plan.needsWeather = true;
         plan.needsBudget = true;
+        plan.budgetScope = "TRIP";
         plan.needsItinerary = true;
         plan.needsKnowledge = true;
         plan.strategy = "trip_planning";
@@ -156,6 +159,14 @@ public class IntentPlan implements Serializable {
         this.needsBudget = needsBudget;
     }
 
+    public String getBudgetScope() {
+        return budgetScope;
+    }
+
+    public void setBudgetScope(String budgetScope) {
+        this.budgetScope = budgetScope == null || budgetScope.isBlank() ? "NONE" : budgetScope.toUpperCase();
+    }
+
     public boolean isNeedsKnowledge() { return needsKnowledge; }
 
     public void setNeedsKnowledge(boolean needsKnowledge) { this.needsKnowledge = needsKnowledge; }
@@ -195,7 +206,7 @@ public class IntentPlan implements Serializable {
     public String summary() {
         return requestType + " flights=" + needsFlights + " hotels=" + needsHotels
                 + " research=" + needsResearch + " weather=" + needsWeather
-                + " budget=" + needsBudget + " itinerary=" + needsItinerary + " knowledge=" + needsKnowledge
+                + " budget=" + needsBudget + " budgetScope=" + budgetScope + " itinerary=" + needsItinerary + " knowledge=" + needsKnowledge
                 + " confidence=" + confidence;
     }
 }

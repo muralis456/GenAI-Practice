@@ -21,7 +21,7 @@ AgenticTripAI
 ## Workflow
 
 ```
-USER → Intent (heuristic, LLM if confidence < 0.75) → Planner → Router
+USER → Semantic Intent LLM → schema validation → Planner → Router → Planner → Router
          → Airport (only if needsFlights)
          → fan_out (native LangGraph parallel fan-out)
               ├→ Flight

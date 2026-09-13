@@ -37,9 +37,19 @@ public class McpHotelSearchClient {
             if (hotelBudget != null) {
                 arguments.put("hotelBudget", hotelBudget);
             }
-            JsonNode root = client.callByUserInput("Find accommodation/hotels", "Find hotel accommodation for destination " + (destination == null ? "" : destination) + ", travel style " + (travelStyle == null ? "balanced" : travelStyle) + ", cheaper=" + cheaper + budgetText, arguments);
+            String userInput = "Find real, identifiable hotel properties for destination "
+                    + (destination == null ? "" : destination)
+                    + ", travel style " + (travelStyle == null ? "balanced" : travelStyle)
+                    + ", cheaper=" + cheaper + budgetText
+                    + ". Return hotel properties only; do not return article titles, listicles, guides or generic research headings.";
+            JsonNode root = client.callByUserInput("Find accommodation/hotels", userInput, arguments);
+            log.debug("mcp.hotel.raw-response destination={} payload={}", destination, abbreviate(root == null ? "" : root.toString()));
             List<HotelOption> hotels = new ArrayList<>();
-            for (JsonNode node : root.path("hotels")) {
+            List<JsonNode> records = hotelRecords(root);
+            if (records.isEmpty()) {
+                log.warn("mcp.hotel.no-structured-records destination={} responseKeys={}", destination, root == null ? "null" : root.toString());
+            }
+            for (JsonNode node : records) {
                 HotelOption hotel = new HotelOption();
                 hotel.setName(node.path("name").asString(""));
                 hotel.setArea(node.path("area").asString(""));
@@ -48,6 +58,9 @@ public class McpHotelSearchClient {
                 hotel.setSuitableFor(node.path("suitableFor").asString(""));
                 hotel.setNotes(node.path("notes").asString(""));
                 hotels.add(hotel);
+                log.debug("mcp.hotel.raw-record destination={} name={} area={} priceRange={}",
+                        destination, abbreviate(hotel.getName()), abbreviate(hotel.getArea()),
+                        abbreviate(hotel.getPriceRange()));
             }
             return hotels;
         } catch (Exception exception) {
@@ -55,6 +68,26 @@ public class McpHotelSearchClient {
                     destination, cheaper, exception.getClass().getName(), safeMessage(exception), exception);
             return List.of();
         }
+    }
+
+    private List<JsonNode> hotelRecords(JsonNode root) {
+        if (root == null || root.isMissingNode() || root.isNull()) {
+            return List.of();
+        }
+        JsonNode candidates = root.path("hotels");
+        if (!candidates.isArray()) candidates = root.path("results");
+        if (!candidates.isArray()) candidates = root.path("data").path("hotels");
+        if (!candidates.isArray()) candidates = root.path("data").path("results");
+        if (!candidates.isArray()) return List.of();
+        List<JsonNode> result = new ArrayList<>();
+        candidates.forEach(result::add);
+        return result;
+    }
+
+    private String abbreviate(String value) {
+        if (value == null) return "";
+        String normalized = value.replace("\n", " ").trim();
+        return normalized.length() <= 120 ? normalized : normalized.substring(0, 120) + "...";
     }
 
     private String safeMessage(Exception exception) {

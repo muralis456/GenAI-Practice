@@ -10,6 +10,7 @@ import com.example.travel.service.McpHotelSearchClient;
 import com.example.travel.support.JsonSupport;
 import com.example.travel.support.TripSlotHeuristics;
 import com.example.travel.tool.HotelSearchTool;
+import com.example.travel.tool.TavilySearchTool;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -38,17 +39,20 @@ public class HotelAgentService {
 
     private final RoutedLlm routedLlm;
     private final HotelSearchTool hotelSearchTool;
+    private final TavilySearchTool tavilySearchTool;
     private final JsonSupport jsonSupport;
     private final ObjectProvider<McpHotelSearchClient> mcpHotelSearchClient;
 
     public HotelAgentService(
             RoutedLlm routedLlm,
             HotelSearchTool hotelSearchTool,
+            TavilySearchTool tavilySearchTool,
             JsonSupport jsonSupport,
             ObjectProvider<McpHotelSearchClient> mcpHotelSearchClient) {
 
         this.routedLlm = routedLlm;
         this.hotelSearchTool = hotelSearchTool;
+        this.tavilySearchTool = tavilySearchTool;
         this.jsonSupport = jsonSupport;
         this.mcpHotelSearchClient = mcpHotelSearchClient;
     }
@@ -79,19 +83,33 @@ public class HotelAgentService {
         if (mcpClient != null && !TravelState.isBlank(destination)) {
             List<HotelOption> directHotels = mcpClient.search(
                     destination, state.travelStyle(), cheaper, state.hotelBudget());
-            directHotels = directHotels.stream()
+            List<HotelOption> providerHotels = directHotels;
+            directHotels = providerHotels.stream()
                     .map(this::scrubPlaceholders)
-                    .filter(this::isValidHotelOption)
-                    .filter(hotel -> isRelevantToDestination(hotel, destination))
+                    .filter(hotel -> {
+                        boolean valid = isValidHotelOption(hotel);
+                        if (!valid) {
+                            log.warn("Hotel provider record rejected as non-property destination={} name={} area={}",
+                                    destination, safe(hotel == null ? null : hotel.getName()), safe(hotel == null ? null : hotel.getArea()));
+                        }
+                        return valid;
+                    })
+                    .filter(hotel -> {
+                        boolean relevant = isRelevantToDestination(hotel, destination);
+                        if (!relevant) {
+                            log.warn("Hotel provider record rejected for destination mismatch destination={} name={} area={}",
+                                    destination, safe(hotel.getName()), safe(hotel.getArea()));
+                        }
+                        return relevant;
+                    })
                     .toList();
             if (!directHotels.isEmpty()) {
                 log.info("Hotel agent using structured MCP results destination={} count={}",
                         destination, directHotels.size());
                 return new HotelSearchResult(new ArrayList<>(directHotels), List.of());
             }
-            log.warn("MCP hotel results were empty or unrelated for destination={}; using safe fallback",
+            log.warn("Hotel provider returned no verified structured hotels destination={} — switching to independent travel-research fallback",
                     destination);
-            return fallback(destination, cheaper);
         }
 
         String user =
@@ -126,13 +144,29 @@ public class HotelAgentService {
         String researchContent = "";
 
         try {
-
-            researchContent = routedLlm.complete(
-                    AgentRole.EXTRACT,
-                    researchSystem,
-                    user,
-                    hotelSearchTool
-            );
+            // When the structured hotel provider returns an article/listicle or no
+            // usable hotel records, use the independent travel-research channel.
+            // This avoids displaying research titles as hotels while still recovering
+            // genuine hotel properties when search results exist.
+            List<SearchHit> researchHits = tavilySearchTool.searchHits(
+                    "best hotels in " + destination + " under "
+                            + (state.hotelBudget() == null ? "" : state.hotelBudget().toPlainString())
+                            + " including hotel names, areas, prices, ratings and family suitability");
+            if (researchHits != null && !researchHits.isEmpty()) {
+                researchContent = researchHits.stream()
+                        .limit(8)
+                        .map(hit -> hit.getTitle() + ": " + hit.getContent() + " " + hit.getUrl())
+                        .collect(java.util.stream.Collectors.joining("\n"));
+                log.info("Hotel research fallback returned {} research hits destination={}",
+                        researchHits.size(), destination);
+            } else {
+                researchContent = routedLlm.complete(
+                        AgentRole.EXTRACT,
+                        researchSystem,
+                        user,
+                        hotelSearchTool
+                );
+            }
 
         } catch (Exception exception) {
 
@@ -147,7 +181,8 @@ public class HotelAgentService {
          * If the research call failed, return the existing fallback.
          */
         if (researchContent == null || researchContent.isBlank()) {
-
+            log.warn("Hotel search produced no research content destination={} cheaper={} budget={}",
+                    destination, cheaper, state.hotelBudget());
             return fallback(destination, cheaper);
         }
 
@@ -238,7 +273,8 @@ public class HotelAgentService {
                 .toList();
 
         if (hotels.isEmpty()) {
-
+            log.warn("Hotel extraction produced zero verified properties destination={} rawChars={} — no hotel card will be fabricated",
+                    destination, content == null ? 0 : content.length());
             return fallback(destination, cheaper);
         }
 
@@ -270,6 +306,9 @@ public class HotelAgentService {
                 || !TravelState.isBlank(hotel.getSuitableFor());
     }
 
+    private boolean hasHotelName(HotelOption hotel) {
+        return hotel != null && !TravelState.isBlank(hotel.getName());
+    }
 
     private boolean isRelevantToDestination(HotelOption hotel, String destination) {
         String target = normalize(destination);

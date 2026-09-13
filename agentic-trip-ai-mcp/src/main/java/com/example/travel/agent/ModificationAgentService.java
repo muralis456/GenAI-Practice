@@ -31,28 +31,89 @@ public class ModificationAgentService {
     }
 
     public ModificationRequest interpret(TravelState state, String notes) {
-        ModificationRequest heuristic = heuristic(notes);
-        try {
-            String content = routedLlm.complete(AgentRole.PLANNER,
-                    "You are the Modification Agent. Map the user's change request to JSON only: "
-                            + "{\"changeType\":\"REDUCE_COST|HOTEL_UPGRADE|ADD_DESTINATION|ITINERARY_CHANGE|GENERAL\","
-                            + "\"destination\":\"\",\"days\":null,\"targetRating\":\"\",\"preserveBudget\":true,"
-                            + "\"hotelBudget\":null,\"flightPreference\":\"\","
-                            + "\"notes\":\"\"}. "
-                            + "hotelBudget is a numeric INR ceiling when the user sets a hotel budget. "
-                            + "flightPreference is cheapest|direct|morning|evening|balanced when stated. "
-                            + "Do not assume cheaper unless the user asked to save money.",
-                    "Current destination=" + state.destination()
-                            + " style=" + state.travelStyle()
-                            + " flightPreference=" + state.flightPreference()
-                            + "\nUser modification: " + notes);
-            return jsonSupport.read(content, ModificationRequest.class)
-                    .map(parsed -> merge(heuristic, parsed, notes))
-                    .orElse(heuristic);
-        } catch (Exception exception) {
-            log.warn("Modification LLM failed; using heuristic", exception);
-            return heuristic;
+        String latest = notes == null ? "" : notes.trim();
+        ModificationRequest empty = new ModificationRequest();
+        empty.setNotes(latest);
+        if (latest.isBlank()) {
+            return empty;
         }
+
+        // Modification intent is semantic-first. The model decides which parts of
+        // the existing plan must be recomputed; Java only validates the structured
+        // contract. The legacy heuristic remains available as an explicit test/
+        // recovery helper, but it is no longer the primary decision path.
+        String context = state == null ? "" :
+                "Current destination=" + state.destination()
+                        + "\nCurrent travel style=" + state.travelStyle()
+                        + "\nCurrent flight preference=" + state.flightPreference();
+
+        ModificationRequest parsed = semanticPass(latest, context, false);
+        if (isMeaningful(parsed)) {
+            return finalizeRequest(parsed, latest);
+        }
+
+        parsed = semanticPass(latest, context, true);
+        if (isMeaningful(parsed)) {
+            return finalizeRequest(parsed, latest);
+        }
+
+        log.warn("Modification semantic classification unresolved; falling back to GENERAL. request={}", latest);
+        return empty;
+    }
+
+    private ModificationRequest semanticPass(String notes, String context, boolean adjudication) {
+        String system = """
+                You are the semantic modification planner for an agentic travel system.
+                Understand the user's latest modification request by meaning, not by
+                fixed phrases or keyword rules. Decide which parts of the CURRENT trip
+                need to be recomputed. Return JSON only.
+
+                Valid changeType values:
+                REDUCE_COST, HOTEL_UPGRADE, ADD_DESTINATION, ITINERARY_CHANGE, GENERAL.
+
+                hotelBudget is an INR ceiling only when the user semantically sets a
+                hotel/accommodation ceiling. flightPreference may be cheapest, direct,
+                morning, evening, balanced, or empty. days is only for an explicit
+                duration change. destination is only for a requested destination change.
+                preserveBudget describes whether the existing overall trip budget should
+                remain the governing constraint. Do not infer a change merely because it
+                would be useful. If the request is unclear, return GENERAL.
+
+                JSON shape:
+                {
+                  "changeType":"GENERAL",
+                  "destination":"",
+                  "days":null,
+                  "targetRating":"",
+                  "preserveBudget":true,
+                  "hotelBudget":null,
+                  "flightPreference":"",
+                  "notes":""
+                }
+                """ + (adjudication ? "\nReconsider the request independently; do not copy a prior interpretation." : "");
+        try {
+            String content = routedLlm.complete(AgentRole.PLANNER, system,
+                    "CURRENT PLAN CONTEXT:\n" + context + "\n\nLATEST MODIFICATION:\n" + notes);
+            return jsonSupport.read(content, ModificationRequest.class).orElseGet(ModificationRequest::new);
+        } catch (Exception exception) {
+            log.warn("Modification semantic pass failed adjudication={}", adjudication, exception);
+            return new ModificationRequest();
+        }
+    }
+
+    private boolean isMeaningful(ModificationRequest request) {
+        if (request == null) return false;
+        return !ModificationRequest.GENERAL.equalsIgnoreCase(request.getChangeType())
+                || request.getHotelBudget() != null
+                || !request.getFlightPreference().isBlank()
+                || !request.getDestination().isBlank()
+                || request.getDays() != null
+                || !request.getTargetRating().isBlank();
+    }
+
+    private ModificationRequest finalizeRequest(ModificationRequest request, String notes) {
+        if (TravelState.isBlank(request.getNotes())) request.setNotes(notes);
+        return request;
     }
 
     static ModificationRequest merge(ModificationRequest heuristic, ModificationRequest parsed, String notes) {
