@@ -434,10 +434,21 @@ public class IntentAgentService {
             return result;
         }
 
-        // Request type is derived from the semantic capability vector only.
-        // No request wording is inspected here.
+        // A trip-planning intent is a complete planning workflow, not merely
+        // an itinerary-generation request. Once the semantic model has identified
+        // itinerary/trip planning, activate the dashboard specialists that provide
+        // the completed-trip contract: flights, hotels, research, weather, budget,
+        // itinerary and practical knowledge. This is deliberately based on the
+        // semantic capability (needsItinerary), not keyword matching.
         if (result.isNeedsItinerary()) {
             result.setRequestType(IntentPlan.TRIP_PLANNING);
+            result.setNeedsFlights(true);
+            result.setNeedsHotels(true);
+            result.setNeedsResearch(true);
+            result.setNeedsWeather(true);
+            result.setNeedsBudget(true);
+            result.setNeedsItinerary(true);
+            result.setNeedsKnowledge(true);
         } else if (count > 1) {
             result.setRequestType("MULTI_CAPABILITY");
         } else if (result.isNeedsFlights()) {
@@ -911,6 +922,22 @@ public class IntentAgentService {
         // fields describe only what the latest semantic decision wants to execute.
         // This is the key isolation boundary that prevents an old trip from leaking
         // flights/hotels/budget into a new specialist request.
+        boolean tripPlanning = IntentPlan.TRIP_PLANNING.equalsIgnoreCase(plan.getRequestType())
+                || plan.isNeedsItinerary();
+        // Keep graph routing consistent with the finalized semantic plan. A
+        // completed trip dashboard always requires live weather and the core
+        // trip specialists, even if a small local LLM omitted one capability.
+        if (tripPlanning) {
+            plan.setRequestType(IntentPlan.TRIP_PLANNING);
+            plan.setNeedsFlights(true);
+            plan.setNeedsHotels(true);
+            plan.setNeedsResearch(true);
+            plan.setNeedsWeather(true);
+            plan.setNeedsBudget(true);
+            plan.setNeedsItinerary(true);
+            plan.setNeedsKnowledge(true);
+        }
+
         updates.put(TravelState.REQUEST_TYPE, plan.getRequestType());
         updates.put(TravelState.NEEDS_FLIGHTS, plan.isNeedsFlights());
         updates.put(TravelState.NEEDS_HOTELS, plan.isNeedsHotels());

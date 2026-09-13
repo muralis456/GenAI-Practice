@@ -546,10 +546,20 @@ public class TravelState extends AgentState {
     }
 
     public static void applyIntentAndRun(Map<String, Object> updates, com.example.travel.model.IntentPlan plan) {
+        boolean tripPlanning = com.example.travel.model.IntentPlan.TRIP_PLANNING.equalsIgnoreCase(plan.getRequestType())
+                || plan.isNeedsItinerary();
+
+        // A completed trip dashboard always includes a travel-date weather card.
+        // Weather is live provider data, so trip planning must execute the Weather
+        // specialist even when the intent model omitted an explicit "weather" flag.
+        // This keeps the dashboard contract deterministic and prevents the UI from
+        // depending on an LLM deciding whether weather is worth showing.
+        boolean needsWeather = plan.isNeedsWeather() || tripPlanning;
+
         updates.put(NEEDS_FLIGHTS, plan.isNeedsFlights());
         updates.put(NEEDS_HOTELS, plan.isNeedsHotels());
         updates.put(NEEDS_RESEARCH, plan.isNeedsResearch());
-        updates.put(NEEDS_WEATHER, plan.isNeedsWeather());
+        updates.put(NEEDS_WEATHER, needsWeather);
         updates.put(NEEDS_BUDGET, plan.isNeedsBudget());
         updates.put(NEEDS_ITINERARY, plan.isNeedsItinerary());
         updates.put(NEEDS_KNOWLEDGE, plan.isNeedsKnowledge());
@@ -557,7 +567,7 @@ public class TravelState extends AgentState {
         updates.put(RUN_FLIGHTS, plan.isNeedsFlights());
         updates.put(RUN_HOTELS, plan.isNeedsHotels());
         updates.put(RUN_RESEARCH, plan.isNeedsResearch());
-        updates.put(RUN_WEATHER, plan.isNeedsWeather());
+        updates.put(RUN_WEATHER, needsWeather);
         updates.put(RUN_BUDGET, plan.isNeedsBudget());
         updates.put(RUN_ITINERARY, plan.isNeedsItinerary());
     }

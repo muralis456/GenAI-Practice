@@ -20,7 +20,8 @@
       "mainClass": "com.example.travel.mcp.TravelMcpServerApplication",
       "projectName": "agentic-trip-ai-mcp-server",
       "args": "",
-      "envFile": "${workspaceFolder}/.env"
+      "envFile": "${workspaceFolder}/.env",
+      "vmArgs": " -Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.port=61359 -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Dspring.jmx.enabled=true -Djava.rmi.server.hostname=localhost -Dspring.application.admin.enabled=true -Dspring.boot.project.name=agentic-trip-ai-mcp-server"
     },
     {
       "type": "java",
@@ -29,6 +30,16 @@
       "cwd": "${workspaceFolder}",
       "mainClass": "com.example.travel.AgenticTripAiApplication",
       "projectName": "agentic-trip-ai-mcp",
+      "args": "",
+      "envFile": "${workspaceFolder}/.env"
+    },
+    {
+      "type": "java",
+      "name": "Spring Boot-AgenticTripAiApplication<agentic-trip-ai-mcp-redesign>",
+      "request": "launch",
+      "cwd": "${workspaceFolder}",
+      "mainClass": "com.example.travel.AgenticTripAiApplication",
+      "projectName": "agentic-trip-ai-mcp-redesign",
       "args": "",
       "envFile": "${workspaceFolder}/.env"
     }
