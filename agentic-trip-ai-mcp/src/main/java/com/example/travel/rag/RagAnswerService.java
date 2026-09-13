@@ -100,7 +100,18 @@ public class RagAnswerService {
         if (INTERNAL_FAILURE.matcher(answer).find() || PLAN_SECTION.matcher(answer).find()) {
             return false;
         }
-        // A knowledge card should not contain a large number of numeric trip facts.
+        // The contract is deliberately stricter than heading detection because a
+        // model can put trip-plan facts inside ordinary bullet points.
+        String lower = answer.toLowerCase(Locale.ROOT);
+        if (lower.matches(".*\\b(?:flight|airline|hotel|accommodation|fare|budget|itinerary|trip total|booking|schedule)\\b.*")) {
+            return false;
+        }
+        if (lower.contains("total") || lower.contains("price") || lower.contains("cost")) {
+            return false;
+        }
+        if (answer.matches("(?s).*\\b20\\d{2}[-/]\\d{1,2}[-/]\\d{1,2}\\b.*")) {
+            return false;
+        }
         int currencyMarks = count(answer, '₹') + count(answer, '$') + count(answer, '€');
         return currencyMarks == 0;
     }
@@ -117,7 +128,10 @@ public class RagAnswerService {
             if (PLAN_SECTION.matcher(line).find()
                     || lower.contains("source:") || lower.contains("price")
                     || lower.contains("fare") || lower.contains("flight")
-                    || lower.contains("hotel") || lower.contains("budget")) {
+                    || lower.contains("hotel") || lower.contains("budget")
+                    || lower.contains("total") || lower.contains("cost")
+                    || lower.contains("airline") || lower.contains("accommodation")
+                    || lower.matches(".*\\b20\\d{2}[-/]\\d{1,2}[-/]\\d{1,2}\\b.*")) {
                 continue;
             }
             line = line.replaceFirst("^[-*•]\\s*", "").trim();

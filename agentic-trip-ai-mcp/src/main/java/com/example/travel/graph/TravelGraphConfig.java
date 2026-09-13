@@ -162,17 +162,15 @@ public class TravelGraphConfig {
                 .addEdge(START, TravelGraphNodes.INTENT)
                 .addConditionalEdges(TravelGraphNodes.INTENT,
                         edge_async(state -> {
-                            // Pure knowledge/research requests can go directly to RAG.
-                            // IMPORTANT: execution requests may also receive needsKnowledge=true
-                            // from semantic arbitration. They still MUST pass through Planner so
-                            // origin/destination/date slots are extracted before airport/flight/hotel
-                            // execution. Otherwise a prompt-only request has a blank destination
-                            // in TravelState and the airport resolver gets called with "".
-                            if ((state.needsKnowledge() || state.needsResearch())
+                            // Routing is driven by the CURRENT semantic capability vector.
+                            // There is deliberately no special-case for weather, flights, hotels,
+                            // budget, etc. The Intent Agent decides which capabilities are needed;
+                            // Java only maps that decision to graph topology.
+                            if ((state.runResearch() || state.needsKnowledge())
                                     && !hasTripExecutionCapability(state)) {
                                 return TravelGraphNodes.RAG;
                             }
-                            if (!hasAnyIntentCapability(state)) {
+                            if (!hasAnyCurrentCapability(state)) {
                                 return TravelGraphNodes.FINAL;
                             }
                             return TravelGraphNodes.PLANNER;
@@ -188,9 +186,7 @@ public class TravelGraphConfig {
                             // live MCP data. The RAG router may still decide that retrieval is
                             // unnecessary, but this gives trip plans a chance to add grounded
                             // packing, culture, safety, seasonality and local-planning guidance.
-                            boolean tripPlan = state != null
-                                    && "TRIP_PLANNING".equalsIgnoreCase(state.requestType());
-                            return (state.needsKnowledge() || tripPlan)
+                            return state != null && state.needsKnowledge()
                                     ? TravelGraphNodes.RAG
                                     : TravelGraphNodes.ROUTER;
                         }),
@@ -340,28 +336,28 @@ public class TravelGraphConfig {
     }
 
     private static boolean hasTripExecutionCapability(TravelState state) {
-        return state != null && (state.needsFlights()
-                || state.needsHotels()
-                || state.needsWeather()
-                || state.needsBudget()
-                || state.needsItinerary());
+        return state != null && (state.runFlights()
+                || state.runHotels()
+                || state.runWeather()
+                || state.runBudget()
+                || state.runItinerary());
     }
 
-    private static boolean hasAnyIntentCapability(TravelState state) {
-        return state != null && (state.needsFlights()
-                || state.needsHotels()
-                || state.needsResearch()
-                || state.needsWeather()
-                || state.needsBudget()
-                || state.needsItinerary()
+    private static boolean hasAnyCurrentCapability(TravelState state) {
+        return state != null && (state.runFlights()
+                || state.runHotels()
+                || state.runResearch()
+                || state.runWeather()
+                || state.runBudget()
+                || state.runItinerary()
                 || state.needsKnowledge());
     }
 
     private static String afterRag(TravelState state) {
         if (state == null) return TravelGraphNodes.VALIDATOR;
-        boolean tripExecution = state.runFlights() || state.runHotels() || state.runWeather()
+        boolean execution = state.runFlights() || state.runHotels() || state.runWeather()
                 || state.runBudget() || state.runItinerary();
-        if (tripExecution) return TravelGraphNodes.ROUTER;
+        if (execution) return TravelGraphNodes.ROUTER;
         if (state.runResearch()) return TravelGraphNodes.RESEARCH;
         return TravelGraphNodes.VALIDATOR;
     }
@@ -398,12 +394,12 @@ public class TravelGraphConfig {
     private static ModelRoutingContext.Complexity complexity(TravelState state) {
         if (state == null) return ModelRoutingContext.Complexity.SIMPLE;
         int capabilities = 0;
-        if (state.needsFlights()) capabilities++;
-        if (state.needsHotels()) capabilities++;
-        if (state.needsResearch()) capabilities++;
-        if (state.needsWeather()) capabilities++;
-        if (state.needsBudget()) capabilities++;
-        if (state.needsItinerary()) capabilities++;
+        if (state.runFlights()) capabilities++;
+        if (state.runHotels()) capabilities++;
+        if (state.runResearch()) capabilities++;
+        if (state.runWeather()) capabilities++;
+        if (state.runBudget()) capabilities++;
+        if (state.runItinerary()) capabilities++;
         if (state.needsKnowledge()) capabilities++;
         if (capabilities >= 4) return ModelRoutingContext.Complexity.COMPLEX;
         if (capabilities >= 2) return ModelRoutingContext.Complexity.NORMAL;

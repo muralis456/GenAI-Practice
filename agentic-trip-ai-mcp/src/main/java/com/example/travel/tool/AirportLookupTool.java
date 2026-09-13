@@ -33,6 +33,20 @@ public class AirportLookupTool {
         if (cityOrCode == null || cityOrCode.isBlank()) {
             return "";
         }
+        // Airport resolution is a data lookup, not an intent decision. Prefer the
+        // local airport database first so common IATA/city lookups do not spend an
+        // LLM call on MCP tool selection. MCP remains an extension/fallback for
+        // airports not present locally.
+        String fromDb = resolve(cityOrCode).map(AirportLocation::getIataCode).orElse("");
+        if (!fromDb.isBlank()) {
+            return fromDb;
+        }
+
+        String fallback = fallbackIata(cityOrCode);
+        if (!fallback.isBlank()) {
+            return fallback;
+        }
+
         McpAirportClient client = mcpAirportClient.getIfAvailable();
         if (client != null) {
             String iata = client.resolve(cityOrCode);
@@ -40,11 +54,7 @@ public class AirportLookupTool {
                 return iata;
             }
         }
-        String fromDb = resolve(cityOrCode).map(AirportLocation::getIataCode).orElse("");
-        if (!fromDb.isBlank()) {
-            return fromDb;
-        }
-        return fallbackIata(cityOrCode);
+        return "";
     }
 
     private static String fallbackIata(String cityOrCode) {

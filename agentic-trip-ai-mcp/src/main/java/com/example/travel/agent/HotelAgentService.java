@@ -254,11 +254,15 @@ public class HotelAgentService {
         if (name.length() < 2 || name.length() > 120) return false;
         String lower = name.toLowerCase(Locale.ROOT);
         // Research/article titles must never become hotel entities.
-        if (lower.contains("best areas") || lower.contains("hotels to stay")
-                || lower.contains("where to stay") || lower.contains("top hotels")
-                || lower.contains("hotel guide") || lower.contains("accommodation guide")
-                || lower.matches(".*\\b(10|20|25|50|100)\\s+(best|top|hotels?).*")) return false;
+        if (lower.contains("best areas") || lower.contains("areas & hotels")
+                || lower.contains("hotels to stay") || lower.contains("where to stay")
+                || lower.contains("top hotels") || lower.contains("hotel guide")
+                || lower.contains("accommodation guide") || lower.contains("travel guide")
+                || lower.contains("things to do") || lower.contains("complete guide")
+                || lower.matches(".*\\b(10|20|25|50|100)\\s+(best|top|hotels?|options?).*")) return false;
+        if (lower.matches(".*\\b20\\d{2}\\b.*") || lower.matches(".*\\(\\s*\\d+\\s*(best|top|hotels?|options?)?.*")) return false;
         if (name.contains("http://") || name.contains("https://") || name.contains("|")) return false;
+        if (name.split("\\s+").length > 11) return false;
         // A structured hotel should have at least a name and one supporting field.
         return !TravelState.isBlank(hotel.getArea())
                 || !TravelState.isBlank(hotel.getPriceRange())
@@ -266,9 +270,6 @@ public class HotelAgentService {
                 || !TravelState.isBlank(hotel.getSuitableFor());
     }
 
-    private boolean hasHotelName(HotelOption hotel) {
-        return hotel != null && !TravelState.isBlank(hotel.getName());
-    }
 
     private boolean isRelevantToDestination(HotelOption hotel, String destination) {
         String target = normalize(destination);

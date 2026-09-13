@@ -67,7 +67,15 @@ public class TripPlanAssembler {
 
         result.setTrip(buildHeader(state, status, awaitingApproval));
 
-        if (state.includeFlightsInReport() && state.hasUsableFlights()) {
+        // A specialist response is a view of the CURRENT request, not a replay
+        // of every capability accumulated in the checkpoint.  NEEDS_* is
+        // intentionally cumulative for trip planning, while RUN_* describes
+        // exactly what executed for this turn.  Mixing the two here was the
+        // source of weather-only responses leaking old budget/hotel/flight data.
+        boolean fullTripReport = isTripPlanningWorkflow(state);
+
+        if ((fullTripReport ? state.includeFlightsInReport() : state.runFlights())
+                && state.hasUsableFlights()) {
 
             result.setFlights(state.flights().stream()
 
@@ -77,13 +85,15 @@ public class TripPlanAssembler {
 
         }
 
-        if (state.includeHotelsInReport() && state.hasHotelResults()) {
+        if ((fullTripReport ? state.includeHotelsInReport() : state.runHotels())
+                && state.hasHotelResults()) {
 
             result.setHotels(new ArrayList<>(state.hotels()));
 
         }
 
-        if (state.includeItineraryInReport()) {
+        if ((fullTripReport ? state.includeItineraryInReport() : state.runItinerary())
+                && state.itinerary() != null) {
 
             Itinerary itinerary = state.itinerary();
 
@@ -95,13 +105,15 @@ public class TripPlanAssembler {
 
         }
 
-        if (state.includeBudgetInReport() && state.budgetSummary() != null) {
+        if ((fullTripReport ? state.includeBudgetInReport() : state.runBudget())
+                && state.budgetSummary() != null) {
 
             result.setBudget(state.budgetSummary());
 
         }
 
-        if (state.includeWeatherInReport() && state.weather() != null) {
+        if ((fullTripReport ? state.includeWeatherInReport() : state.runWeather())
+                && state.weather() != null) {
 
             result.setWeather(state.weather());
 
@@ -158,6 +170,14 @@ public class TripPlanAssembler {
             guidance.setTitle("Travel Knowledge & Guidance for " + destination);
         }
         return guidance;
+    }
+
+    private boolean isTripPlanningWorkflow(TravelState state) {
+        if (state == null) {
+            return false;
+        }
+        return state.needsItinerary()
+                || "TRIP_PLANNING".equalsIgnoreCase(state.requestType());
     }
 
     private TripHeader buildHeader(TravelState state, String status, boolean awaitingApproval) {

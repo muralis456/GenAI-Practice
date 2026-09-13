@@ -57,6 +57,7 @@ public class ReplanAgentService {
                         state, modificationStrategy);
                 // A user modification is not a failed retry.
                 updates.put(TravelState.RETRY_COUNT, state.retryCount());
+                updates.put(TravelState.REQUEST_TYPE, com.example.travel.model.IntentPlan.TRIP_PLANNING);
                 updates.put(TravelState.HITL_DECISION, "");
                 updates.put(TravelState.AWAITING_APPROVAL, Boolean.TRUE);
                 return updates;
@@ -65,6 +66,11 @@ public class ReplanAgentService {
             Map<String, Object> intentUpdates = classifyLatestUserRequest(state);
 
             if (hasRunAction(intentUpdates)) {
+                // A modification resumes the existing trip workflow, but RUN_*
+                // remains narrowly scoped to the capabilities requested by this
+                // modification. The dashboard may therefore preserve old results
+                // without scheduling their specialists again.
+                intentUpdates.put(TravelState.REQUEST_TYPE, com.example.travel.model.IntentPlan.TRIP_PLANNING);
                 // Consume the HITL modification marker. The next Supervisor retry
                 // must NOT interpret the same user request again.
                 intentUpdates.put(TravelState.HITL_DECISION, "");

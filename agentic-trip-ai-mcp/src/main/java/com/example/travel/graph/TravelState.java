@@ -472,7 +472,7 @@ public class TravelState extends AgentState {
     }
 
     public String requestType() {
-        return this.<String>value(REQUEST_TYPE).orElse("TRIP_PLANNING");
+        return this.<String>value(REQUEST_TYPE).orElse("GENERAL");
     }
 
     public boolean needsFlights() {

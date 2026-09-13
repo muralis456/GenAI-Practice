@@ -9,6 +9,7 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 /**
@@ -23,6 +24,7 @@ public class McpToolSelector {
 
     private final RoutedLlm routedLlm;
     private final ObjectMapper objectMapper;
+    private final ConcurrentHashMap<String, String> selectionCache = new ConcurrentHashMap<>();
 
     public McpToolSelector(RoutedLlm routedLlm, ObjectMapper objectMapper) {
         this.routedLlm = routedLlm;
@@ -38,6 +40,21 @@ public class McpToolSelector {
                 .map(callback -> "- name: " + callback.getToolDefinition().name()
                         + "\n  description: " + safe(callback.getToolDefinition().description()))
                 .collect(Collectors.joining("\n"));
+
+        // MCP tool selection is infrastructure, not the application's semantic
+        // intent decision. Cache a selection for the same purpose/catalog so a
+        // graph that resolves two airports or performs outbound+return searches
+        // does not burn one LLM call for every identical tool-selection decision.
+        String cacheKey = safe(agentPurpose) + "\n" + tools;
+        String cachedName = selectionCache.get(cacheKey);
+        if (cachedName != null && candidates.stream().anyMatch(c ->
+                c.getToolDefinition().name().equals(cachedName))) {
+            log.debug("mcp.client.llm-selection-cache-hit purpose='{}' selectedTool='{}'",
+                    abbreviate(agentPurpose), cachedName);
+            return candidates.stream()
+                    .filter(callback -> callback.getToolDefinition().name().equals(cachedName))
+                    .findFirst().orElseThrow();
+        }
 
         String system = "You are an MCP tool selector. "
                 + "Choose exactly ONE tool from the supplied MCP tool catalog for the requested task. "
@@ -60,6 +77,7 @@ public class McpToolSelector {
                         "LLM selected an unavailable MCP tool '" + selectedName + "'. Available: "
                                 + candidates.stream().map(c -> c.getToolDefinition().name()).collect(Collectors.joining(", "))));
 
+        selectionCache.put(cacheKey, selectedName);
         log.info("mcp.client.llm-selection purpose='{}' userInput='{}' selectedTool='{}' model={}",
                 abbreviate(agentPurpose), abbreviate(userInput), selectedName, result.model());
         return selected;

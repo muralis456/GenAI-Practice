@@ -156,10 +156,10 @@ public class AgenticRagService {
     }
 
     private Decision decideRetrieval(TravelState state) {
-        // Explicit knowledge intent is a high-confidence retrieval requirement.
-        // This is especially important for combined requests such as
-        // "weather in Bangalore to travel": live weather and durable travel
-        // tips are complementary capabilities and must both execute.
+        // The semantic Intent Agent owns the knowledge capability. If it decided
+        // that the user wants durable travel guidance in addition to another
+        // capability, retrieval is mandatory. No specialist gets a hard-coded
+        // knowledge exception here.
         if (state != null && state.needsKnowledge()) {
             String destination = TravelState.firstNonBlank(
                     state.destination(),

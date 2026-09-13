@@ -58,7 +58,7 @@ public class FlightAgentService {
         List<FlightOption> flights = mcpClient == null
                 ? flightSearchTool.search(originIata, destinationIata, outboundDate)
                 : mcpClient.search(originIata, destinationIata, outboundDate, state.travelers(), state.userRequest());
-        flights = normalizeResults(flights, "outbound", outboundDate, state.datesFlexible());
+        flights = normalizeResults(flights, "outbound", outboundDate, state.datesFlexible(), originIata, destinationIata);
 
         if (state.roundTrip()) {
             java.time.LocalDate returnDate = state.datesFlexible() ? null : state.returnDate();
@@ -66,7 +66,10 @@ public class FlightAgentService {
                     ? flightSearchTool.search(destinationIata, originIata, returnDate)
                     : mcpClient.search(destinationIata, originIata, returnDate, state.travelers(),
                     state.userRequest() + " Return journey");
-            flights.addAll(normalizeResults(returns, "return", returnDate, state.datesFlexible()));
+            // A provider may ignore the requested reverse route. Never relabel a
+            // BLR->NRT result as a return NRT->BLR flight; discard route-mismatched
+            // records instead of presenting incorrect round-trip data.
+            flights.addAll(normalizeResults(returns, "return", returnDate, state.datesFlexible(), destinationIata, originIata));
         }
 
         if (flights.isEmpty()) {
@@ -76,7 +79,8 @@ public class FlightAgentService {
     }
 
     private List<FlightOption> normalizeResults(List<FlightOption> input, String direction,
-                                                 java.time.LocalDate requestedDate, boolean flexible) {
+                                                 java.time.LocalDate requestedDate, boolean flexible,
+                                                 String expectedOrigin, String expectedDestination) {
         if (input == null) {
             return new java.util.ArrayList<>();
         }
@@ -89,6 +93,11 @@ public class FlightAgentService {
                     flight.setDirection(direction);
                     result.add(flight);
                 }
+                continue;
+            }
+            if (!routeMatches(flight, expectedOrigin, expectedDestination)) {
+                log.warn("Discarding route-mismatched flight direction={} expected={}->{} actual={}->{} flight={}",
+                        direction, expectedOrigin, expectedDestination, flight.getOrigin(), flight.getDestination(), flight.getFlightNumber());
                 continue;
             }
             flight.setDirection(direction);
@@ -110,6 +119,23 @@ public class FlightAgentService {
         if (existing == null || existing.isBlank()) return addition;
         if (existing.contains(addition)) return existing;
         return existing + " · " + addition;
+    }
+
+    private boolean routeMatches(FlightOption flight, String expectedOrigin, String expectedDestination) {
+        if (flight == null) return false;
+        String actualOrigin = normalizeCode(flight.getOrigin());
+        String actualDestination = normalizeCode(flight.getDestination());
+        String origin = normalizeCode(expectedOrigin);
+        String destination = normalizeCode(expectedDestination);
+        // Some providers return empty route fields. Keep those records because the
+        // request itself supplied the authoritative route. Reject only explicit
+        // mismatches, which protects return-flight direction.
+        if (actualOrigin.isBlank() || actualDestination.isBlank()) return true;
+        return actualOrigin.equals(origin) && actualDestination.equals(destination);
+    }
+
+    private String normalizeCode(String value) {
+        return value == null ? "" : value.trim().toUpperCase(java.util.Locale.ROOT);
     }
 
     private String resolveDestinationQuery(String destination, String hint) {

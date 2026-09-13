@@ -1513,6 +1513,7 @@
         .workspace-card-title { display:flex; align-items:center; gap:9px; font-size:16px; font-weight:800; }
         .workspace-card-sub { margin-top:3px; color:#8fa9c5; font-size:12px; }
         .ready-badge { color:#9cf2c0; background:rgba(37,192,111,.12); border:1px solid rgba(37,192,111,.28); border-radius:999px; padding:5px 9px; font-size:11px; font-weight:800; }
+        .ready-badge.review-badge { color:#ffd28a; background:rgba(245,168,60,.10); border-color:rgba(245,168,60,.26); }
         .workspace-view { color:#9fc7f7; font-size:11px; font-weight:700; }
         .workspace-content { min-width:0; }
         .workspace-content .flight-card,.workspace-content .hotel-card { background:rgba(255,255,255,.025); border:1px solid rgba(255,255,255,.055); border-radius:11px; padding:10px 11px; margin-bottom:7px; }
@@ -1718,15 +1719,51 @@
         .server-memory-card p:last-child { margin-bottom:0; }
         .sidebar-session .user-field { margin-top:5px; padding:7px 9px; font-size:11px; background:rgba(255,255,255,.06); color:#c4d5e9; border-color:rgba(255,255,255,.08); }
         .travel-dashboard { grid-template-columns:minmax(0,1fr) 292px; gap:14px; }
-        .travel-main { min-width:0; }
+        .travel-main { min-width:0; width:100%; }
+        .travel-main > .workspace-tabs,
+        .travel-main > .workspace-grid,
+        .travel-main > .workspace-card { width:100%; max-width:100%; }
         .trip-banner { min-height:128px; padding:22px 24px; background:linear-gradient(105deg,#12345b 0%,#0c223d 48%,#122d4b 100%); }
         .trip-banner:before { content:""; position:absolute; right:0; top:0; bottom:0; width:48%; background:radial-gradient(circle at 65% 35%,rgba(77,164,255,.20),transparent 46%),linear-gradient(135deg,transparent 20%,rgba(65,134,207,.16)); pointer-events:none; }
         .trip-banner:after { height:130px; inset:auto -5% -55% 42%; }
         .trip-route { position:relative; z-index:1; font-size:clamp(1.8rem,2.6vw,2.35rem); }
         .trip-facts { position:relative; z-index:1; }
-        .workspace-tabs { padding:3px 0; gap:0; border:1px solid rgba(255,255,255,.06); background:rgba(255,255,255,.025); border-radius:10px; }
-        .workspace-tab { border:0; border-radius:8px; padding:9px 14px; cursor:pointer; }
-        .workspace-tab:hover { background:rgba(255,255,255,.045); }
+        .workspace-tabs {
+            display:grid;
+            grid-auto-flow:column;
+            grid-auto-columns:minmax(96px,1fr);
+            width:100%;
+            min-width:0;
+            gap:3px;
+            padding:3px;
+            margin:0 0 14px;
+            border:1px solid rgba(255,255,255,.06);
+            background:rgba(255,255,255,.025);
+            border-radius:12px;
+            overflow-x:auto;
+            scrollbar-width:none;
+        }
+        .workspace-tabs::-webkit-scrollbar { display:none; }
+        .workspace-tab {
+            min-width:96px;
+            border:0;
+            border-radius:9px;
+            padding:10px 12px;
+            cursor:pointer;
+            color:#9fb4ce;
+            background:transparent;
+            font:inherit;
+            font-size:11px;
+            font-weight:800;
+            white-space:nowrap;
+            transition:background .16s ease,color .16s ease,box-shadow .16s ease;
+        }
+        .workspace-tab:hover { background:rgba(255,255,255,.045); color:#e8f2ff; }
+        .workspace-tab.active {
+            color:#f2f7ff;
+            background:linear-gradient(180deg,rgba(55,128,231,.25),rgba(45,103,191,.16));
+            box-shadow:inset 0 0 0 1px rgba(93,166,255,.18);
+        }
         .workspace-grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
         .workspace-card { padding:14px; border-radius:14px; }
         .workspace-card.full { grid-column:1/-1; }
@@ -1755,6 +1792,7 @@
         .trip-side .trip-side-card:first-child { position:sticky; top:12px; }
         @media (max-width:1250px) { .travel-dashboard{grid-template-columns:minmax(0,1fr) 260px;} .workspace-grid{grid-template-columns:repeat(2,minmax(0,1fr));} }
         @media (max-width:900px) { .layout > .sidebar{flex-basis:250px;width:250px;max-width:250px;} .layout > .main{width:calc(100% - 250px);} .travel-dashboard{grid-template-columns:1fr;} .travel-side{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;} .final-decision{position:static;} }
+        @media (max-width:650px) { .workspace-tabs{grid-auto-columns:minmax(92px,1fr);} .workspace-tab{min-width:92px;padding:9px 8px;font-size:10px;} }
 
 
         /* V7 interaction and density fixes */
@@ -1984,6 +2022,12 @@
 .flight-direction{flex:0 0 auto;padding:3px 6px;border-radius:5px;background:rgba(84,157,244,.10);color:#9ecaff;font-size:8px;font-weight:850;letter-spacing:.06em}
 .flight-route-line{margin-top:5px;color:#d4e2f3;font-size:10px;line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .compact-flight-card .item-note{margin-top:4px;font-size:9px;color:#7891ae;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.flight-group{padding:2px 0 4px}
+.flight-group + .flight-group{margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,.055)}
+.flight-group-title{display:flex;justify-content:space-between;align-items:center;margin:0 2px 7px;color:#b8cbe2;font-size:10px;font-weight:850;letter-spacing:.03em;text-transform:uppercase}
+.flight-group-title span:last-child{color:#7189a7;font-weight:700;text-transform:none;letter-spacing:0}
+.flight-more-note{padding:5px 2px 0;color:#7891ae;font-size:9px;font-weight:700;text-align:right}
+
 .hotel-card{padding:10px 11px!important;min-height:0!important}
 .hotel-card-main{min-width:0}
 .hotel-fit{display:inline-block;margin-top:5px;padding:3px 7px;border-radius:5px;background:rgba(38,185,120,.09);border:1px solid rgba(38,185,120,.15);color:#9de0bf;font-size:9px;font-weight:700}
@@ -3084,7 +3128,8 @@
     const buildFlightsSection = (flights) => {
         const usable = (flights || []).filter(f => f && String(f.status || '').toLowerCase() !== 'unavailable');
         if (!usable.length) return '<div class="specialist-empty">No confirmed flight options are available for the requested route/date.</div>';
-        return usable.map(f => {
+
+        const renderFlight = (f) => {
             const direction = String(f.direction || 'outbound').toLowerCase() === 'return' ? 'RETURN' : 'OUTBOUND';
             const route = (f.origin && f.destination) ? f.origin + ' → ' + f.destination : '';
             const times = [f.departureTime, f.arrivalTime].filter(Boolean).join(' → ');
@@ -3095,7 +3140,23 @@
                 + (meta ? '<div class="flight-route-line">' + escapeHtml(meta) + '</div>' : '')
                 + ((dateNote || f.notes) ? '<div class="item-note">' + escapeHtml([dateNote, f.notes].filter(Boolean).join(' · ')) + '</div>' : '')
                 + '</div>';
-        }).join('');
+        };
+
+        const groups = [
+            ['outbound', 'Outbound'],
+            ['return', 'Return']
+        ];
+        let html = '';
+        groups.forEach(([key, label]) => {
+            const items = usable.filter(f => String(f.direction || 'outbound').toLowerCase() === key);
+            if (!items.length) return;
+            html += '<div class="flight-group">'
+                + '<div class="flight-group-title"><span>' + label + '</span><span>' + items.length + ' option' + (items.length === 1 ? '' : 's') + '</span></div>'
+                + items.slice(0, 3).map(renderFlight).join('')
+                + (items.length > 3 ? '<div class="flight-more-note">+' + (items.length - 3) + ' more available options</div>' : '')
+                + '</div>';
+        });
+        return html;
     };
 
     const cleanHotelText = (value) => String(value || '')
@@ -3104,8 +3165,22 @@
         .replace(/\s+/g, ' ')
         .trim();
 
+    const isLikelyHotelName = (value) => {
+        const name = cleanHotelText(value);
+        if (name.length < 2 || name.length > 90) return false;
+        const lower = name.toLowerCase();
+        if (/https?:\/\//i.test(name) || /\b20\d{2}\b/.test(name)) return false;
+        if (/best areas|areas? & hotels?|hotels? to stay|where to stay|top hotels?|hotel guide|accommodation guide|travel guide|things to do|complete guide/.test(lower)) return false;
+        if (/^the\s+best\b|^top\s+\d+|\b\d+\s*(best|top|hotels?)\b/.test(lower)) return false;
+        if (/\(\s*\d+\s*(best|top|hotels?|options?)?/i.test(name)) return false;
+        if ((name.match(/[:;|]/g) || []).length > 1) return false;
+        if (name.split(/\s+/).length > 11) return false;
+        return true;
+    };
+
     const buildHotelsSection = (hotels) => {
-        const usable = (hotels || []).filter(h => h && h.name && cleanHotelText(h.name).length > 1);
+        const usable = (hotels || []).filter(h => h && isLikelyHotelName(h.name)
+            && (h.area || h.priceRange || h.rating || h.suitableFor));
         if (!usable.length) return '<div class="specialist-empty">No verified hotel options were returned. The research result was not treated as a hotel.</div>';
         const visibleCount = 4;
         const cards = usable.map((h, index) => {
@@ -3210,12 +3285,33 @@
             .replace(/\\b\\w/g, ch => ch.toUpperCase());
     };
 
+    const isInternalOrPlanKnowledge = (text) => {
+        const value = String(text || '').trim();
+        if (!value) return true;
+        return /llm\s+budget\s+exhausted|budget\s+exhausted|quota(?:\s+exceeded)?|rate\s*limit|model unavailable|stack trace/i.test(value)
+            || /(?:^|\n)\s*(?:#{1,6}\s*)?(?:flights?|hotels?|accommodation|itinerary|day[- ]by[- ]day|trip plan)\s*[:#-]?/i.test(value)
+            || /(?:₹|\$|€)\s*[\d,]+/i.test(value)
+            || /\b(?:flight|airline|hotel|accommodation|trip total|budget breakdown|fare)\b/i.test(value);
+    };
+
+    const safeKnowledgeAnswer = (text) => {
+        const value = String(text || '').trim();
+        if (!value || isInternalOrPlanKnowledge(value) || value.length > 1600) return '';
+        return value;
+    };
+
+    const safeTripTips = (text) => {
+        const value = String(text || '').trim();
+        if (!value || /llm\s+budget\s+exhausted|budget\s+exhausted|quota(?:\s+exceeded)?|rate\s*limit|model unavailable|stack trace/i.test(value)) return '';
+        return value.length > 1400 ? value.slice(0, 1397).trim() + '…' : value;
+    };
+
     const buildKnowledgeGuidanceSection = (data, plan) => {
         const exec = data.execution || {};
         const knowledge = plan.knowledge || {};
-        const answer = String(knowledge.answer || exec.ragAnswer || data.ragAnswer || '').trim();
+        const answer = safeKnowledgeAnswer(knowledge.answer || exec.ragAnswer || data.ragAnswer || '');
         const available = knowledge.available === true || !!answer;
-        if (!available || !answer || /llm\s+budget\s+exhausted|budget\s+exhausted|rate\s*limit|quota/i.test(answer)) return '';
+        if (!available || !answer) return '';
         const topics = Array.isArray(knowledge.topics) ? knowledge.topics : [];
         const sources = Array.isArray(knowledge.sources) ? knowledge.sources : (Array.isArray(exec.ragSources) ? exec.ragSources : []);
         const destination = String(knowledge.destination || '').trim();
@@ -3234,8 +3330,8 @@
     const buildSpecialistKnowledgeCard = (data, plan) => {
         const exec = data.execution || {};
         const knowledge = plan.knowledge || {};
-        const answer = String(knowledge.answer || exec.ragAnswer || data.ragAnswer || '').trim();
-        if (!answer || /llm\s+budget\s+exhausted|budget\s+exhausted|rate\s*limit|quota/i.test(answer)) return '';
+        const answer = safeKnowledgeAnswer(knowledge.answer || exec.ragAnswer || data.ragAnswer || '');
+        if (!answer) return '';
         const sources = Array.isArray(knowledge.sources) && knowledge.sources.length
             ? knowledge.sources : (Array.isArray(exec.ragSources) ? exec.ragSources : []);
         const topics = Array.isArray(knowledge.topics) ? knowledge.topics : [];
@@ -3249,12 +3345,19 @@
         }
         html += '<div class="specialist-answer">' + formatKnowledgeText(answer) + '</div>';
         if (sources.length) {
-            html += '<div class="knowledge-sources">' + sources.slice(0, 6).map(source =>
+            html += '<details class="knowledge-sources-details"><summary>View knowledge sources</summary><div class="knowledge-sources">' + sources.slice(0, 6).map(source =>
                 '<span class="knowledge-source">' + escapeHtml(humanizeKnowledgeSource(source)) + '</span>'
-            ).join('') + '</div>';
+            ).join('') + '</div></details>';
         }
         html += '</section>';
         return html;
+    };
+
+    const hasSpecialistKnowledge = (data, plan) => {
+        const knowledge = plan?.knowledge || {};
+        const exec = data?.execution || {};
+        return knowledge.available === true
+            || !!String(knowledge.answer || exec.ragAnswer || data?.ragAnswer || '').trim();
     };
 
     const buildSpecialistResponseHtml = (data, userRequest) => {
@@ -3335,14 +3438,14 @@
             + '<span class="complete-badge">✓ Complete</span></div>'
             + body
             + '</section>'
-            + ((type === 'RESEARCH' || type === 'GENERAL' || type === 'TRAVEL_INFORMATION') ? '' : buildSpecialistKnowledgeCard(data, plan))
+            + (hasSpecialistKnowledge(data, plan) ? buildSpecialistKnowledgeCard(data, plan) : '')
             + '</div>';
     };
 
     const buildPlanCardHtml = (data, userRequest) => {
         const plan = data.plan || {};
         const trip = plan.trip || {};
-        const tips = plan.tips || data.finalPlan || '';
+        const tips = safeTripTips(plan.tips || data.finalPlan || '');
         if (data.status === 'ERROR' || (tips && String(tips).startsWith('Error:'))) {
             return '<div class="result-card"><div class="result-hero"><div class="result-eyebrow">Agent response</div><h2 class="result-title">Something went wrong</h2></div><div class="result-body"><div class="validation-banner">⚠ ' + escapeHtml(safeUiErrorMessage()) + '</div></div></div>';
         }
@@ -3351,6 +3454,8 @@
         const isTripPlan = data.tripPlanning === true || hasItineraryData;
         const requestType = String(data.requestType || trip.requestType || '').toUpperCase();
         const hasFlights = Array.isArray(plan.flights) && plan.flights.length;
+        const hasReturnFlights = hasFlights && plan.flights.some(f => f && String(f.status || '').toLowerCase() !== 'unavailable' && String(f.direction || 'outbound').toLowerCase() === 'return');
+        const roundTripReturnMissing = hasFlights && trip.roundTrip !== false && !hasReturnFlights;
         const hasHotels = Array.isArray(plan.hotels) && plan.hotels.length;
         const hasItinerary = hasItineraryData;
         const hasBudget = !!(plan.budget && Array.isArray(plan.budget.lineItems) && plan.budget.lineItems.length);
@@ -3390,10 +3495,10 @@
         const requirements = Array.isArray(trip.requirements) ? trip.requirements : [];
         if (requirements.length) html += '<div class="requirement-chips">' + requirements.map(r => '<span class="requirement-chip">✓ ' + escapeHtml(r) + '</span>').join('') + '</div>';
         if (trip.qualityExplanation) html += '<div class="quality-explanation"><strong>' + escapeHtml(trip.qualityLabel || 'Plan confidence') + '</strong> · ' + escapeHtml(trip.qualityExplanation) + '</div>';
-        html += '</div></div>';
+        html += '</div>';
         html += '<div class="workspace-tabs"><button type="button" class="workspace-tab active" data-section-target="overview">Overview</button>' + (hasFlights ? '<button type="button" class="workspace-tab" data-section-target="flights">✈ Flights</button>' : '') + (hasHotels ? '<button type="button" class="workspace-tab" data-section-target="hotels">🏨 Hotels</button>' : '') + (hasItinerary ? '<button type="button" class="workspace-tab" data-section-target="itinerary">🗓 Itinerary</button>' : '') + (hasWeather ? '<button type="button" class="workspace-tab" data-section-target="weather">☀ Weather</button>' : '') + (hasBudget ? '<button type="button" class="workspace-tab" data-section-target="budget">💰 Budget</button>' : '') + (hasKnowledge ? '<button type="button" class="workspace-tab" data-section-target="knowledge">🧠 Knowledge</button>' : '') + '</div>';
         html += '<div class="workspace-grid">';
-        if (hasFlights) html += '<section id="section-flights" class="workspace-card"><div class="workspace-card-head"><div><div class="workspace-card-title">✈️ Flights</div><div class="workspace-card-sub">' + (flightDateUnconfirmed ? 'Live schedules — requested date not confirmed' : 'Best available flight options') + '</div></div><span class="ready-badge">' + (flightDateUnconfirmed ? 'Review' : '✓ ' + (complete ? 'Complete' : 'Ready')) + '</span></div><div class="workspace-content">' + buildFlightsSection(plan.flights) + '</div></section>';
+        if (hasFlights) html += '<section id="section-flights" class="workspace-card"><div class="workspace-card-head"><div><div class="workspace-card-title">✈️ Flights</div><div class="workspace-card-sub">' + (flightDateUnconfirmed ? 'Live schedules — requested date not confirmed' : (roundTripReturnMissing ? 'Outbound options available · return flight not confirmed' : 'Outbound and return options')) + '</div></div><span class="ready-badge ' + ((flightDateUnconfirmed || roundTripReturnMissing) ? 'review-badge' : '') + '">' + ((flightDateUnconfirmed || roundTripReturnMissing) ? 'Review' : '✓ ' + (complete ? 'Complete' : 'Ready')) + '</span></div><div class="workspace-content">' + buildFlightsSection(plan.flights) + '</div></section>';
         if (hasHotels) html += '<section id="section-hotels" class="workspace-card"><div class="workspace-card-head"><div><div class="workspace-card-title">🏨 Hotels</div><div class="workspace-card-sub">Accommodation recommendations</div></div><span class="ready-badge">✓ ' + (complete ? 'Complete' : 'Ready') + '</span></div><div class="workspace-content">' + buildHotelsSection(plan.hotels) + '</div></section>';
         if (hasWeather) html += '<section id="section-weather" class="workspace-card"><div class="workspace-card-head"><div><div class="workspace-card-title">☀️ Weather</div><div class="workspace-card-sub">Travel-date forecast</div></div><span class="ready-badge">✓ ' + (complete ? 'Complete' : 'Ready') + '</span></div><div class="workspace-content">' + buildWeatherSection(plan.weather) + '</div></section>';
         if (hasBudget) html += '<section id="section-budget" class="workspace-card"><div class="workspace-card-head"><div><div class="workspace-card-title">💰 Budget</div><div class="workspace-card-sub">Estimated trip cost</div></div><span class="ready-badge">✓ ' + (complete ? 'Complete' : 'Ready') + '</span></div><div class="workspace-content">' + buildBudgetTable(plan.budget) + '</div></section>';
@@ -3413,7 +3518,7 @@
         const componentStatus = responseStatus === 'REJECTED' ? 'Rejected' : complete ? 'Complete' : 'Ready';
         const componentClass = responseStatus === 'REJECTED' ? ' rejected' : complete ? ' complete' : '';
         html += '<section class="trip-side-card"><div class="trip-side-title">⚙ Plan Status</div><div class="status-list">';
-        if (hasFlights) html += '<div class="status-row"><span class="status-name"><i class="status-dot' + (flightDateUnconfirmed ? ' rejected' : componentClass) + '"></i>Flights</span><span class="status-value' + (flightDateUnconfirmed ? ' rejected' : componentClass) + '">' + (flightDateUnconfirmed ? 'Review' : componentStatus) + '</span></div>';
+        if (hasFlights) html += '<div class="status-row"><span class="status-name"><i class="status-dot' + ((flightDateUnconfirmed || roundTripReturnMissing) ? ' rejected' : componentClass) + '"></i>Flights</span><span class="status-value' + ((flightDateUnconfirmed || roundTripReturnMissing) ? ' rejected' : componentClass) + '">' + ((flightDateUnconfirmed || roundTripReturnMissing) ? 'Review' : componentStatus) + '</span></div>';
         if (hasHotels) html += '<div class="status-row"><span class="status-name"><i class="status-dot' + componentClass + '"></i>Hotels</span><span class="status-value' + componentClass + '">' + componentStatus + '</span></div>';
         if (hasWeather) html += '<div class="status-row"><span class="status-name"><i class="status-dot' + componentClass + '"></i>Weather</span><span class="status-value' + componentClass + '">' + componentStatus + '</span></div>';
         if (hasBudget) html += '<div class="status-row"><span class="status-name"><i class="status-dot' + componentClass + '"></i>Budget</span><span class="status-value' + componentClass + '">' + componentStatus + '</span></div>';
@@ -3481,12 +3586,17 @@
         // responses can legitimately have no plan object while still carrying
         // requestType, weather/hotels/flights/budget or RAG knowledge. Always
         // let the structured renderer decide which UI is appropriate.
+        const responseType = String(data?.requestType || data?.plan?.trip?.requestType || '').toUpperCase();
+        const specialistResponse = data && data.tripPlanning !== true
+            && ['WEATHER','FLIGHT_SEARCH','HOTEL_SEARCH','BUDGET','RESEARCH','MULTI_CAPABILITY','MULTI_INTENT','TRAVEL_INFORMATION','GENERAL'].includes(responseType);
         const hasStructuredResponse = !!(data && (
             data.threadId || data.plan || data.requestType || data.weather ||
             data.flights || data.hotels || data.budget || data.execution ||
             data.ragAnswer || data.knowledge
         ));
-        if (hasStructuredResponse) {
+        if (specialistResponse) {
+            body.innerHTML = buildSpecialistResponseHtml(data, userRequest);
+        } else if (hasStructuredResponse) {
             body.innerHTML = buildPlanCardHtml(data, userRequest);
         } else {
             const text = data && (data.finalPlan || data.text) ? (data.finalPlan || data.text) : 'Plan response available.';
@@ -3560,7 +3670,7 @@
             ? data.origin + ' → ' + data.destination
             : (data && data.routeSummary) || title;
         const quality = data && data.planQuality && data.planQuality.overall > 0
-            ? ' · Quality ' + Math.round(data.planQuality.overall * 100) + '/100' : '';
+            ? ' · Confidence ' + Math.round(data.planQuality.overall * 100) + '/100' : '';
         return title + ' — ' + route + quality;
     };
 

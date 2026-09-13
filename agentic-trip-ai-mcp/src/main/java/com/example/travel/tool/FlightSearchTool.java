@@ -38,7 +38,10 @@ public class FlightSearchTool {
             try {
                 date = LocalDate.parse(departureDate.trim());
             } catch (Exception ignored) {
-                date = LocalDate.now();
+                // Invalid/missing dates must remain unknown. Never silently
+                // substitute today's date because it can make live results look
+                // like results for a user-requested travel date.
+                date = null;
             }
         }
         List<FlightOption> flights = search(originIata, destinationIata, date);

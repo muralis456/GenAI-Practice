@@ -326,7 +326,8 @@ public class ReplanStrategyExecutor {
             List<ReplanAction> actions,
             TravelState state) {
 
-        // NEEDS_* is cumulative across the conversation.
+        // NEEDS_* describes the active workflow requirements after this replan.
+        // Historical result data is retained separately in the checkpoint.
         boolean needsFlights = state.needsFlights();
         boolean needsHotels = state.needsHotels();
         boolean needsResearch = state.needsResearch();

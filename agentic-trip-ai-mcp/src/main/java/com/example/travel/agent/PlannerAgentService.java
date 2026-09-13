@@ -6,7 +6,6 @@ import com.example.travel.graph.model.PlannerExtraction;
 import com.example.travel.service.RoutedLlm;
 import com.example.travel.support.JsonSupport;
 import com.example.travel.support.TripSlotHeuristics;
-import com.example.travel.tool.AirportLookupTool;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -27,12 +26,10 @@ public class PlannerAgentService {
 
     private final RoutedLlm routedLlm;
     private final JsonSupport jsonSupport;
-    private final AirportLookupTool airportLookupTool;
 
-    public PlannerAgentService(RoutedLlm routedLlm, JsonSupport jsonSupport, AirportLookupTool airportLookupTool) {
+    public PlannerAgentService(RoutedLlm routedLlm, JsonSupport jsonSupport) {
         this.routedLlm = routedLlm;
         this.jsonSupport = jsonSupport;
-        this.airportLookupTool = airportLookupTool;
     }
 
     public Map<String, Object> plan(TravelState state) {
@@ -49,7 +46,7 @@ public class PlannerAgentService {
                             + "For departureDate and returnDate, return a value ONLY when the CURRENT REQUEST explicitly provides a calendar date. "
                             + "A duration such as '7 days' is not a calendar date; leave both date fields empty. Never use today's date as an answer to a missing date. "
                             + "Never invent London/LHR unless the user said London. "
-                            + "You may call the airport lookup tool to sanity-check city names.",
+                            + "Do not call external tools. Airport/IATA resolution is handled by the graph after slot extraction.",
                     "CURRENT REQUEST: " + state.userRequest()
                             + "\nKnown origin: " + state.origin()
                             + "\nKnown destination: " + state.destination()
@@ -58,8 +55,7 @@ public class PlannerAgentService {
                             + "\nTravelers: " + state.travelers()
                             + "\nBudget: " + state.budgetLabel()
                             + "\nStyle: " + state.travelStyle()
-                            + "\nHistory (background only): " + state.historyContext(),
-                    airportLookupTool);
+                            + "\nHistory (background only): " + state.historyContext());
         } catch (Exception exception) {
             log.warn("Planner LLM extraction failed, using request fields and regex", exception);
             content = "";

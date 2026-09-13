@@ -22,16 +22,13 @@ public class IntentAgentService {
 
     private final RoutedLlm routedLlm;
     private final JsonSupport jsonSupport;
-    private final SemanticIntentArbiter semanticIntentArbiter;
 
     public IntentAgentService(
             RoutedLlm routedLlm,
-            JsonSupport jsonSupport,
-            SemanticIntentArbiter semanticIntentArbiter) {
+            JsonSupport jsonSupport) {
 
         this.routedLlm = routedLlm;
         this.jsonSupport = jsonSupport;
-        this.semanticIntentArbiter = semanticIntentArbiter;
     }
 
     /**
@@ -140,8 +137,11 @@ public class IntentAgentService {
                          travel cost/spend.
                 itinerary = organizing a journey into a coherent schedule or day-by-day plan,
                             including a request to create or modify that schedule.
-                knowledge = durable/general travel guidance such as culture, customs,
-                            safety, packing, visa guidance, local practical advice or overview.
+                knowledge = durable/general travel guidance such as culture, customs, safety,
+                            packing, visa guidance, local practical advice or overview. It can be
+                            combined with a live capability when the user explicitly wants practical
+                            travel guidance derived from that information; do not infer it just from
+                            the destination or from a generic travel mention.
 
                 Key semantic rule: infer the user's objective, not the presence or absence
                 of a particular word. For example, a person can clearly ask for a vacation
@@ -185,7 +185,11 @@ public class IntentAgentService {
                 - budget: travel cost estimation, comparison, constraints or optimization
                 - itinerary: a coherent trip schedule, day-by-day journey plan, or schedule change
                 - knowledge: durable travel guidance such as culture, customs, safety, packing,
-                  visa guidance, practical local advice or destination overview
+                  visa guidance, practical local advice or destination overview. It may be
+                  requested alongside a live capability when the user is asking for the travel
+                  implications of that information (for example weather for an upcoming visit,
+                  or flight/hotel advice that explicitly asks for practical travel guidance).
+                  Do not enable it merely because the request happens to mention a destination.
 
                 Semantic principles:
                 - Infer intent from the complete sentence and relationships between its parts.
@@ -426,6 +430,15 @@ public class IntentAgentService {
 
                     2. If a capability is not requested by the latest request,
                        that field MUST be false.
+
+                    3. Evaluate the whole request, including purpose and context. A
+                       live lookup can legitimately coexist with knowledge when the
+                       user asks what the live information means for their travel.
+                       Example: weather plus an explicit request to prepare for a visit
+                       can produce needsWeather=true and needsKnowledge=true. A plain
+                       weather lookup can remain needsKnowledge=false.
+
+                    4. Never copy capability flags from the existing trip.
 
                     3. Do NOT copy requirements from an earlier request.
 
@@ -671,171 +684,75 @@ public class IntentAgentService {
      * TravelState.applyIntentAndRun() owns the mapping between
      * intent capabilities and NEEDS/RUN flags.
      */
-   private Map<String, Object> toUpdates(
-        TravelState state,
-        IntentPlan plan) {
+    private Map<String, Object> toUpdates(TravelState state, IntentPlan plan) {
+        Map<String, Object> updates = new LinkedHashMap<>();
+        if (plan == null) {
+            plan = emptyPlan();
+        }
 
-    Map<String, Object> updates = new LinkedHashMap<>();
+        // Intent is a CURRENT-TURN decision. Never OR it with checkpoint history.
+        // Historical trip data remains in the state/result collections, while these
+        // fields describe only what the latest semantic decision wants to execute.
+        // This is the key isolation boundary that prevents an old trip from leaking
+        // flights/hotels/budget into a new specialist request.
+        updates.put(TravelState.REQUEST_TYPE, plan.getRequestType());
+        updates.put(TravelState.NEEDS_FLIGHTS, plan.isNeedsFlights());
+        updates.put(TravelState.NEEDS_HOTELS, plan.isNeedsHotels());
+        updates.put(TravelState.NEEDS_RESEARCH, plan.isNeedsResearch());
+        updates.put(TravelState.NEEDS_WEATHER, plan.isNeedsWeather());
+        updates.put(TravelState.NEEDS_BUDGET, plan.isNeedsBudget());
+        updates.put(TravelState.NEEDS_ITINERARY, plan.isNeedsItinerary());
+        updates.put(TravelState.NEEDS_KNOWLEDGE, plan.isNeedsKnowledge());
 
-    if (plan == null) {
-        plan = emptyPlan();
+        // RUN_* is also exactly the semantic capability vector for this turn.
+        updates.put(TravelState.RUN_FLIGHTS, plan.isNeedsFlights());
+        updates.put(TravelState.RUN_HOTELS, plan.isNeedsHotels());
+        updates.put(TravelState.RUN_RESEARCH, plan.isNeedsResearch());
+        updates.put(TravelState.RUN_WEATHER, plan.isNeedsWeather());
+        updates.put(TravelState.RUN_BUDGET, plan.isNeedsBudget());
+        updates.put(TravelState.RUN_ITINERARY, plan.isNeedsItinerary());
+
+        updates.put(TravelState.PLAN_STRATEGY, plan.getStrategy());
+        updates.put(TravelState.PLAN_PRIORITY, plan.getPriority());
+        updates.put(TravelState.INTENT_CONFIDENCE, plan.getConfidence());
+
+        // Clear turn-scoped generated artifacts before executing this semantic
+        // request. The checkpoint intentionally retains historical domain data,
+        // but transient RAG/tips/validation output must never leak into a new turn.
+        updates.put(TravelState.RAG_DECISION, "skip");
+        updates.put(TravelState.RAG_QUERY, "");
+        updates.put(TravelState.RAG_CONTEXT, "");
+        updates.put(TravelState.RAG_ANSWER, "");
+        updates.put(TravelState.RAG_SOURCES, java.util.List.of());
+        updates.put(TravelState.RAG_ITERATIONS, 0);
+        updates.put(TravelState.RAG_SUFFICIENT, Boolean.FALSE);
+        updates.put(TravelState.RAG_RETRIEVAL_METHOD, "none");
+        updates.put(TravelState.RAG_CANDIDATE_COUNT, 0);
+        updates.put(TravelState.RAG_RERANKED_COUNT, 0);
+        updates.put(TravelState.RAG_CONTEXT_CHARS, 0);
+        updates.put(TravelState.RAG_EVIDENCE_SCORE, 0.0d);
+        updates.put(TravelState.RAG_GROUNDEDNESS, 0.0d);
+        updates.put(TravelState.RAG_JUDGE_PASS, Boolean.TRUE);
+        updates.put(TravelState.RAG_JUDGE_REASON, "not_applicable");
+        updates.put(TravelState.RAG_DESTINATION, "");
+        updates.put(TravelState.RAG_COUNTRY, "");
+        updates.put(TravelState.RAG_TOPICS, java.util.List.of());
+        updates.put(TravelState.FINAL_TIPS, "");
+        updates.put(TravelState.VALIDATION_ERRORS, java.util.List.of());
+        updates.put(TravelState.SEMANTIC_NOTES, java.util.List.of());
+
+        if (state != null) {
+            updates.put(TravelState.TRIP_REQUIREMENTS,
+                    TripRequirementsParser.parse(state.userRequest()));
+            updates.put(TravelState.LAST_DECISION,
+                    new AgentDecision(
+                            "intent",
+                            plan.getRequestType(),
+                            plan.summary(),
+                            plan.getConfidence()));
+        }
+        return updates;
     }
-
-    updates.put(
-            TravelState.REQUEST_TYPE,
-            plan.getRequestType());
-
-    /*
-     * ============================================================
-     * CUMULATIVE NEEDS
-     * ============================================================
-     *
-     * NEEDS_* represents everything requested during the
-     * conversation so far.
-     *
-     * Example:
-     *
-     * Request 1: hotels
-     * Request 2: flights
-     * Request 3: weather + budget
-     *
-     * Final:
-     * hotel=true
-     * flight=true
-     * weather=true
-     * budget=true
-     */
-    boolean previousFlights =
-            state != null && state.needsFlights();
-
-    boolean previousHotels =
-            state != null && state.needsHotels();
-
-    boolean previousResearch =
-            state != null && state.needsResearch();
-
-    boolean previousWeather =
-            state != null && state.needsWeather();
-
-    boolean previousBudget =
-            state != null && state.needsBudget();
-
-    boolean previousItinerary =
-            state != null && state.needsItinerary();
-
-    updates.put(
-            TravelState.NEEDS_FLIGHTS,
-            previousFlights || plan.isNeedsFlights());
-
-    updates.put(
-            TravelState.NEEDS_HOTELS,
-            previousHotels || plan.isNeedsHotels());
-
-    updates.put(
-            TravelState.NEEDS_RESEARCH,
-            previousResearch || plan.isNeedsResearch());
-
-    updates.put(
-            TravelState.NEEDS_WEATHER,
-            previousWeather || plan.isNeedsWeather());
-
-    updates.put(
-            TravelState.NEEDS_BUDGET,
-            previousBudget || plan.isNeedsBudget());
-
-    updates.put(
-            TravelState.NEEDS_ITINERARY,
-            previousItinerary || plan.isNeedsItinerary());
-
-    updates.put(
-            TravelState.NEEDS_KNOWLEDGE,
-            plan.isNeedsKnowledge());
-
-
-    /*
-     * ============================================================
-     * CURRENT RUN
-     * ============================================================
-     *
-     * RUN_* represents ONLY what needs to execute now.
-     *
-     * Therefore if the latest request is:
-     *
-     * "weather and budget"
-     *
-     * then:
-     *
-     * RUN_WEATHER=true
-     * RUN_BUDGET=true
-     *
-     * everything else=false.
-     */
-    updates.put(
-            TravelState.RUN_FLIGHTS,
-            plan.isNeedsFlights());
-
-    updates.put(
-            TravelState.RUN_HOTELS,
-            plan.isNeedsHotels());
-
-    updates.put(
-            TravelState.RUN_RESEARCH,
-            plan.isNeedsResearch());
-
-    updates.put(
-            TravelState.RUN_WEATHER,
-            plan.isNeedsWeather());
-
-    updates.put(
-            TravelState.RUN_BUDGET,
-            plan.isNeedsBudget());
-
-    updates.put(
-            TravelState.RUN_ITINERARY,
-            plan.isNeedsItinerary());
-
-
-    /*
-     * ============================================================
-     * PLAN METADATA
-     * ============================================================
-     */
-    updates.put(
-            TravelState.PLAN_STRATEGY,
-            plan.getStrategy());
-
-    updates.put(
-            TravelState.PLAN_PRIORITY,
-            plan.getPriority());
-
-    updates.put(
-            TravelState.INTENT_CONFIDENCE,
-            plan.getConfidence());
-
-
-    /*
-     * ============================================================
-     * TRIP REQUIREMENTS / DECISION
-     * ============================================================
-     */
-    if (state != null) {
-
-        updates.put(
-                TravelState.TRIP_REQUIREMENTS,
-                TripRequirementsParser.parse(
-                        state.userRequest()));
-
-        updates.put(
-                TravelState.LAST_DECISION,
-                new AgentDecision(
-                        "intent",
-                        plan.getRequestType(),
-                        plan.summary(),
-                        plan.getConfidence()));
-    }
-
-    return updates;
-}
 
     /**
      * Refines the deterministic initial classification using the LLM.
@@ -893,8 +810,12 @@ public class IntentAgentService {
                               cost or expense requests.
                             - needsItinerary=true only for itinerary
                               or schedule requests.
-                            - needsKnowledge=true for durable travel knowledge; false for purely live flight, hotel, weather or airport lookups.
-                            - needsKnowledge=true for durable travel knowledge such as destination guidance, culture, packing, safety, planning rules, visa guidance, or knowledge-backed recommendations; false for purely live flight/hotel/weather lookups.
+                            - needsKnowledge=true for durable travel knowledge or practical travel guidance
+                              requested alongside another capability. It may be true for a live
+                              lookup when the user asks what that information means for the trip;
+                              keep it false for a purely factual live lookup.
+                            - Judge this from the complete latest request and its purpose. Do not copy
+                              capabilities from the existing checkpoint.
 
                             Do not activate a specialist merely because
                             it would be useful.

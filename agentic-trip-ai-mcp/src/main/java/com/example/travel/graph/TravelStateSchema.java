@@ -80,7 +80,7 @@ public final class TravelStateSchema {
         schema.put(Hitl.HITL_DECISION, Channels.base(() -> ""));
         schema.put(Trip.PREFERRED_AIRPORT, Channels.base(() -> ""));
         schema.put(Trip.CURRENCY, Channels.base(() -> "INR"));
-        schema.put(Request.REQUEST_TYPE, Channels.base(() -> "TRIP_PLANNING"));
+        schema.put(Request.REQUEST_TYPE, Channels.base(() -> "GENERAL"));
         schema.put(Needs.NEEDS_FLIGHTS, Channels.base(() -> Boolean.FALSE));
         schema.put(Needs.NEEDS_HOTELS, Channels.base(() -> Boolean.FALSE));
         schema.put(Needs.NEEDS_RESEARCH, Channels.base(() -> Boolean.FALSE));
