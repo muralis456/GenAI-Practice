@@ -17,6 +17,7 @@ import com.example.travel.service.GraphRunContext;
 import com.example.travel.service.ModelRoutingContext;
 import com.example.travel.service.TripPlanAssembler;
 import com.example.travel.service.UserPreferenceService;
+import tools.jackson.databind.ObjectMapper;
 
 import org.bsc.langgraph4j.CompiledGraph;
 import org.bsc.langgraph4j.GraphInput;
@@ -63,6 +64,7 @@ public class TravelPlannerAgentService {
     private final ConversationMemoryService conversationMemoryService;
     private final TripPlanAssembler tripPlanAssembler;
     private final com.example.travel.service.TripHistoryService tripHistoryService;
+    private final ObjectMapper objectMapper;
     private final int maxRetries;
 
     public TravelPlannerAgentService(
@@ -80,6 +82,7 @@ public class TravelPlannerAgentService {
             ConversationMemoryService conversationMemoryService,
             TripPlanAssembler tripPlanAssembler,
             com.example.travel.service.TripHistoryService tripHistoryService,
+            ObjectMapper objectMapper,
             @Value("${travel.graph.max-retries:2}") int maxRetries) {
 
         this.travelGraph = travelGraph;
@@ -96,6 +99,7 @@ public class TravelPlannerAgentService {
         this.conversationMemoryService = conversationMemoryService;
         this.tripPlanAssembler = tripPlanAssembler;
         this.tripHistoryService = tripHistoryService;
+        this.objectMapper = objectMapper;
         this.maxRetries = maxRetries;
     }
 
@@ -1081,6 +1085,32 @@ public class TravelPlannerAgentService {
         String status = awaitingApproval
                 ? "PENDING_APPROVAL"
                 : "COMPLETE";
+
+        // A HISTORY request is a read from persistent trip memory. Return the
+        // exact saved structured plan instead of running Planner/specialists again.
+        if ("HISTORY".equalsIgnoreCase(state.requestType()) && !TravelState.isBlank(state.historyResult())) {
+            try {
+                TravelPlanResponse saved = objectMapper.readValue(
+                        state.historyResult(), TravelPlanResponse.class);
+                saved.setThreadId(threadId);
+                saved.setUserId(state.userId());
+                saved.setRequestType("HISTORY");
+                saved.setTripPlanning(false);
+                saved.setAwaitingApproval(false);
+                saved.setStatus("COMPLETE");
+                if (saved.getPlan() != null && saved.getPlan().getTrip() != null) {
+                    // A recalled plan is a read-only snapshot. Never expose the
+                    // old HITL state or its approval controls on the new history
+                    // conversation, otherwise the UI could send an approval to
+                    // the wrong checkpoint/thread.
+                    saved.getPlan().getTrip().setAwaitingApproval(false);
+                    saved.getPlan().getTrip().setStatus("HISTORY");
+                }
+                return saved;
+            } catch (Exception ex) {
+                log.warn("Could not deserialize most recent saved trip for history request", ex);
+            }
+        }
 
         TripPlanResult plan = tripPlanAssembler.assemble(
                 state,

@@ -44,6 +44,19 @@ public class TripHistoryService {
         TripHeader trip = plan == null ? null : plan.getTrip();
         if (trip == null) return;
 
+        // Never persist an incomplete/failed graph state as a "recent trip".
+        // History retrieval must only return a genuine structured trip snapshot;
+        // otherwise a failed itinerary can become the user's newest memory.
+        if (trip.getDestination() == null || trip.getDestination().isBlank()) return;
+        if (trip.getOrigin() == null || trip.getOrigin().isBlank()) return;
+        if (plan.getItinerary() == null || plan.getItinerary().isEmpty()) {
+            boolean hasDomainResult = (plan.getFlights() != null && !plan.getFlights().isEmpty())
+                    || (plan.getHotels() != null && !plan.getHotels().isEmpty())
+                    || (plan.getWeather() != null && (plan.getWeather().getSummary() != null && !plan.getWeather().getSummary().isBlank()))
+                    || (plan.getBudget() != null && plan.getBudget().getLineItems() != null && !plan.getBudget().getLineItems().isEmpty());
+            if (!hasDomainResult) return;
+        }
+
         TripHistory entity = repository.findByUserIdAndThreadId(userId, response.getThreadId())
                 .orElseGet(TripHistory::new);
         Instant now = Instant.now();
@@ -150,6 +163,118 @@ public class TripHistoryService {
             conversationRepository.deleteByUserIdAndSessionId(userId, threadId);
         }
         return true;
+    }
+
+    /**
+     * Retrieves a saved trip using a semantic selection policy decided by the
+     * Intent Agent. The important distinction is that "my recent trip" means
+     * the user's recent finalized trip, not the most recently written
+     * conversation row or a pending draft.
+     */
+    @Transactional(readOnly = true)
+    public String findPlanJson(String userId, String selection) {
+        if (userId == null || userId.isBlank()) return "";
+        String policy = normalizeSelection(selection);
+
+        List<TripHistory> recentTrips = repository.findByUserIdOrderByUpdatedAtDesc(
+                userId, PageRequest.of(0, 50));
+
+        // First search the structured trip store. Status is evaluated before
+        // recency so an unrelated/pending draft cannot shadow the latest
+        // finalized trip merely because it was edited more recently.
+        for (TripHistory trip : recentTrips) {
+            if (!matchesSelection(trip, policy)) continue;
+            if (isValidTripPlanJson(trip.getPlanJson())) return trip.getPlanJson();
+        }
+
+        // A specific/approved lookup should not silently downgrade to an
+        // unrelated conversation. RECENT_ANY is the only policy allowed to
+        // fall back to the newest valid saved trip when status filtering finds
+        // nothing.
+        if ("RECENT_ANY".equals(policy)) {
+            for (TripHistory trip : recentTrips) {
+                if (isValidTripPlanJson(trip.getPlanJson())) return trip.getPlanJson();
+            }
+        }
+
+        // Backward-compatible fallback for trips stored only in conversation_memory.
+        // We still require a genuine structured trip response; ordinary assistant
+        // messages such as travel tips are never treated as a saved trip.
+        if ("CONVERSATION".equals(policy) || "RECENT_ANY".equals(policy) || "APPROVED_RECENT".equals(policy)) {
+            List<ConversationMemory> memories = conversationRepository
+                    .findByUserIdOrderByCreatedAtDesc(userId, PageRequest.of(0, 100));
+            for (ConversationMemory memory : memories) {
+                if (!"assistant".equalsIgnoreCase(memory.getRole())) continue;
+                String structured = memory.getStructuredData();
+                if (structured == null || structured.isBlank()) continue;
+                if (isValidTripPlanJson(structured)) {
+                    TravelPlanResponse candidate = readPlan(structured);
+                    if (candidate == null) continue;
+                    if ("APPROVED_RECENT".equals(policy) &&
+                            (candidate.isAwaitingApproval() || "PENDING_APPROVAL".equalsIgnoreCase(candidate.getStatus()))) {
+                        continue;
+                    }
+                    return structured;
+                }
+            }
+        }
+        return "";
+    }
+
+    /** Backward-compatible default: recent finalized trip. */
+    @Transactional(readOnly = true)
+    public String findMostRecentPlanJson(String userId) {
+        return findPlanJson(userId, "APPROVED_RECENT");
+    }
+
+    private boolean matchesSelection(TripHistory trip, String policy) {
+        if (trip == null || !isValidTripPlanJson(trip.getPlanJson())) return false;
+        String status = firstNonBlank(trip.getStatus(), "").toUpperCase();
+        boolean awaiting = trip.isAwaitingApproval();
+        return switch (policy) {
+            case "PENDING" -> awaiting || "PENDING_APPROVAL".equals(status);
+            case "REJECTED" -> "REJECTED".equals(status);
+            case "APPROVED_RECENT" -> !awaiting && ("COMPLETE".equals(status) || "APPROVED".equals(status) || "CONFIRMED".equals(status));
+            case "SPECIFIC", "RECENT_ANY", "CONVERSATION" -> true;
+            default -> !awaiting && ("COMPLETE".equals(status) || "APPROVED".equals(status) || "CONFIRMED".equals(status));
+        };
+    }
+
+    private String normalizeSelection(String selection) {
+        if (selection == null || selection.isBlank()) return "APPROVED_RECENT";
+        String normalized = selection.trim().toUpperCase();
+        return Set.of("APPROVED_RECENT", "RECENT_ANY", "PENDING", "REJECTED", "SPECIFIC", "CONVERSATION")
+                .contains(normalized) ? normalized : "APPROVED_RECENT";
+    }
+
+    private TravelPlanResponse readPlan(String json) {
+        try {
+            return objectMapper.readValue(json, TravelPlanResponse.class);
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    private boolean isValidTripPlanJson(String json) {
+        if (json == null || json.isBlank()) return false;
+        try {
+            TravelPlanResponse response = objectMapper.readValue(json, TravelPlanResponse.class);
+            if (response == null || !response.isTripPlanning() || response.getPlan() == null) return false;
+            TripHeader trip = response.getPlan().getTrip();
+            if (trip == null || trip.getOrigin() == null || trip.getOrigin().isBlank()
+                    || trip.getDestination() == null || trip.getDestination().isBlank()) return false;
+            if (response.getPlan().getItinerary() != null && !response.getPlan().getItinerary().isEmpty()) return true;
+            return (response.getPlan().getFlights() != null && !response.getPlan().getFlights().isEmpty())
+                    || (response.getPlan().getHotels() != null && !response.getPlan().getHotels().isEmpty())
+                    || (response.getPlan().getWeather() != null
+                        && response.getPlan().getWeather().getSummary() != null
+                        && !response.getPlan().getWeather().getSummary().isBlank())
+                    || (response.getPlan().getBudget() != null
+                        && response.getPlan().getBudget().getLineItems() != null
+                        && !response.getPlan().getBudget().getLineItems().isEmpty());
+        } catch (Exception ignored) {
+            return false;
+        }
     }
 
     @Transactional(readOnly = true)

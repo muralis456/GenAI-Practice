@@ -50,6 +50,8 @@ public final class TravelStateSchema {
         schema.put(Request.USER_ID, Channels.base(() -> "anonymous"));
         schema.put(Request.SELECTED_MODEL, Channels.base(() -> ""));
         schema.put(Request.HISTORY_CONTEXT, Channels.base(() -> ""));
+        schema.put(Request.HISTORY_RESULT, Channels.base(() -> ""));
+        schema.put(Request.HISTORY_SELECTION, Channels.base(() -> "APPROVED_RECENT"));
         schema.put(Trip.ORIGIN, Channels.base(() -> ""));
         schema.put(Trip.DESTINATION, Channels.base(() -> ""));
         schema.put(Trip.DEPARTURE_DATE, Channels.base(() -> LocalDate.now()));
@@ -88,6 +90,7 @@ public final class TravelStateSchema {
         schema.put(Needs.NEEDS_BUDGET, Channels.base(() -> Boolean.FALSE));
         schema.put(Needs.NEEDS_ITINERARY, Channels.base(() -> Boolean.FALSE));
         schema.put(Needs.NEEDS_KNOWLEDGE, Channels.base(() -> Boolean.FALSE));
+        schema.put(Needs.NEEDS_HISTORY, Channels.base(() -> Boolean.FALSE));
         schema.put(Run.RUN_FLIGHTS, Channels.base(() -> Boolean.FALSE));
         schema.put(Run.RUN_HOTELS, Channels.base(() -> Boolean.FALSE));
         schema.put(Run.RUN_RESEARCH, Channels.base(() -> Boolean.FALSE));

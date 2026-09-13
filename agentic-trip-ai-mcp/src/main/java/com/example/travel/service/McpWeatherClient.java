@@ -32,9 +32,27 @@ public class McpWeatherClient {
                     "destination", destination == null ? "" : destination,
                     "startDate", start == null ? "" : start.toString(),
                     "endDate", end == null ? "" : end.toString()));
-            return new WeatherForecast(root.path("location").asString(destination),
+            WeatherForecast result = new WeatherForecast(root.path("location").asString(destination),
                     root.path("summary").asString("Weather unavailable."),
                     root.path("rainLikely").asBoolean(false));
+            JsonNode days = root.path("days");
+            if (!days.isArray() && root.path("daily").isObject()) {
+                days = root.path("daily").path("days");
+            }
+            if (days.isArray()) {
+                java.util.List<WeatherForecast.DailyForecast> forecasts = new java.util.ArrayList<>();
+                for (JsonNode day : days) {
+                    forecasts.add(new WeatherForecast.DailyForecast(
+                            day.path("date").asText(day.path("time").asText("")),
+                            day.path("condition").asText("Forecast"),
+                            day.path("icon").asText("🌤️"),
+                            day.path("high").isNumber() ? day.path("high").doubleValue() : null,
+                            day.path("low").isNumber() ? day.path("low").doubleValue() : null,
+                            day.path("rainProbability").isNumber() ? day.path("rainProbability").intValue() : null));
+                }
+                result.setDays(forecasts);
+            }
+            return result;
         } catch (Exception exception) {
             log.error("mcp.client.error client=McpWeatherClient operation=forecast destination={} start={} end={} errorType={} errorMessage={}",
                     destination, start, end, exception.getClass().getName(), safeMessage(exception), exception);

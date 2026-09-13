@@ -109,3 +109,7 @@ POST /api/rag/groundedness
 `/api/rag/evaluate` runs the built-in retrieval benchmark against the current pgvector index. The benchmark now generates an evidence-only answer and uses an LLM judge for groundedness. `/api/rag/groundedness` accepts `{ "answer": "...", "context": "..." }` and returns a lexical screening score. `/api/rag/judge` accepts `{ "userRequest": "...", "answer": "...", "context": "..." }` and returns LLM-as-a-judge groundedness, coverage, unsupported-claim rate, pass/fail and reason. During the graph, `ValidatorNode` judges the generated itinerary against RAG evidence; a failed judge adds a validation error and sends the graph through the existing replan loop.
 
 The groundedness score is a guardrail/smoke metric, not a substitute for an LLM-as-judge evaluation. For production evaluation, add a second judge using a stronger model and compare it with these deterministic metrics.
+
+### Persistent trip-memory retrieval
+
+Requests that semantically ask to recall/reopen a previous trip are classified by the Intent Agent with `needsHistory=true`. The graph routes those requests to the `history` node, which reads the newest saved structured trip from PostgreSQL `trip_history` and falls back to structured `conversation_memory` rows created by older versions. It does not start a new Planner/specialist run and does not use the browser's localStorage as the source of truth.

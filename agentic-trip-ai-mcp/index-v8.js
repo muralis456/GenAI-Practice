@@ -718,7 +718,8 @@
             || responseStatus === 'PENDING_APPROVAL'
             || tripStatus === 'PENDING_APPROVAL'
         );
-        const complete = !awaitingApproval && (responseStatus === 'COMPLETE' || tripStatus === 'COMPLETE');
+        const historyResponse = String(data.requestType || '').toUpperCase() === 'HISTORY';
+        const complete = !historyResponse && !awaitingApproval && (responseStatus === 'COMPLETE' || tripStatus === 'COMPLETE');
         const title = trip.title || tripTitle(data);
         const origin = trip.origin || data.origin || '';
         const destination = trip.destination || data.destination || '';
@@ -728,7 +729,7 @@
         const budgetLabel = trip.budgetLabel || data.budgetLabel || '';
 
         let html = '<div class="travel-dashboard"><div class="travel-main">';
-        html += '<div class="trip-banner"><div class="trip-eyebrow">AI Travel Plan</div><div class="trip-route">' + escapeHtml(route) + '</div>';
+        html += '<div class="trip-banner"><div class="trip-eyebrow">' + (historyResponse ? 'Recalled Trip from Memory' : 'AI Travel Plan') + '</div><div class="trip-route">' + escapeHtml(route) + '</div>';
         html += '<div class="trip-facts">';
         if (trip.departureDate || trip.returnDate) html += '<span class="trip-fact">📅 ' + escapeHtml(formatDateRange(trip.departureDate, trip.returnDate)) + '</span>';
         if (nights) html += '<span class="trip-fact">🌙 ' + escapeHtml(String(nights)) + ' nights</span>';
@@ -754,7 +755,7 @@
         if (budgetLabel) html += '<div class="summary-row"><span>Budget</span><strong>' + escapeHtml(budgetLabel) + '</strong></div>';
         if (quality != null) html += '<div class="summary-row"><span>Quality</span><strong>' + escapeHtml(String(quality)) + '/100</strong></div>';
         html += '</section>';
-        const componentStatus = responseStatus === 'REJECTED' ? 'Rejected' : complete ? 'Complete' : 'Ready';
+        const componentStatus = historyResponse ? 'Recalled' : responseStatus === 'REJECTED' ? 'Rejected' : complete ? 'Complete' : 'Ready';
         const componentClass = responseStatus === 'REJECTED' ? ' rejected' : complete ? ' complete' : '';
         html += '<section class="trip-side-card"><div class="trip-side-title">⚙ Plan Status</div><div class="status-list">';
         if (hasFlights) html += '<div class="status-row"><span class="status-name"><i class="status-dot' + componentClass + '"></i>Flights</span><span class="status-value' + componentClass + '">' + componentStatus + '</span></div>';
@@ -763,8 +764,10 @@
         if (hasBudget) html += '<div class="status-row"><span class="status-name"><i class="status-dot' + componentClass + '"></i>Budget</span><span class="status-value' + componentClass + '">' + componentStatus + '</span></div>';
         if (hasItinerary) html += '<div class="status-row"><span class="status-name"><i class="status-dot' + componentClass + '"></i>Itinerary</span><span class="status-value' + componentClass + '">' + componentStatus + '</span></div>';
         html += '</div></section>';
-        if (awaitingApproval && data.threadId) {
+        if (!historyResponse && awaitingApproval && data.threadId) {
             html += '<section class="final-decision"><div class="decision-status pending"><i class="decision-dot"></i> Waiting for your decision</div><h3>Ready to finalize?</h3><p>Review the complete plan. Approve it, request a change, or reject it.</p><div class="final-actions"><button type="button" class="final-approve" data-plan-action="approve">✓ Approve</button><button type="button" class="final-modify" data-plan-action="modify">✎ Modify</button><button type="button" class="final-reject" data-plan-action="reject">✕ Reject</button></div></section>';
+        } else if (historyResponse) {
+            html += '<section class="final-decision"><div class="decision-status"><i class="decision-dot"></i> Recalled from saved memory</div><h3>Previous trip details</h3><p>This is a read-only copy of your saved trip. Create a new trip if you want to plan or modify it.</p></section>';
         } else if (complete) {
             html += '<section class="final-decision"><div class="decision-status"><i class="decision-dot"></i> Plan confirmed</div><h3>✓ Trip plan confirmed</h3><p>This plan has already been finalized. Create a new trip or use Modify from a pending plan.</p></section>';
         }

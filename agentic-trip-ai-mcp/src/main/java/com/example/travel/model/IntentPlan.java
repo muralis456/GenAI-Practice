@@ -27,6 +27,10 @@ public class IntentPlan implements Serializable {
     private String budgetScope = "NONE";
     private boolean needsItinerary = false;
     private boolean needsKnowledge = false;
+    /** Request asks the agent to retrieve a previously saved trip/conversation from memory. */
+    private boolean needsHistory = false;
+    /** Semantic retrieval policy for history requests. */
+    private String historySelection = "APPROVED_RECENT";
     private String strategy = "none";
     private String priority = "none";
     private double confidence = 0.5;
@@ -171,6 +175,18 @@ public class IntentPlan implements Serializable {
 
     public void setNeedsKnowledge(boolean needsKnowledge) { this.needsKnowledge = needsKnowledge; }
 
+    public boolean isNeedsHistory() { return needsHistory; }
+
+    public void setNeedsHistory(boolean needsHistory) { this.needsHistory = needsHistory; }
+
+    public String getHistorySelection() { return historySelection; }
+
+    public void setHistorySelection(String historySelection) {
+        this.historySelection = historySelection == null || historySelection.isBlank()
+                ? "APPROVED_RECENT"
+                : historySelection.toUpperCase();
+    }
+
     public boolean isNeedsItinerary() {
         return needsItinerary;
     }
@@ -206,7 +222,7 @@ public class IntentPlan implements Serializable {
     public String summary() {
         return requestType + " flights=" + needsFlights + " hotels=" + needsHotels
                 + " research=" + needsResearch + " weather=" + needsWeather
-                + " budget=" + needsBudget + " budgetScope=" + budgetScope + " itinerary=" + needsItinerary + " knowledge=" + needsKnowledge
+                + " budget=" + needsBudget + " budgetScope=" + budgetScope + " itinerary=" + needsItinerary + " knowledge=" + needsKnowledge + " history=" + needsHistory
                 + " confidence=" + confidence;
     }
 }

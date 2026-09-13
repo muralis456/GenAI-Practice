@@ -44,6 +44,8 @@ public class TravelState extends AgentState {
     public static final String USER_ID = TravelStateKeys.Request.USER_ID;
     public static final String SELECTED_MODEL = TravelStateKeys.Request.SELECTED_MODEL;
     public static final String HISTORY_CONTEXT = TravelStateKeys.Request.HISTORY_CONTEXT;
+    public static final String HISTORY_RESULT = TravelStateKeys.Request.HISTORY_RESULT;
+    public static final String HISTORY_SELECTION = TravelStateKeys.Request.HISTORY_SELECTION;
     public static final String ORIGIN = TravelStateKeys.Trip.ORIGIN;
     public static final String DESTINATION = TravelStateKeys.Trip.DESTINATION;
     public static final String DEPARTURE_DATE = TravelStateKeys.Trip.DEPARTURE_DATE;
@@ -85,6 +87,7 @@ public class TravelState extends AgentState {
     public static final String NEEDS_BUDGET = TravelStateKeys.Needs.NEEDS_BUDGET;
     public static final String NEEDS_ITINERARY = TravelStateKeys.Needs.NEEDS_ITINERARY;
     public static final String NEEDS_KNOWLEDGE = TravelStateKeys.Needs.NEEDS_KNOWLEDGE;
+    public static final String NEEDS_HISTORY = TravelStateKeys.Needs.NEEDS_HISTORY;
     public static final String RUN_FLIGHTS = TravelStateKeys.Run.RUN_FLIGHTS;
     public static final String RUN_HOTELS = TravelStateKeys.Run.RUN_HOTELS;
     public static final String RUN_RESEARCH = TravelStateKeys.Run.RUN_RESEARCH;
@@ -150,6 +153,8 @@ public class TravelState extends AgentState {
         input.put(USER_ID, firstNonBlank(request.getUserId(), "anonymous"));
         input.put(SELECTED_MODEL, blankToEmpty(request.getSelectedModel()));
         input.put(HISTORY_CONTEXT, historyContext == null ? "" : historyContext);
+        input.put(HISTORY_RESULT, "");
+        input.put(HISTORY_SELECTION, "APPROVED_RECENT");
         // Seed route slots from the CURRENT prompt before the graph starts.
         // API clients often send only prompt/preferences and leave DTO slots blank.
         // Every downstream specialist must see the same deterministic route; never
@@ -187,6 +192,7 @@ public class TravelState extends AgentState {
         input.put(NEEDS_BUDGET, false);
         input.put(NEEDS_ITINERARY, false);
         input.put(NEEDS_KNOWLEDGE, false);
+        input.put(NEEDS_HISTORY, false);
         input.put(RUN_FLIGHTS, false);
         input.put(RUN_HOTELS, false);
         input.put(RUN_RESEARCH, false);
@@ -475,6 +481,18 @@ public class TravelState extends AgentState {
         return this.<String>value(REQUEST_TYPE).orElse("GENERAL");
     }
 
+    public boolean needsHistory() {
+        return flag(NEEDS_HISTORY);
+    }
+
+    public String historyResult() {
+        return this.<String>value(HISTORY_RESULT).orElse("");
+    }
+
+    public String historySelection() {
+        return this.<String>value(HISTORY_SELECTION).orElse("APPROVED_RECENT");
+    }
+
     public boolean needsFlights() {
         return flag(NEEDS_FLIGHTS);
     }
@@ -535,6 +553,7 @@ public class TravelState extends AgentState {
         updates.put(NEEDS_BUDGET, plan.isNeedsBudget());
         updates.put(NEEDS_ITINERARY, plan.isNeedsItinerary());
         updates.put(NEEDS_KNOWLEDGE, plan.isNeedsKnowledge());
+        updates.put(NEEDS_HISTORY, plan.isNeedsHistory());
         updates.put(RUN_FLIGHTS, plan.isNeedsFlights());
         updates.put(RUN_HOTELS, plan.isNeedsHotels());
         updates.put(RUN_RESEARCH, plan.isNeedsResearch());

@@ -14,6 +14,8 @@ public final class TravelStateKeys {
         public static final String USER_ID = "userId";
         public static final String SELECTED_MODEL = "selectedModel";
         public static final String HISTORY_CONTEXT = "historyContext";
+        public static final String HISTORY_RESULT = "historyResult";
+        public static final String HISTORY_SELECTION = "historySelection";
         public static final String REQUEST_TYPE = "requestType";
         public static final String INTENT_CONFIDENCE = "intentConfidence";
         public static final String MODEL_POLICY = "modelPolicy";
@@ -85,6 +87,7 @@ public final class TravelStateKeys {
         public static final String NEEDS_BUDGET = "needsBudget";
         public static final String NEEDS_ITINERARY = "needsItinerary";
         public static final String NEEDS_KNOWLEDGE = "needsKnowledge";
+        public static final String NEEDS_HISTORY = "needsHistory";
 
         private Needs() {
         }

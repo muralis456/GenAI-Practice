@@ -67,24 +67,34 @@ public class WeatherTool {
             String forecastUri = UriComponentsBuilder.fromUriString(forecastUrl)
                     .queryParam("latitude", lat)
                     .queryParam("longitude", lon)
-                    .queryParam("daily", "precipitation_sum,weathercode")
+                    .queryParam("daily", "temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum,weathercode")
                     .queryParam("start_date", window.from)
                     .queryParam("end_date", window.to)
                     .queryParam("timezone", "auto")
                     .build()
                     .toUriString();
             JsonNode forecast = objectMapper.readTree(restTemplate.getForObject(forecastUri, String.class));
-            JsonNode precip = forecast.path("daily").path("precipitation_sum");
+            JsonNode daily = forecast.path("daily");
+            JsonNode dates = daily.path("time");
+            JsonNode highs = daily.path("temperature_2m_max");
+            JsonNode lows = daily.path("temperature_2m_min");
+            JsonNode rainProb = daily.path("precipitation_probability_max");
+            JsonNode precip = daily.path("precipitation_sum");
+            JsonNode codes = daily.path("weathercode");
             boolean rain = false;
             double total = 0;
-            if (precip.isArray()) {
-                for (JsonNode value : precip) {
-                    double mm = number(value);
-                    total += mm;
-                    if (mm >= 2) {
-                        rain = true;
-                    }
-                }
+            java.util.List<WeatherForecast.DailyForecast> days = new java.util.ArrayList<>();
+            int count = dates.isArray() ? dates.size() : 0;
+            for (int i = 0; i < count; i++) {
+                double mm = i < precip.size() ? number(precip.get(i)) : 0;
+                total += mm;
+                int probability = i < rainProb.size() ? (int) Math.round(number(rainProb.get(i))) : (mm >= 2 ? 60 : 10);
+                if (probability >= 40 || mm >= 2) rain = true;
+                int code = i < codes.size() ? (int) Math.round(number(codes.get(i))) : -1;
+                WeatherLabel label = weatherLabel(code);
+                Double high = i < highs.size() && highs.get(i).isNumber() ? highs.get(i).doubleValue() : null;
+                Double low = i < lows.size() && lows.get(i).isNumber() ? lows.get(i).doubleValue() : null;
+                days.add(new WeatherForecast.DailyForecast(dates.get(i).asText(), label.condition, label.icon, high, low, probability));
             }
             String summary = rain
                     ? "Rain likely during the stay (about " + Math.round(total) + " mm total). Prefer indoor backups on wet days."
@@ -93,7 +103,9 @@ public class WeatherTool {
                 summary += " Open-Meteo only covers " + window.from + " to " + window.to
                         + " (not the full requested trip dates).";
             }
-            return new WeatherForecast(destination, summary, rain);
+            WeatherForecast result = new WeatherForecast(destination, summary, rain);
+            result.setDays(days);
+            return result;
         } catch (Exception exception) {
             log.warn("Weather lookup failed for {}: {}", destination, exception.getMessage());
             return new WeatherForecast(destination, "Weather lookup failed.", false);
@@ -137,6 +149,19 @@ public class WeatherTool {
 
     private record DateWindow(LocalDate from, LocalDate to, boolean clamped) {
     }
+
+    private WeatherLabel weatherLabel(int code) {
+        if (code == 0) return new WeatherLabel("Clear", "☀️");
+        if (code <= 3) return new WeatherLabel(code == 1 ? "Mostly clear" : code == 2 ? "Partly cloudy" : "Cloudy", code == 2 ? "🌤️" : "☁️");
+        if (code >= 51 && code <= 57) return new WeatherLabel("Drizzle", "🌦️");
+        if (code >= 61 && code <= 67) return new WeatherLabel("Rain", "🌧️");
+        if (code >= 71 && code <= 77) return new WeatherLabel("Snow", "❄️");
+        if (code >= 80 && code <= 82) return new WeatherLabel("Rain showers", "🌦️");
+        if (code >= 95) return new WeatherLabel("Thunderstorm", "⛈️");
+        return new WeatherLabel("Mixed conditions", "🌤️");
+    }
+
+    private record WeatherLabel(String condition, String icon) {}
 
     private LocalDate parseDate(String value, LocalDate fallback) {
         if (value == null || value.isBlank()) {

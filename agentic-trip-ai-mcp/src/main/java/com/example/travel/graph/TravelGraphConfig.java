@@ -8,6 +8,7 @@ import com.example.travel.graph.node.FanOutNode;
 import com.example.travel.graph.node.FinalizationNode;
 import com.example.travel.graph.node.FlightNode;
 import com.example.travel.graph.node.HitlNode;
+import com.example.travel.graph.node.HistoryNode;
 import com.example.travel.graph.node.HotelNode;
 import com.example.travel.graph.node.IntentNode;
 import com.example.travel.graph.node.ItineraryNode;
@@ -19,6 +20,7 @@ import com.example.travel.graph.node.RouterNode;
 import com.example.travel.graph.node.SupervisorNode;
 import com.example.travel.graph.node.ValidatorNode;
 import com.example.travel.graph.node.WeatherNode;
+import com.example.travel.service.GraphProgressHub;
 import com.example.travel.service.GraphRunContext;
 import com.example.travel.service.ModelRoutingContext;
 import org.bsc.langgraph4j.CompileConfig;
@@ -54,9 +56,11 @@ import static org.bsc.langgraph4j.action.AsyncNodeAction.node_async;
 public class TravelGraphConfig {
 
     private final GraphRunContext graphRunContext;
+    private final GraphProgressHub graphProgressHub;
 
-    public TravelGraphConfig(GraphRunContext graphRunContext) {
+    public TravelGraphConfig(GraphRunContext graphRunContext, GraphProgressHub graphProgressHub) {
         this.graphRunContext = graphRunContext;
+        this.graphProgressHub = graphProgressHub;
     }
 
     @Bean(destroyMethod = "shutdown")
@@ -101,6 +105,7 @@ public class TravelGraphConfig {
     public StateGraph<TravelState> travelStateGraph(IntentNode intentNode,
             PlannerNode plannerNode,
             RagNode ragNode,
+            HistoryNode historyNode,
             RouterNode routerNode,
             AirportResolverNode airportResolverNode,
             FanOutNode fanOutNode,
@@ -123,8 +128,10 @@ public class TravelGraphConfig {
                 .addNode(TravelGraphNodes.INTENT, async(TravelGraphNodes.INTENT, intentNode))
                 .addNode(TravelGraphNodes.PLANNER, async(TravelGraphNodes.PLANNER, plannerNode))
                 .addNode(TravelGraphNodes.RAG, async(TravelGraphNodes.RAG, ragNode))
+                .addNode(TravelGraphNodes.HISTORY, async(TravelGraphNodes.HISTORY, historyNode))
                 .addNode(TravelGraphNodes.ROUTER, command_async((state, config) -> {
                     GraphExecutionLogger.nodeStart(TravelGraphNodes.ROUTER, state);
+                    emitNodeStarted(state, TravelGraphNodes.ROUTER);
                     long started = System.nanoTime();
                     try {
                         Map<String, Object> updates = enrich(routerNode, state);
@@ -166,6 +173,9 @@ public class TravelGraphConfig {
                             // There is deliberately no special-case for weather, flights, hotels,
                             // budget, etc. The Intent Agent decides which capabilities are needed;
                             // Java only maps that decision to graph topology.
+                            if (state.needsHistory() && !hasAnyNonHistoryCapability(state)) {
+                                return TravelGraphNodes.HISTORY;
+                            }
                             if ((state.runResearch() || state.needsKnowledge())
                                     && !hasTripExecutionCapability(state)) {
                                 return TravelGraphNodes.RAG;
@@ -177,6 +187,7 @@ public class TravelGraphConfig {
                         }),
                         EdgeMappings.builder()
                                 .to(TravelGraphNodes.RAG, TravelGraphNodes.RAG)
+                                .to(TravelGraphNodes.HISTORY, TravelGraphNodes.HISTORY)
                                 .to(TravelGraphNodes.PLANNER, TravelGraphNodes.PLANNER)
                                 .to(TravelGraphNodes.FINAL, TravelGraphNodes.FINAL)
                                 .build())
@@ -192,8 +203,10 @@ public class TravelGraphConfig {
                         }),
                         EdgeMappings.builder()
                                 .to(TravelGraphNodes.RAG, TravelGraphNodes.RAG)
+                                .to(TravelGraphNodes.HISTORY, TravelGraphNodes.HISTORY)
                                 .to(TravelGraphNodes.ROUTER, TravelGraphNodes.ROUTER)
                                 .build())
+                .addEdge(TravelGraphNodes.HISTORY, TravelGraphNodes.FINAL)
                 .addConditionalEdges(TravelGraphNodes.RAG,
                         edge_async(TravelGraphConfig::afterRag),
                         EdgeMappings.builder()
@@ -335,6 +348,11 @@ public class TravelGraphConfig {
                 .build();
     }
 
+    private static boolean hasAnyNonHistoryCapability(TravelState state) {
+        return state != null && (state.runFlights() || state.runHotels() || state.runResearch()
+                || state.runWeather() || state.runBudget() || state.runItinerary() || state.needsKnowledge());
+    }
+
     private static boolean hasTripExecutionCapability(TravelState state) {
         return state != null && (state.runFlights()
                 || state.runHotels()
@@ -366,6 +384,7 @@ public class TravelGraphConfig {
             NodeAction<TravelState> node) {
         return node_async(state -> {
             GraphExecutionLogger.nodeStart(nodeName, state);
+            emitNodeStarted(state, nodeName);
             long started = System.nanoTime();
             String threadId = state.graphThreadId();
             if (!TravelState.isBlank(threadId)) {
@@ -389,6 +408,22 @@ public class TravelGraphConfig {
                 }
             }
         });
+    }
+
+    /**
+     * Publishes the node-start event before the node action executes.
+     * This is intentionally separate from the graph stream output because
+     * LangGraph emits NodeOutput after a node has finished. The UI therefore
+     * needs an explicit start event to show the actual currently-running stage.
+     */
+    private void emitNodeStarted(TravelState state, String nodeName) {
+        if (state == null || TravelState.isBlank(state.graphThreadId()) || nodeName == null) {
+            return;
+        }
+        graphProgressHub.emit(
+                state.graphThreadId(),
+                "node_start",
+                Map.of("node", nodeName));
     }
 
     private static ModelRoutingContext.Complexity complexity(TravelState state) {

@@ -4,6 +4,7 @@ import com.example.travel.config.TravelModelsProperties.AgentRole;
 import com.example.travel.graph.TravelState;
 import com.example.travel.model.AgentDecision;
 import com.example.travel.model.IntentPlan;
+import com.example.travel.model.MemoryIntentDecision;
 import com.example.travel.service.RoutedLlm;
 import com.example.travel.support.JsonSupport;
 import com.example.travel.support.TripRequirementsParser;
@@ -22,13 +23,16 @@ public class IntentAgentService {
 
     private final RoutedLlm routedLlm;
     private final JsonSupport jsonSupport;
+    private final SemanticMemoryArbiter semanticMemoryArbiter;
 
     public IntentAgentService(
             RoutedLlm routedLlm,
-            JsonSupport jsonSupport) {
+            JsonSupport jsonSupport,
+            SemanticMemoryArbiter semanticMemoryArbiter) {
 
         this.routedLlm = routedLlm;
         this.jsonSupport = jsonSupport;
+        this.semanticMemoryArbiter = semanticMemoryArbiter;
     }
 
     /**
@@ -78,6 +82,43 @@ public class IntentAgentService {
 
         log.info("Intent primary semantic result request={} type={} confidence={} capabilities={}",
                 request, primary.getRequestType(), primary.getConfidence(), capabilitySummary(primary));
+
+        // Memory retrieval is a separate semantic concern from travel planning.
+        // Small local models can legitimately interpret "my recent trip details"
+        // as an itinerary request even when the user's real objective is to READ
+        // persistent memory. Run a focused semantic memory pass for every turn so
+        // that retrieval can override a conflicting live-planning interpretation.
+        // This is intentionally NOT a keyword/regex rule.
+        MemoryIntentDecision memoryIntent = runMemoryIntentPass(request);
+        log.info("Intent memory semantic result request={} history={} historyOnly={} selection={} confidence={}",
+                request, memoryIntent.isNeedsHistory(), memoryIntent.isHistoryOnly(), memoryIntent.getSelection(), memoryIntent.getConfidence());
+
+        // If the dedicated LLM memory pass is weak or conflicts with an itinerary
+        // interpretation, obtain an independent semantic signal from the embedding
+        // model. This is still meaning-based; no request text is inspected.
+        if (!memoryIntent.isNeedsHistory() || memoryIntent.getConfidence() < 0.70d
+                || (memoryIntent.isNeedsHistory() && !memoryIntent.isHistoryOnly() && primary.isNeedsItinerary())) {
+            MemoryIntentDecision semanticRecovery = semanticMemoryArbiter.recover(request);
+            if (semanticRecovery.getConfidence() > memoryIntent.getConfidence()) {
+                memoryIntent = semanticRecovery;
+                log.info("Intent memory semantic recovery selected history={} historyOnly={} confidence={}",
+                        memoryIntent.isNeedsHistory(), memoryIntent.isHistoryOnly(), memoryIntent.getConfidence());
+            }
+        }
+
+        if (memoryIntent.isNeedsHistory() && memoryIntent.getConfidence() >= 0.70d) {
+            if (memoryIntent.isHistoryOnly()) {
+                IntentPlan historyPlan = emptyPlan();
+                historyPlan.setNeedsHistory(true);
+                historyPlan.setHistorySelection(normalizeHistorySelection(memoryIntent.getSelection()));
+                historyPlan.setConfidence(memoryIntent.getConfidence());
+                historyPlan.setStrategy("history_retrieval");
+                historyPlan.setPriority("history");
+                return finalizeSemanticPlan(historyPlan);
+            }
+            primary.setNeedsHistory(true);
+            primary.setHistorySelection(normalizeHistorySelection(memoryIntent.getSelection()));
+        }
 
         // A good semantic classification is authoritative. Do NOT let an
         // independent embedding classifier veto a valid multi-capability plan.
@@ -145,6 +186,19 @@ public class IntentAgentService {
                             combined with a live capability when the user explicitly wants practical
                             travel guidance derived from that information; do not infer it just from
                             the destination or from a generic travel mention.
+                history = retrieving, recalling, reopening or summarizing a previously saved
+                          trip/conversation belonging to the current user. This is a memory/database
+                          retrieval objective, not travel research and not a new trip plan.
+
+                History examples (semantic examples, not literal triggers):
+                - "show me the trip we planned most recently" => needsHistory=true, all travel
+                  execution capabilities=false.
+                - "what was my last vacation plan?" => needsHistory=true, all travel execution
+                  capabilities=false.
+                - "open my previous Paris plan" => needsHistory=true; any destination/entity
+                  reference is a retrieval constraint, not a new trip-planning request.
+                - "plan a new trip similar to my last one" => this is not history-only; preserve
+                  the new planning capabilities and use memory as context if the workflow supports it.
 
                 Key semantic rule: infer the user's objective, not the presence or absence
                 of a particular word. Distinguish an overall cost-analysis objective from a
@@ -166,6 +220,8 @@ public class IntentAgentService {
                   "budgetScope":"NONE",
                   "needsItinerary":false,
                   "needsKnowledge":false,
+                  "needsHistory":false,
+                  "historySelection":"APPROVED_RECENT",
                   "strategy":"",
                   "priority":"",
                   "confidence":0.0
@@ -196,9 +252,21 @@ public class IntentAgentService {
                   implications of that information (for example weather for an upcoming visit,
                   or flight/hotel advice that explicitly asks for practical travel guidance).
                   Do not enable it merely because the request happens to mention a destination.
+                - history: retrieve, recall, reopen or summarize a previously saved trip/conversation
+                  from the current user's memory/database. This is a retrieval objective, not research
+                  and not a new trip plan.
 
                 Semantic principles:
                 - Infer intent from the complete sentence and relationships between its parts.
+                History examples (semantic examples, not literal triggers):
+                - "show me the trip we planned most recently" => needsHistory=true and no live
+                  specialist capability.
+                - "what was my last vacation plan?" => needsHistory=true and no new planning.
+                - "open my previous Paris plan" => history retrieval with Paris as a retrieval
+                  constraint, not a new trip request.
+                - "plan a new trip similar to my last one" => new trip planning; history may be
+                  useful as context but the request is not history-only.
+
                 - A route plus a duration plus a travel objective can express trip planning even
                   when the user never says "plan" or "itinerary".
                 - A monetary constraint can express a budget objective even when the user never
@@ -227,6 +295,8 @@ public class IntentAgentService {
                   "budgetScope":"NONE",
                   "needsItinerary":false,
                   "needsKnowledge":false,
+                  "needsHistory":false,
+                  "historySelection":"APPROVED_RECENT",
                   "strategy":"",
                   "priority":"",
                   "confidence":0.0
@@ -245,11 +315,105 @@ public class IntentAgentService {
         }
     }
 
+    /**
+     * Focused semantic gate for persistent-memory retrieval.
+     *
+     * This runs independently of the general capability classifier because
+     * retrieval intent is orthogonal to travel-domain capabilities. A user
+     * asking to recall a saved itinerary can otherwise be misclassified as a
+     * brand-new itinerary request by a small local model.
+     */
+    private MemoryIntentDecision runMemoryIntentPass(String request) {
+        if (TravelState.isBlank(request)) {
+            return new MemoryIntentDecision(false, false, 0.0);
+        }
+
+        String system = """
+                You are a semantic memory-intent classifier for a production
+                travel assistant. Decide whether the user's CURRENT request
+                asks to retrieve information that already exists in the user's
+                persistent conversation/trip memory.
+
+                Understand meaning, not literal words. The user may use any
+                wording, abbreviations, typos, or conversational phrasing.
+                Never use a keyword trigger.
+
+                Set needsHistory=true when the user wants to recall, reopen,
+                inspect, summarize, compare, or otherwise obtain a previously
+                saved trip/conversation.
+
+                Set historyOnly=true when the requested answer can be satisfied
+                by retrieving prior user data and does NOT ask to create a new
+                travel plan or execute a new live travel search.
+
+                Also choose the semantic retrieval selection policy:
+                - APPROVED_RECENT: most recently finalized/approved/confirmed saved trip.
+                  Use this as the default for a request for the user's recent/last trip.
+                - RECENT_ANY: most recently saved trip regardless of approval state.
+                - PENDING: a draft/plan that is awaiting approval.
+                - REJECTED: a previously rejected trip.
+                - SPECIFIC: the user identifies a particular saved trip/destination/date.
+                - CONVERSATION: the user wants a previous conversation rather than a saved trip.
+                The selection is semantic. Do not classify it from literal trigger words alone.
+
+                Set historyOnly=false when previous memory is only context for a
+                new task, for example asking to create a new trip similar to an
+                earlier trip.
+
+                Also return a semantic selection value:
+                APPROVED_RECENT = latest finalized/approved/confirmed trip (default for
+                "my recent/last trip" style retrieval requests).
+                RECENT_ANY = latest saved trip regardless of status.
+                PENDING = trip awaiting approval.
+                REJECTED = rejected trip.
+                SPECIFIC = a particular prior trip identified by destination/date/entity.
+                CONVERSATION = previous conversation/history rather than a saved trip.
+
+                Examples are semantic guidance only:
+                - a request for the user's most recently saved trip -> true/true
+                - a request to show details from a previous vacation -> true/true
+                - a request to reopen an earlier Paris itinerary -> true/true
+                - a request to build a new itinerary based on the last trip -> true/false
+                - a request for a completely new destination plan -> false/false
+
+                Return JSON only:
+                {
+                  "needsHistory":false,
+                  "historyOnly":false,
+                  "selection":"APPROVED_RECENT",
+                  "confidence":0.0
+                }
+                """;
+
+        try {
+            String content = routedLlm.complete(
+                    AgentRole.EXTRACT,
+                    system,
+                    "CURRENT USER REQUEST:\n" + request + "\n\nReturn the semantic memory decision now.");
+            java.util.Optional<MemoryIntentDecision> parsed = jsonSupport.read(content, MemoryIntentDecision.class);
+            MemoryIntentDecision decision = parsed.orElse(new MemoryIntentDecision(false, false, 0.0));
+            if (decision.getConfidence() < 0) decision.setConfidence(0);
+            if (decision.getConfidence() > 1) decision.setConfidence(1);
+            decision.setSelection(normalizeHistorySelection(decision.getSelection()));
+            return decision;
+        } catch (Exception ex) {
+            log.warn("Semantic memory intent pass failed", ex);
+            return new MemoryIntentDecision(false, false, 0.0);
+        }
+    }
+
+    private String normalizeHistorySelection(String selection) {
+        if (selection == null || selection.isBlank()) return "APPROVED_RECENT";
+        String normalized = selection.trim().toUpperCase(java.util.Locale.ROOT);
+        return java.util.Set.of("APPROVED_RECENT", "RECENT_ANY", "PENDING", "REJECTED", "SPECIFIC", "CONVERSATION")
+                .contains(normalized) ? normalized : "APPROVED_RECENT";
+    }
+
     private boolean hasAnyCapability(IntentPlan plan) {
         return plan != null && (plan.isNeedsFlights() || plan.isNeedsHotels()
                 || plan.isNeedsResearch() || plan.isNeedsWeather()
                 || plan.isNeedsBudget() || plan.isNeedsItinerary()
-                || plan.isNeedsKnowledge());
+                || plan.isNeedsKnowledge() || plan.isNeedsHistory());
     }
 
     private IntentPlan finalizeSemanticPlan(IntentPlan plan) {
@@ -260,7 +424,8 @@ public class IntentAgentService {
                 + (result.isNeedsWeather() ? 1 : 0)
                 + (result.isNeedsBudget() ? 1 : 0)
                 + (result.isNeedsItinerary() ? 1 : 0)
-                + (result.isNeedsKnowledge() ? 1 : 0);
+                + (result.isNeedsKnowledge() ? 1 : 0)
+                + (result.isNeedsHistory() ? 1 : 0);
 
         if (count == 0) {
             result.setRequestType("GENERAL");
@@ -285,6 +450,8 @@ public class IntentAgentService {
             result.setRequestType("BUDGET");
         } else if (result.isNeedsResearch()) {
             result.setRequestType(IntentPlan.RESEARCH);
+        } else if (result.isNeedsHistory()) {
+            result.setRequestType("HISTORY");
         } else {
             result.setRequestType("TRAVEL_INFORMATION");
         }
@@ -297,6 +464,7 @@ public class IntentAgentService {
                     : result.isNeedsWeather() ? "weather_only"
                     : result.isNeedsBudget() ? "budget_only"
                     : result.isNeedsResearch() ? "research_only"
+                    : result.isNeedsHistory() ? "history_retrieval"
                     : "rag_only");
         }
         if (result.getPriority() == null || result.getPriority().isBlank() || "none".equalsIgnoreCase(result.getPriority())) {
@@ -306,6 +474,7 @@ public class IntentAgentService {
                     : result.isNeedsWeather() ? "weather"
                     : result.isNeedsBudget() ? "budget"
                     : result.isNeedsResearch() ? "research"
+                    : result.isNeedsHistory() ? "history"
                     : "knowledge");
         }
         return result;
@@ -426,6 +595,7 @@ public class IntentAgentService {
                       "budgetScope":"NONE",
                       "needsItinerary":false,
                       "needsKnowledge":false,
+                      "needsHistory":false,
                       "strategy":"",
                       "priority":"",
                       "confidence":0.0
@@ -749,6 +919,8 @@ public class IntentAgentService {
         updates.put(TravelState.NEEDS_BUDGET, plan.isNeedsBudget());
         updates.put(TravelState.NEEDS_ITINERARY, plan.isNeedsItinerary());
         updates.put(TravelState.NEEDS_KNOWLEDGE, plan.isNeedsKnowledge());
+        updates.put(TravelState.NEEDS_HISTORY, plan.isNeedsHistory());
+        updates.put(TravelState.HISTORY_SELECTION, normalizeHistorySelection(plan.getHistorySelection()));
 
         // RUN_* is also exactly the semantic capability vector for this turn.
         updates.put(TravelState.RUN_FLIGHTS, plan.isNeedsFlights());

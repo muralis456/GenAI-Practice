@@ -29,7 +29,11 @@ public class FinalizationNode implements NodeAction<TravelState> {
                         || state.needsWeather() || state.needsBudget() || state.needsKnowledge()));
 
         String tips = "";
-        if (requiresApproval) {
+        if ("HISTORY".equalsIgnoreCase(state.requestType())) {
+            // HistoryNode may already have produced a safe no-result message.
+            // Never overwrite it with an empty finalization payload.
+            tips = state.finalTips();
+        } else if (requiresApproval) {
             // Keep durable RAG knowledge separate from generated trip tips.
             // The API exposes RAG guidance as plan.knowledge so the UI can
             // label it clearly and show its provenance without mixing it into

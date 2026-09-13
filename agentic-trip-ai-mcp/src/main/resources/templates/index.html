@@ -1563,6 +1563,16 @@
         @media (max-width:1100px) { .travel-dashboard{grid-template-columns:1fr;} .travel-side{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;} .travel-side .trip-side-card{margin-bottom:0;} }
         @media (max-width:760px) { .workspace-grid{grid-template-columns:1fr;} .workspace-card.full{grid-column:auto;} .travel-side{grid-template-columns:1fr;} .content{padding-left:14px;padding-right:14px;} .trip-banner{padding:18px;} }
 
+        .weather-dashboard-card{border:1px solid rgba(93,166,255,.16);border-radius:14px;background:linear-gradient(180deg,rgba(20,44,72,.72),rgba(8,22,39,.68));padding:14px;box-shadow:0 12px 28px rgba(0,0,0,.12)}
+        .weather-dashboard-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:13px}
+        .weather-location-title{font-size:15px;font-weight:800;color:#edf6ff}.weather-location-sub{margin-top:3px;color:#8fa9c5;font-size:11px}
+        .weather-live-badge{white-space:nowrap;color:#8fc5ff;background:rgba(55,139,235,.10);border:1px solid rgba(76,157,255,.20);border-radius:999px;padding:5px 8px;font-size:10px;font-weight:800}
+        .weather-days-grid{display:grid;grid-template-columns:repeat(5,minmax(105px,1fr));gap:8px;overflow:auto;padding-bottom:2px}
+        .weather-day-card{min-width:105px;padding:11px 9px;border-radius:11px;background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.055);text-align:center}
+        .weather-day-date{font-size:10px;font-weight:800;color:#9eb8d5;text-transform:uppercase;letter-spacing:.06em}.weather-day-icon{font-size:26px;margin:8px 0 4px}.weather-day-condition{height:29px;font-size:10px;color:#c9d9eb;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.weather-day-temp{margin-top:5px;font-size:12px}.weather-day-temp strong{font-size:16px;color:#f3f8ff}.weather-day-temp span{color:#8da5bf}.weather-day-rain{margin-top:6px;font-size:10px;color:#8fbdf1}
+        .weather-insight{display:flex;gap:9px;margin-top:10px;padding:10px 11px;border-radius:10px;background:rgba(75,151,235,.08);border:1px solid rgba(75,151,235,.15);color:#a9c4e2;font-size:11px;line-height:1.5}.weather-insight strong{display:block;color:#dcecff;margin-bottom:2px}.weather-insight-icon{font-size:16px}
+        @media(max-width:760px){.weather-days-grid{grid-template-columns:repeat(5,105px)}.weather-dashboard-head{flex-direction:column}.weather-live-badge{align-self:flex-start}}
+
         /* ===== Final V5 visual design ===== */
         .brand-v5 { margin: 2px 4px 22px; gap: 10px; }
         .brand-v5 .brand-mark { width: 38px; height: 38px; border-radius: 11px; display:grid; place-items:center; background:linear-gradient(135deg,#54bfff,#1b68ef); color:white; font-size:22px; box-shadow:0 8px 22px rgba(31,116,255,.24); }
@@ -1869,6 +1879,11 @@
         .trips-empty strong { display:block; color:#dce9f7; margin-bottom:6px; font-size:14px; }
         .chat-history-item .db-status { font-size:9px; font-weight:800; color:#75dca1; margin-left:5px; }
         .chat-history-section-label { margin:12px 8px 5px; color:#6f86a4; font-size:9px; font-weight:900; letter-spacing:.12em; }
+        .history-recalled-hero { border-color:rgba(91,154,229,.20); background:linear-gradient(145deg,rgba(22,40,66,.92),rgba(10,23,40,.95)); }
+        .history-recalled-route { margin-top:14px; font-size:22px; font-weight:900; color:#eef6ff; }
+        .history-recalled-meta { display:flex; flex-wrap:wrap; gap:7px; margin-top:10px; }
+        .history-recalled-meta span { padding:6px 9px; border-radius:9px; background:rgba(255,255,255,.045); color:#9db3cc; font-size:10.5px; }
+        .history-readonly-note { border-color:rgba(117,145,177,.12); background:rgba(255,255,255,.018); }
         @media (max-width:900px) { .trips-grid{grid-template-columns:1fr;} }
 
         .specialist-dashboard { max-width: 1040px; margin: 0 auto; display: grid; gap: 14px; }
@@ -2150,12 +2165,10 @@
                         <input type="hidden" name="travelStyle" value="" />
                         <input type="hidden" name="destination" value="" />
                     </div>
-                    <div class="composer-foot">
-                        <div id="loadingState" class="loading-shell" aria-live="polite">
-                            <span class="spinner"></span>
-                            <span>Agents are planning…</span>
-                        </div>
-                    </div>
+                    <!-- Runtime status is shown in the AI execution card above the conversation.
+                         Keep this DOM node hidden for backward-compatible JS state handling;
+                         do not render a second status/spinner bar in the composer. -->
+                    <div id="loadingState" class="loading-shell" aria-hidden="true" style="display:none !important;"></div>
                 </form>
             </div>
         </div>
@@ -3231,13 +3244,46 @@
     };
 
     const buildWeatherSection = (weather) => {
-        if (!weather || (!weather.summary && !weather.location)) return '';
-        const summary = weather.summary || 'Weather information available';
-        const detail = [weather.location, weather.rainLikely ? 'Rain may be likely' : ''].filter(Boolean).join(' · ');
-        return '<div class="weather-card"><div class="weather-icon">🌤️</div><div><div class="weather-main">' + escapeHtml(summary) + '</div>'
-            + (detail ? '<div class="weather-detail">' + escapeHtml(detail) + '</div>' : '') + '</div></div>';
+        if (!weather || (!weather.summary && !weather.location && !Array.isArray(weather.days))) return '';
+        const days = Array.isArray(weather.days) ? weather.days.filter(Boolean).slice(0, 7) : [];
+        const fmtDate = (value) => {
+            if (!value) return '';
+            const d = new Date(value + (String(value).length === 10 ? 'T00:00:00' : ''));
+            return Number.isNaN(d.getTime()) ? String(value) : d.toLocaleDateString(undefined, { month:'short', day:'numeric' });
+        };
+        const dateRange = days.length ? fmtDate(days[0].date) + (days.length > 1 ? ' – ' + fmtDate(days[days.length - 1].date) : '') : '';
+        const cards = days.map(day => {
+            const high = day.high != null ? Math.round(Number(day.high)) + '°' : '—';
+            const low = day.low != null ? Math.round(Number(day.low)) + '°' : '—';
+            const rain = day.rainProbability != null ? 'Rain ' + Math.round(Number(day.rainProbability)) + '%' : 'Rain —';
+            return '<div class="weather-day-card">'
+                + '<div class="weather-day-date">' + escapeHtml(fmtDate(day.date)) + '</div>'
+                + '<div class="weather-day-icon">' + escapeHtml(day.icon || '🌤️') + '</div>'
+                + '<div class="weather-day-condition">' + escapeHtml(day.condition || 'Forecast') + '</div>'
+                + '<div class="weather-day-temp"><strong>' + escapeHtml(high) + '</strong> <span>' + escapeHtml(low) + '</span></div>'
+                + '<div class="weather-day-rain">' + escapeHtml(rain) + '</div>'
+                + '</div>';
+        }).join('');
+        let insight = '';
+        if (days.length) {
+            const wet = days.reduce((best, day) => Number(day.rainProbability || 0) > Number(best?.rainProbability || 0) ? day : best, null);
+            const maxRain = Number(wet?.rainProbability || 0);
+            if (maxRain >= 50) insight = 'Higher rain probability on ' + fmtDate(wet.date) + ' — consider keeping indoor activities such as museums for that day.';
+            else if (maxRain >= 30) insight = 'Mostly good travel conditions, with a moderate chance of rain on ' + fmtDate(wet.date) + '. Keep a light rain layer handy.';
+            else insight = 'Good travel conditions overall. Outdoor sightseeing should be comfortable across the forecast period.';
+        }
+        if (!days.length) {
+            const detail = [weather.location, weather.rainLikely ? 'Rain may be likely' : ''].filter(Boolean).join(' · ');
+            return '<div class="weather-card"><div class="weather-icon">🌤️</div><div><div class="weather-main">' + escapeHtml(weather.summary || 'Weather information available') + '</div>'
+                + (detail ? '<div class="weather-detail">' + escapeHtml(detail) + '</div>' : '') + '</div></div>';
+        }
+        return '<div class="weather-dashboard-card">'
+            + '<div class="weather-dashboard-head"><div><div class="weather-location-title">🌤️ ' + escapeHtml(weather.location || 'Destination') + ' Weather</div>'
+            + '<div class="weather-location-sub">' + escapeHtml(dateRange || 'Travel-date forecast') + '</div></div><span class="weather-live-badge">Provider forecast</span></div>'
+            + '<div class="weather-days-grid">' + cards + '</div>'
+            + (insight ? '<div class="weather-insight"><span class="weather-insight-icon">💡</span><div><strong>Travel Weather Insight</strong><div>' + escapeHtml(insight) + '</div></div></div>' : '')
+            + '</div>';
     };
-
     const buildAgentDetails = (data) => {
         const exec = data.execution || {};
         const rawSteps = exec.timeline || data.executionTimeline || data.pipeline || [];
@@ -3373,6 +3419,50 @@
             || !!String(knowledge.answer || exec.ragAnswer || data?.ragAnswer || '').trim();
     };
 
+    const buildHistoryResponseHtml = (data) => {
+        const plan = data?.plan || {};
+        const trip = plan.trip || {};
+        const route = [trip.origin, trip.destination].filter(Boolean).join(' → ') || 'Saved trip';
+        const dates = trip.datesFlexible === true
+            ? 'Dates flexible'
+            : formatDateRange(trip.departureDate, trip.returnDate);
+        const flights = Array.isArray(plan.flights) ? plan.flights : [];
+        const hotels = Array.isArray(plan.hotels) ? plan.hotels : [];
+        const itinerary = plan.itinerary;
+        const weather = plan.weather;
+        const budget = plan.budget;
+        const tips = safeTripTips(plan.tips || '');
+        const quality = Number(trip.qualityScore || 0);
+        const requirements = Array.isArray(trip.requirements) ? trip.requirements : [];
+
+        let html = '<div class="history-recalled-dashboard">'
+            + '<section class="workspace-card full history-recalled-hero">'
+            + '<div class="workspace-card-head"><div><div class="workspace-card-title">🕘 Recalled saved trip</div>'
+            + '<div class="workspace-card-sub">Read-only details retrieved from your persistent trip history</div></div>'
+            + '<span class="knowledge-guidance-badge">✓ Memory</span></div>'
+            + '<div class="history-recalled-route">' + escapeHtml(route) + '</div>'
+            + '<div class="history-recalled-meta">'
+            + '<span>' + escapeHtml(dates || 'Dates not recorded') + '</span>'
+            + (trip.nights > 0 ? '<span>' + escapeHtml(String(trip.nights)) + ' nights</span>' : '')
+            + '<span>' + escapeHtml(String(trip.travelers || 1)) + ' traveler' + ((trip.travelers || 1) === 1 ? '' : 's') + '</span>'
+            + (trip.budgetLabel ? '<span>' + escapeHtml(trip.budgetLabel) + '</span>' : '')
+            + (quality > 0 ? '<span>Confidence ' + escapeHtml(String(quality)) + '/100</span>' : '')
+            + '</div>'
+            + (requirements.length ? '<div class="knowledge-topics">' + requirements.slice(0, 8).map(r => '<span class="knowledge-topic">' + escapeHtml(String(r).replace(/[_-]+/g, ' ')) + '</span>').join('') + '</div>' : '')
+            + '</section>';
+
+        if (flights.length) html += '<section class="workspace-card full"><div class="workspace-card-head"><div><div class="workspace-card-title">✈️ Flights</div><div class="workspace-card-sub">Saved flight details from the trip</div></div></div><div class="workspace-content">' + buildFlightsSection(flights) + '</div></section>';
+        if (hotels.length) html += '<section class="workspace-card full"><div class="workspace-card-head"><div><div class="workspace-card-title">🏨 Hotels</div><div class="workspace-card-sub">Saved accommodation details</div></div></div><div class="workspace-content">' + buildHotelsSection(hotels) + '</div></section>';
+        if (weather && (weather.summary || weather.location)) html += '<section class="workspace-card full"><div class="workspace-card-head"><div><div class="workspace-card-title">☀️ Weather</div><div class="workspace-card-sub">Saved weather information</div></div></div><div class="workspace-content">' + buildWeatherSection(weather) + '</div></section>';
+        if (budget && Array.isArray(budget.lineItems) && budget.lineItems.length) html += '<section class="workspace-card full"><div class="workspace-card-head"><div><div class="workspace-card-title">💰 Budget</div><div class="workspace-card-sub">Saved trip cost estimate</div></div></div><div class="workspace-content">' + buildBudgetTable(budget) + '</div></section>';
+        if (itinerary && Array.isArray(itinerary.days) && itinerary.days.length) html += '<section class="workspace-card full"><div class="workspace-card-head"><div><div class="workspace-card-title">🗓️ Day-wise Itinerary</div><div class="workspace-card-sub">Saved itinerary from this trip</div></div></div><div class="workspace-content itin-compact">' + buildItinerarySection(itinerary) + '</div></section>';
+        if (plan.knowledge?.available === true || plan.knowledge?.answer) html += buildKnowledgeGuidanceSection(data, plan);
+        if (tips) html += '<section class="workspace-card full"><div class="workspace-card-head"><div><div class="workspace-card-title">💡 Travel Tips</div><div class="workspace-card-sub">Saved trip-specific suggestions</div></div></div><div class="workspace-content knowledge-answer">' + formatKnowledgeText(tips) + '</div></section>';
+
+        html += '<section class="workspace-card full history-readonly-note"><div class="workspace-card-title">🔒 Read-only history</div><div class="workspace-card-sub">This is a recalled snapshot. Approve, modify and reject actions are disabled until you create or modify a new plan.</div></section>';
+        return html + '</div>';
+    };
+
     const buildSpecialistResponseHtml = (data, userRequest) => {
         const plan = data.plan || data || {};
         const trip = plan.trip || {};
@@ -3416,6 +3506,11 @@
             title = location ? 'Things to do in ' + location : 'Travel research';
             subtitle = 'Destination recommendations and current research';
             icon = '🔎';
+            body = answer ? '<div class="specialist-answer">' + formatKnowledgeText(answer) + '</div>' : '';
+        } else if (type === 'HISTORY') {
+            title = 'Recent saved trip';
+            subtitle = 'Retrieved from your persistent trip history';
+            icon = '🕘';
             body = answer ? '<div class="specialist-answer">' + formatKnowledgeText(answer) + '</div>' : '';
         } else if (type === 'MULTI_CAPABILITY' || type === 'MULTI_INTENT') {
             title = location ? 'Travel information for ' + location : 'Travel information';
@@ -3538,7 +3633,7 @@
         if (hasItinerary) html += '<div class="status-row"><span class="status-name"><i class="status-dot' + componentClass + '"></i>Itinerary</span><span class="status-value' + componentClass + '">' + componentStatus + '</span></div>';
         html += '</div></section>';
         if (awaitingApproval && data.threadId && data.tripPlanning !== false) {
-            html += '<section class="final-decision"><div class="decision-status pending"><i class="decision-dot"></i> Waiting for your decision</div><h3>Ready to finalize?</h3><p>Review the complete plan. Approve it, request a change, or reject it.</p><div class="final-actions"><button type="button" class="final-approve" data-plan-action="approve">✓ Approve</button><button type="button" class="final-modify" data-plan-action="modify">✎ Modify</button><button type="button" class="final-reject" data-plan-action="reject">✕ Reject</button></div></section>';
+            html += '<section class="final-decision"><div class="decision-status pending"><i class="decision-dot"></i> Waiting for your decision</div><h3>Ready to finalize?</h3><p>Review the complete plan. Approve it, request a change, or reject it.</p><div class="final-actions"><button type="button" class="final-approve" data-plan-action="approve" data-thread-id="' + escapeHtml(data.threadId) + '">✓ Approve</button><button type="button" class="final-modify" data-plan-action="modify" data-thread-id="' + escapeHtml(data.threadId) + '">✎ Modify</button><button type="button" class="final-reject" data-plan-action="reject" data-thread-id="' + escapeHtml(data.threadId) + '">✕ Reject</button></div></section>';
         } else if (complete) {
             html += '<section class="final-decision"><div class="decision-status"><i class="decision-dot"></i> Plan confirmed</div><h3>✓ Trip plan confirmed</h3><p>This plan has already been finalized.</p></section>';
         }
@@ -3586,6 +3681,7 @@
         markChatActive();
         const row = document.createElement('div');
         row.className = 'chat-msg assistant';
+        if (data?.threadId) row.dataset.threadId = String(data.threadId);
         row.innerHTML =
             '<div class="chat-avatar">AI</div>' +
             '<div class="chat-bubble">' +
@@ -3601,13 +3697,15 @@
         // let the structured renderer decide which UI is appropriate.
         const responseType = String(data?.requestType || data?.plan?.trip?.requestType || '').toUpperCase();
         const specialistResponse = data && data.tripPlanning !== true
-            && ['WEATHER','FLIGHT_SEARCH','HOTEL_SEARCH','BUDGET','RESEARCH','MULTI_CAPABILITY','MULTI_INTENT','TRAVEL_INFORMATION','GENERAL'].includes(responseType);
+            && ['WEATHER','FLIGHT_SEARCH','HOTEL_SEARCH','BUDGET','RESEARCH','MULTI_CAPABILITY','MULTI_INTENT','TRAVEL_INFORMATION','HISTORY','GENERAL'].includes(responseType);
         const hasStructuredResponse = !!(data && (
             data.threadId || data.plan || data.requestType || data.weather ||
             data.flights || data.hotels || data.budget || data.execution ||
             data.ragAnswer || data.knowledge
         ));
-        if (specialistResponse) {
+        if (responseType === 'HISTORY') {
+            body.innerHTML = buildHistoryResponseHtml(data);
+        } else if (specialistResponse) {
             body.innerHTML = buildSpecialistResponseHtml(data, userRequest);
         } else if (hasStructuredResponse) {
             body.innerHTML = buildPlanCardHtml(data, userRequest);
@@ -3625,17 +3723,6 @@
             });
         });
         chatThread.appendChild(row);
-        const finalActions = row.querySelectorAll('[data-plan-action]');
-        finalActions.forEach(btn => {
-            btn.addEventListener('click', () => {
-                const action = btn.getAttribute('data-plan-action');
-                if (action === 'approve') decide('/api/plan/approve', data.threadId, null, row);
-                else if (action === 'reject') decide('/api/plan/reject', data.threadId, null, row);
-                else if (action === 'modify') {
-                    enterModifyMode(data.threadId, row);
-                }
-            });
-        });
         scrollChat();
         if (persist) {
             ensureCurrentChat(data.destination || data.routeSummary || 'Trip plan');
@@ -3706,21 +3793,35 @@
         };
     };
 
-    const updateLiveResponse = (live, node) => {
+    const updateLiveResponse = (live, node, phase = 'start') => {
         if (!live || !node) return;
-        const normalized = String(node).replace(/^__+|__+$/g, '').replace(/[-_]+/g, ' ');
-        live.state.textContent = normalized ? 'Running ' + normalized + '…' : 'Working…';
+        const raw = String(node).replace(/^__+|__+$/g, '').replace(/[-_]+/g, ' ').trim();
+        // START is a graph lifecycle marker, not an actual agent stage.
+        // Never leave the UI showing "Running START…".
+        if (!raw || raw.toUpperCase() === 'START') {
+            if (phase === 'start') {
+                live.state.textContent = 'Understanding request…';
+            }
+            return;
+        }
+        const normalized = raw;
+        if (phase === 'start') {
+            live.state.textContent = 'Running ' + normalized + '…';
+        }
         const key = normalized.toLowerCase();
-        if (!live.seen.has(key)) {
-            live.seen.add(key);
-            const pill = document.createElement('span');
-            pill.className = 'live-step active';
-            pill.textContent = '✓ ' + normalized;
+        let pill = Array.from(live.steps.querySelectorAll('.live-step'))
+            .find(p => p.dataset.node === key);
+        if (!pill) {
+            pill = document.createElement('span');
+            pill.className = 'live-step';
+            pill.dataset.node = key;
             live.steps.appendChild(pill);
         }
+        pill.textContent = '✓ ' + normalized;
         live.steps.querySelectorAll('.live-step').forEach(p => p.classList.remove('active'));
-        const last = live.steps.lastElementChild;
-        if (last) last.classList.add('active');
+        if (phase === 'start') {
+            pill.classList.add('active');
+        }
         scrollChat();
     };
 
@@ -3775,12 +3876,37 @@
             await new Promise((resolve, reject) => {
                 let finished = false;
                 const es = new EventSource('/api/plan/' + encodeURIComponent(threadId) + '/events');
+                // The backend emits a `started` event immediately after the
+                // async graph begins.  Listen to it as well as `node`; without
+                // this handler the live card stays on its initial
+                // "Understanding request…" text until the first graph node
+                // finishes, which can take a while when the intent model is
+                // running.
+                es.addEventListener('started', (evt) => {
+                    // START only means the asynchronous graph was accepted.
+                    // It is not an agent stage, so keep the neutral state until
+                    // the first real node_start event arrives.
+                    try {
+                        const data = JSON.parse(evt.data);
+                        if (!data.node || String(data.node).toUpperCase() === 'START') {
+                            liveResponse.state.textContent = 'Understanding request…';
+                        }
+                    } catch (ignored) {}
+                });
+                es.addEventListener('node_start', (evt) => {
+                    try {
+                        const data = JSON.parse(evt.data);
+                        if (data.node) {
+                            if (statusSpan) statusSpan.textContent = 'Running ' + data.node + '…';
+                            updateLiveResponse(liveResponse, data.node, 'start');
+                        }
+                    } catch (ignored) {}
+                });
                 es.addEventListener('node', (evt) => {
                     try {
                         const data = JSON.parse(evt.data);
-                        if (statusSpan && data.node) {
-                            statusSpan.textContent = 'Running ' + data.node + '…';
-                            updateLiveResponse(liveResponse, data.node);
+                        if (data.node) {
+                            updateLiveResponse(liveResponse, data.node, 'complete');
                         }
                     } catch (ignored) {}
                 });
@@ -3852,6 +3978,31 @@
             updateComposerState();
             promptInput.focus();
         }
+    });
+
+    // Decision actions are delegated from the chat thread so they keep working
+    // after assistant cards are replaced/re-rendered. The button carries the
+    // thread id explicitly, avoiding any dependency on a stale closure.
+    chatThread.addEventListener('click', async (event) => {
+        const button = event.target.closest('[data-plan-action]');
+        if (!button || !chatThread.contains(button)) return;
+        event.preventDefault();
+        event.stopPropagation();
+        if (button.disabled || button.dataset.busy === 'true') return;
+        const row = button.closest('.chat-msg.assistant');
+        const action = button.getAttribute('data-plan-action');
+        const threadId = button.getAttribute('data-thread-id') || row?.dataset.threadId;
+        if (!threadId) {
+            showToast('This plan no longer has an active decision thread. Please create a new plan.');
+            return;
+        }
+        if (action === 'modify') {
+            enterModifyMode(threadId, row);
+            return;
+        }
+        const endpoint = action === 'approve' ? '/api/plan/approve' : action === 'reject' ? '/api/plan/reject' : null;
+        if (!endpoint) return;
+        await decide(endpoint, threadId, null, row);
     });
 
     chatThread.addEventListener('click', (event) => {
