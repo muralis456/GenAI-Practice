@@ -1579,6 +1579,7 @@
         .weather-metrics{display:grid;grid-template-columns:repeat(4,minmax(92px,1fr));gap:7px}.weather-metric{padding:10px 9px;border-radius:10px;background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.055)}.weather-metric-label{font-size:9px;color:#7f9bb7;text-transform:uppercase;letter-spacing:.05em}.weather-metric-value{margin-top:5px;color:#e9f3fd;font-size:12px;font-weight:800}.weather-metric-sub{margin-top:2px;color:#718da8;font-size:9px}
         .weather-sunline{display:flex;gap:7px;margin-top:8px}.weather-sun{flex:1;padding:8px 9px;border-radius:9px;background:rgba(255,255,255,.03);color:#9db6ce;font-size:10px}.weather-sun strong{display:block;color:#e7f2fc;font-size:11px;margin-top:2px}
         .weather-source{margin-top:9px;color:#6f8ba6;font-size:9px}.weather-source strong{color:#88afd2}
+        .weather-empty-state{padding:16px}.weather-empty-message{display:flex;align-items:center;gap:12px;padding:16px;border-radius:12px;background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.06)}.weather-empty-icon{width:46px;height:46px;display:flex;align-items:center;justify-content:center;border-radius:12px;background:rgba(255,255,255,.055);font-size:25px}.weather-empty-title{font-size:14px;font-weight:800;color:#eef6ff}.weather-empty-detail{margin-top:4px;color:#91a8c0;font-size:11px;line-height:1.5}
         .weather-forecast-title{margin:12px 0 8px;color:#cfe0f1;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.07em}
         .weather-focused .weather-current{grid-template-columns:minmax(230px,1fr) minmax(0,2fr)}.weather-focused .weather-current-main{padding:20px}.weather-focused .weather-current-temp{font-size:44px}
         @media(max-width:900px){.weather-current{grid-template-columns:1fr}.weather-metrics{grid-template-columns:repeat(2,minmax(100px,1fr))}.weather-focused .weather-current{grid-template-columns:1fr}}
@@ -3255,10 +3256,24 @@
     };
 
     const buildWeatherSection = (weather, options = {}) => {
-        if (!weather || (!weather.summary && !weather.location && !weather.current && !Array.isArray(weather.days))) return '';
+        if (!weather) return '';
         const current = weather.current || {};
         const days = Array.isArray(weather.days) ? weather.days.filter(Boolean).slice(0, 7) : [];
+        const hasCurrent = current.temperature != null;
+        const hasForecast = days.some(day => day && (day.high != null || day.low != null || day.condition));
+        const hasWeatherData = hasCurrent || hasForecast;
         const focused = !!options.focused;
+        if (!hasWeatherData) {
+            const location = weather.location || 'the requested destination';
+            return '<div class="weather-dashboard-card weather-empty-state">'
+                + '<div class="weather-dashboard-head"><div><div class="weather-location-title">🌤️ Weather</div>'
+                + '<div class="weather-location-sub">' + escapeHtml(location) + '</div></div>'
+                + '<span class="weather-live-badge">OpenWeather</span></div>'
+                + '<div class="weather-empty-message"><div class="weather-empty-icon">☁️</div>'
+                + '<div><div class="weather-empty-title">No weather details found</div>'
+                + '<div class="weather-empty-detail">We could not retrieve usable weather details for ' + escapeHtml(location) + '.</div></div></div>'
+                + '</div>';
+        }
         const fmtDate = (value) => {
             if (!value) return '';
             const d = new Date(value + (String(value).length === 10 ? 'T00:00:00' : ''));
@@ -3280,7 +3295,6 @@
             ? '<img class="weather-current-icon" src="https://openweathermap.org/img/wn/' + escapeHtml(String(icon)) + '@2x.png" alt="Weather icon">'
             : '<span class="weather-current-icon" style="display:flex;align-items:center;justify-content:center;font-size:34px">🌤️</span>';
         const dateRange = days.length ? fmtDate(days[0].date) + (days.length > 1 ? ' – ' + fmtDate(days[days.length - 1].date) : '') : '';
-        const hasCurrent = current.temperature != null;
         let html = '<div class="weather-dashboard-card' + (focused ? ' weather-focused' : '') + '">';
         html += '<div class="weather-dashboard-head"><div><div class="weather-location-title">🌤️ ' + escapeHtml(weather.location || 'Destination') + ' Weather</div>'
             + '<div class="weather-location-sub">' + escapeHtml(dateRange || 'Current conditions') + '</div></div>'
@@ -3330,9 +3344,6 @@
             else if (maxRain >= 30) insight = 'Mostly good travel conditions, with a moderate chance of rain on ' + fmtDate(wet.date) + '. Keep a light rain layer handy.';
             else insight = 'Good travel conditions overall. Outdoor sightseeing should be comfortable across the forecast period.';
             html += '<div class="weather-insight"><span class="weather-insight-icon">💡</span><div><strong>Travel Weather Insight</strong><div>' + escapeHtml(insight) + '</div></div></div>';
-        } else if (!hasCurrent) {
-            html += '<div class="weather-card"><div class="weather-icon">🌤️</div><div><div class="weather-main">' + escapeHtml(weather.summary || 'Weather information available') + '</div>'
-                + '<div class="weather-detail">' + escapeHtml(weather.location || '') + (weather.rainLikely ? ' · Rain may be likely' : '') + '</div></div></div>';
         }
         return html + '</div>';
 
@@ -3623,7 +3634,11 @@
         const hasHotels = Array.isArray(plan.hotels) && plan.hotels.length;
         const hasItinerary = hasItineraryData;
         const hasBudget = !!(plan.budget && Array.isArray(plan.budget.lineItems) && plan.budget.lineItems.length);
-        const hasWeather = !!(plan.weather && (plan.weather.summary || plan.weather.location || (Array.isArray(plan.weather.days) && plan.weather.days.length)));
+        const hasWeather = !!(plan.weather && (
+            (plan.weather.current && plan.weather.current.temperature != null)
+            || (Array.isArray(plan.weather.days) && plan.weather.days.some(d => d && (d.high != null || d.low != null || d.condition)))
+            || (typeof plan.weather.summary === 'string' && /no weather details found/i.test(plan.weather.summary))
+        ));
         const knowledge = plan.knowledge || {};
         const exec = data.execution || {};
         const hasKnowledge = !!(knowledge.available === true || knowledge.answer || exec.ragAnswer || data.ragAnswer);

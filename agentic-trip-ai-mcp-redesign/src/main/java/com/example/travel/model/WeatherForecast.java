@@ -61,6 +61,21 @@ public class WeatherForecast implements Serializable {
         return current != null && current.getTemperature() != null;
     }
 
+    /**
+     * Returns true only when the provider returned actual weather observations
+     * or at least one usable forecast day. Location/summary text alone is not
+     * considered weather data.
+     */
+    public boolean hasWeatherData() {
+        return hasCurrentDetails() || getDays().stream().anyMatch(day ->
+                day != null && (day.getHigh() != null || day.getLow() != null ||
+                        !isBlank(day.getCondition())));
+    }
+
+    private boolean isBlank(String value) {
+        return value == null || value.isBlank();
+    }
+
     public boolean isRainLikely() {
         return rainLikely;
     }

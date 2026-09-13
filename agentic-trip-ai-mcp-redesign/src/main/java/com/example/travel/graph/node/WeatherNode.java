@@ -33,15 +33,16 @@ public class WeatherNode implements NodeAction<TravelState> {
         try {
             WeatherForecast weather = weatherAgentService.forecast(state);
             Map<String, Object> updates = new LinkedHashMap<>();
+            boolean hasWeatherData = weather != null && weather.hasWeatherData();
+            if (weather != null && !hasWeatherData) {
+                String location = TravelState.firstNonBlank(weather.getLocation(), state.destination(), "the requested destination");
+                weather.setSummary("No weather details found for " + location + ".");
+            }
             updates.put(TravelState.WEATHER, weather);
-            updates.putAll(TravelState.trace(TravelGraphNodes.WEATHER,
-                    weather != null && weather.isRainLikely() ? "warn" : "ok",
-                    weather == null ? "no forecast" : weather.toDisplay()));
-            boolean hasWeatherData = weather != null && (weather.hasCurrentDetails() || !weather.getDays().isEmpty());
+            String display = weather == null ? "No weather details found." : weather.toDisplay();
             String status = hasWeatherData ? (weather.isRainLikely() ? "warn" : "ok") : "error";
-            GraphExecutionLogger.specialistResult(TravelGraphNodes.WEATHER, state,
-                    status,
-                    weather == null ? "no forecast" : weather.toDisplay());
+            updates.putAll(TravelState.trace(TravelGraphNodes.WEATHER, status, display));
+            GraphExecutionLogger.specialistResult(TravelGraphNodes.WEATHER, state, status, display);
             updates.putAll(TravelState.provenance(new ProvenanceEvent(
                     "weather", "OpenWeather Free Weather APIs", "https://openweathermap.org/price", 0,
                     state.destination())));

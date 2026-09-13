@@ -82,7 +82,7 @@ public class McpWeatherClient {
                 for (JsonNode day : days) {
                     forecasts.add(new WeatherForecast.DailyForecast(
                             day.path("date").asText(day.path("time").asText("")),
-                            day.path("condition").asText("Forecast"),
+                            day.path("condition").asText(""),
                             day.path("icon").asText("🌤️"),
                             day.path("high").isNumber() ? day.path("high").doubleValue() : null,
                             day.path("low").isNumber() ? day.path("low").doubleValue() : null,
