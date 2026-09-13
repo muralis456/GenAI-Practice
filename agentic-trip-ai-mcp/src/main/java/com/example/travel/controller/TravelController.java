@@ -91,7 +91,10 @@ public class TravelController {
     @PostMapping("/plan/approve")
     public ResponseEntity<TravelPlanResponse> approve(@RequestBody PlanDecisionRequest request) {
         String userId = request.getUserId() != null ? request.getUserId() : "anonymous";
-        TravelPlanResponse response = travelPlannerAgentService.approve(userId, request.getThreadId() != null ? request.getThreadId() : userId);
+        if (request.getThreadId() == null || request.getThreadId().isBlank()) {
+            return ResponseEntity.badRequest().body(null);
+        }
+        TravelPlanResponse response = travelPlannerAgentService.approve(userId, request.getThreadId());
         conversationMemoryService.saveUiMessage(userId, userId, "assistant", responseMessage(response, "Plan approved"));
         return ResponseEntity.ok(response);
     }
@@ -99,12 +102,15 @@ public class TravelController {
     @PostMapping("/plan/modify")
     public ResponseEntity<TravelPlanResponse> modify(@RequestBody PlanDecisionRequest request) {
         String userId = request.getUserId() != null ? request.getUserId() : "anonymous";
+        if (request.getThreadId() == null || request.getThreadId().isBlank()) {
+            return ResponseEntity.badRequest().body(null);
+        }
         conversationMemoryService.saveMessage(userId, userId, "user",
                 "Modify: " + (request.getNotes() == null ? "(no details)" : request.getNotes()));
         String historyContext = conversationMemoryService.buildHistoryContext(userId, userId);
         try {
             TravelPlanResponse response = travelPlannerAgentService.modify(userId,
-                    request.getThreadId() != null ? request.getThreadId() : userId,
+                    request.getThreadId(),
                     request.getNotes() == null ? "Please adjust the plan" : request.getNotes(),
                     historyContext);
             conversationMemoryService.saveUiMessage(userId, userId, "assistant",
@@ -120,8 +126,10 @@ public class TravelController {
     @PostMapping("/plan/reject")
     public ResponseEntity<TravelPlanResponse> reject(@RequestBody PlanDecisionRequest request) {
         String userId = request.getUserId() != null ? request.getUserId() : "anonymous";
-        TravelPlanResponse response = travelPlannerAgentService.reject(userId,
-                request.getThreadId() != null ? request.getThreadId() : userId);
+        if (request.getThreadId() == null || request.getThreadId().isBlank()) {
+            return ResponseEntity.badRequest().body(null);
+        }
+        TravelPlanResponse response = travelPlannerAgentService.reject(userId, request.getThreadId());
         conversationMemoryService.saveUiMessage(userId, userId, "assistant",
                 responseMessage(response, "Plan rejected"));
         return ResponseEntity.ok(response);

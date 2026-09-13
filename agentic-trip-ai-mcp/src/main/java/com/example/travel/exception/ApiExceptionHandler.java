@@ -17,9 +17,20 @@ public class ApiExceptionHandler {
 
     @ExceptionHandler(IllegalStateException.class)
     public ResponseEntity<Map<String, String>> handleIllegalState(IllegalStateException ex) {
-        log.warn("Bad plan state: {}", ex.getMessage());
+        String message = ex.getMessage() == null ? "" : ex.getMessage();
+        log.warn("Bad plan state: {}", message);
+
+        // A plan stored only in browser history may outlive its active HITL
+        // checkpoint. Do not expose the LangGraph checkpoint detail to the UI.
+        if (message.contains("Missing Checkpoint") || message.contains("No graph checkpoint")) {
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body(Map.of("error",
+                            "This plan approval session is no longer active. It may have already been completed or expired. Please create a new trip plan."));
+        }
+
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(Map.of("error", "We couldn't process that travel request. Please check the details and try again."));
+                .body(Map.of("error",
+                        "We couldn't process that travel request. Please check the details and try again."));
     }
 
     @ExceptionHandler(NoResourceFoundException.class)
