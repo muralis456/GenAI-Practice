@@ -7,7 +7,6 @@ import com.example.travel.model.IntentPlan;
 import com.example.travel.service.RoutedLlm;
 import com.example.travel.support.JsonSupport;
 import com.example.travel.support.TripRequirementsParser;
-import com.example.travel.support.TravelIntentNormalizer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -62,61 +61,142 @@ public class IntentAgentService {
      * and multiple simultaneous requests. Java only applies safety rules after
      * the model response: no invented capabilities and no invented intent.
      */
+    /**
+     * Production semantic intent pipeline.
+     *
+     * IMPORTANT: this method intentionally contains NO lexical/regex intent
+     * detection. User language is interpreted by the semantic model. Java only
+     * validates the returned structure and derives routing metadata from the
+     * capability vector. This prevents every new phrasing from becoming another
+     * keyword patch.
+     */
     private IntentPlan classifySemantically(TravelState state) {
         if (state == null || TravelState.isBlank(state.userRequest())) {
             return emptyPlan();
         }
 
-        String system = """
+        String request = state.userRequest();
+        IntentPlan primary = runSemanticIntentPass(request, false);
+        primary = sanitizeSemanticPlan(primary);
+
+        log.info("Intent primary semantic result request={} type={} confidence={} capabilities={}",
+                request, primary.getRequestType(), primary.getConfidence(), capabilitySummary(primary));
+
+        // A good semantic classification is authoritative. Do NOT let an
+        // independent embedding classifier veto a valid multi-capability plan.
+        // The previous architecture caused exactly this regression: the LLM
+        // correctly detected flights/budget/itinerary, then embedding similarity
+        // returned all false and the request became GENERAL.
+        if (hasAnyCapability(primary) && primary.getConfidence() >= 0.55) {
+            return finalizeSemanticPlan(primary);
+        }
+
+        // If the first model is uncertain or returns an empty capability vector,
+        // ask a second semantic pass to independently reconsider the same text.
+        // This is still meaning-based and works for new wording, typos and
+        // natural language that was never anticipated by Java code.
+        IntentPlan adjudicated = runSemanticIntentPass(request, true);
+        adjudicated = sanitizeSemanticPlan(adjudicated);
+
+        log.info("Intent secondary semantic result request={} type={} confidence={} capabilities={}",
+                request, adjudicated.getRequestType(), adjudicated.getConfidence(), capabilitySummary(adjudicated));
+
+        if (hasAnyCapability(adjudicated)
+                && (!hasAnyCapability(primary) || adjudicated.getConfidence() >= primary.getConfidence())) {
+            return finalizeSemanticPlan(adjudicated);
+        }
+
+        if (hasAnyCapability(primary)) {
+            return finalizeSemanticPlan(primary);
+        }
+
+        // Embeddings remain an observability/recovery signal only. They are not
+        // allowed to overwrite a semantic LLM decision or manufacture a set of
+        // capabilities. If both semantic passes are genuinely uncertain, the
+        // safe result is GENERAL rather than an invented specialist action.
+        log.info("Intent semantic classification unresolved request={}; returning GENERAL", request);
+        return finalizeSemanticPlan(emptyPlan());
+    }
+
+    private IntentPlan runSemanticIntentPass(String request, boolean adjudication) {
+        String system = adjudication ? """
+                You are the independent semantic adjudicator for a production travel-agent.
+
+                Re-evaluate the USER REQUEST from its meaning, not literal words or
+                predefined phrases. The wording may be novel, abbreviated, noisy,
+                misspelled, conversational, or grammatically incomplete.
+
+                Identify every capability the user is actually requesting NOW.
+                Do not infer a capability merely because it would be useful.
+                Do not use previous conversation state.
+
+                Capability meanings:
+                flights = airline/airfare/flight search or flight details.
+                hotels = accommodation/lodging/rooms/stay options.
+                research = recommendations, attractions, activities, destination research
+                           or information that needs current external research.
+                weather = current/forecast weather or weather-dependent conditions.
+                budget = calculating, estimating, comparing, constraining or optimizing
+                         travel cost/spend.
+                itinerary = organizing a journey into a coherent schedule or day-by-day plan,
+                            including a request to create or modify that schedule.
+                knowledge = durable/general travel guidance such as culture, customs,
+                            safety, packing, visa guidance, local practical advice or overview.
+
+                Key semantic rule: infer the user's objective, not the presence or absence
+                of a particular word. For example, a person can clearly ask for a vacation
+                schedule without using the word "itinerary", and can ask for cost limits
+                without using the word "budget".
+
+                Preserve multiple objectives when the user asks for them. Do not collapse
+                a multi-objective request to one specialist.
+
+                Return JSON only with this exact shape:
+                {
+                  "requestType":"",
+                  "needsFlights":false,
+                  "needsHotels":false,
+                  "needsResearch":false,
+                  "needsWeather":false,
+                  "needsBudget":false,
+                  "needsItinerary":false,
+                  "needsKnowledge":false,
+                  "strategy":"",
+                  "priority":"",
+                  "confidence":0.0
+                }
+                """ : """
                 You are the semantic intent planner for a production travel-agent system.
 
-                Understand the USER REQUEST by meaning, not by exact words.
-                The user may use typos, abbreviations, incomplete grammar, slang,
-                spelling mistakes, or several requests in one sentence. Infer the
-                intended meaning when it is reasonably clear. Do NOT require exact
-                keywords.
+                Understand the USER REQUEST by meaning. Do not classify by exact keywords,
+                regex patterns, or a fixed list of trigger phrases. Users may express the
+                same goal in completely different ways, use typos, abbreviations, speech-to-
+                text errors, slang, or incomplete grammar.
 
-                You must classify ONLY what the user is asking for NOW. Do not copy
-                capabilities from conversation state. Do not invent a destination,
-                dates, flights, hotels, weather, budget, or itinerary.
+                Determine every capability explicitly or semantically requested by the user.
+                Do not activate capabilities merely because they might be useful.
+                Do not copy capabilities from previous state.
 
-                Capability semantics:
-                - flights: the user wants flight search/details/airfare/flight changes.
-                - hotels: the user wants accommodation, hotels, rooms, or areas to stay.
-                - research: the user wants current/open-web destination research,
-                  recommendations, attractions, activities, or things to do.
-                - weather: the user wants current or forecast weather/conditions.
-                - budget: the user asks to calculate, estimate, compare, or optimize cost.
-                - itinerary: the user wants a trip plan, schedule, day-by-day plan,
-                  or changes to such a plan.
-                - knowledge: the user wants durable/general travel knowledge such as
-                  culture, history, significance, customs, visa/safety/packing guidance,
-                  travel tips, destination overview, or general advice.
+                Capability meanings:
+                - flights: airline/airfare/flight search, options, availability or details
+                - hotels: accommodation/lodging/rooms/stay options
+                - research: recommendations, attractions, activities or current destination research
+                - weather: current/forecast weather, temperature, precipitation or conditions
+                - budget: travel cost estimation, comparison, constraints or optimization
+                - itinerary: a coherent trip schedule, day-by-day journey plan, or schedule change
+                - knowledge: durable travel guidance such as culture, customs, safety, packing,
+                  visa guidance, practical local advice or destination overview
 
-                Important distinction:
-                A destination knowledge request does NOT automatically require flights,
-                hotels, weather, budget, or itinerary. A request for an itinerary DOES
-                require itinerary=true even if the user does not use the word itinerary.
-                A request for current weather requires weather=true.
-
-                Intent types should describe the primary user goal, for example:
-                TRAVEL_INFORMATION, TRIP_PLANNING, FLIGHT_SEARCH, HOTEL_SEARCH,
-                WEATHER, BUDGET, RESEARCH, ITINERARY_CHANGE, GENERAL.
-                For multiple goals use a combined descriptive type such as
-                TRIP_PLANNING or MULTI_INTENT rather than dropping secondary goals.
-
-                Semantic examples (examples are about meaning, not keyword matching):
-                - "Give bangalore travel trios" means the user is asking for travel tips/advice
-                  about Bengaluru despite the noisy spelling/grammar.
-                  => knowledge=true, destination=Bengaluru, no flights/hotels/weather/budget/itinerary.
-                - "what should I see in Dubai this weekend" => research=true, destination=Dubai.
-                - "will it rain in Dubai tomorrow" => weather=true, destination=Dubai.
-                - "plan five days in Japan from Bangalore" => itinerary=true, destination=Japan,
-                  origin=Bengaluru; do not add flights unless flights are requested.
-                - "find a hotel near downtown and tell me what area is best" => hotels=true,
-                  knowledge=true; preserve both objectives.
-                - "cheapest flights and a 4 day itinerary" => flights=true, itinerary=true;
-                  budget is true only if cost calculation/optimization is explicitly requested.
+                Semantic principles:
+                - Infer intent from the complete sentence and relationships between its parts.
+                - A route plus a duration plus a travel objective can express trip planning even
+                  when the user never says "plan" or "itinerary".
+                - A monetary constraint can express a budget objective even when the user never
+                  says "budget".
+                - Multiple requested outcomes must remain multiple capabilities.
+                - Do not add flights, hotels, weather, research or budget simply because a trip exists.
+                - Do not confuse durable knowledge with live research.
+                - If the request is genuinely ambiguous, return GENERAL with all capabilities false.
 
                 Return JSON only:
                 {
@@ -132,175 +212,17 @@ public class IntentAgentService {
                   "priority":"",
                   "confidence":0.0
                 }
-
-                Confidence must reflect semantic certainty. Do not output a high
-                confidence merely because the request resembles a travel query.
                 """;
 
         try {
             String content = routedLlm.complete(
                     AgentRole.EXTRACT,
                     system,
-                    "USER REQUEST:\n" + state.userRequest() +
-                    "\n\nReturn the semantic capability plan now.");
-
-            log.info("Intent semantic raw LLM response={}", content);
-            IntentPlan parsed = jsonSupport.read(content, IntentPlan.class).orElse(null);
-            if (parsed == null) {
-                return semanticIntentArbiter.recover(state.userRequest(), null);
-            }
-
-            parsed = sanitizeSemanticPlan(parsed);
-
-            // The chat model is not the sole authority. A small local model can
-            // confidently return GENERAL for noisy/typo-heavy requests. The
-            // embedding model provides a model-independent semantic signal and
-            // recovers the capability plan without a keyword dictionary.
-            if (!hasAnyCapability(parsed)) {
-                IntentPlan recovered =
-                        semanticIntentArbiter.recover(state.userRequest(), parsed);
-                if (hasAnyCapability(recovered)) {
-                    log.info(
-                            "Intent semantic recovery requestType={} confidence={} capabilities=[flights={},hotels={},research={},weather={},budget={},itinerary={},knowledge={}]",
-                            recovered.getRequestType(), recovered.getConfidence(),
-                            recovered.isNeedsFlights(), recovered.isNeedsHotels(),
-                            recovered.isNeedsResearch(), recovered.isNeedsWeather(),
-                            recovered.isNeedsBudget(), recovered.isNeedsItinerary(),
-                            recovered.isNeedsKnowledge());
-                    return guardrailIntent(state.userRequest(), recovered);
-                }
-
-                // Last-resort semantic adjudication. This is another
-                // meaning-based LLM pass, not a keyword fallback.
-                IntentPlan adjudicated =
-                        adjudicateNoCapabilityRequest(state.userRequest());
-                if (hasAnyCapability(adjudicated)) {
-                    return guardrailIntent(state.userRequest(), adjudicated);
-                }
-            }
-
-            // When both signals agree, keep the richer LLM plan. When the
-            // embedding signal strongly identifies a missing knowledge intent,
-            // merge it rather than forcing the request through Planner.
-            IntentPlan recovered =
-                    semanticIntentArbiter.recover(state.userRequest(), parsed);
-            log.info(
-                    "Intent semantic arbitration result request={} capabilities=[flights={},hotels={},research={},weather={},budget={},itinerary={},knowledge={}] confidence={}",
-                    state.userRequest(),
-                    recovered.isNeedsFlights(), recovered.isNeedsHotels(),
-                    recovered.isNeedsResearch(), recovered.isNeedsWeather(),
-                    recovered.isNeedsBudget(), recovered.isNeedsItinerary(),
-                    recovered.isNeedsKnowledge(), recovered.getConfidence());
-            IntentPlan merged = mergeSemanticSignals(parsed, recovered);
-
-            // High-confidence explicit requests are authoritative guardrails.
-            // Small local models and embedding recovery can semantically drift
-            // a request such as "weather conditions in Bangalore to travel"
-            // toward generic travel knowledge. For non-trip-planning requests,
-            // the deterministic normalizer preserves the exact capabilities
-            // explicitly expressed by the user while still allowing combined
-            // requests such as "weather and travel tips".
-            if (!isExplicitTripPlanningRequest(state.userRequest())) {
-                merged = TravelIntentNormalizer.normalize(state.userRequest(), merged);
-            }
-
-            return sanitizeSemanticPlan(merged);
+                    "USER REQUEST:\n" + request + "\n\nReturn the semantic capability plan now.");
+            return jsonSupport.read(content, IntentPlan.class).orElseGet(this::emptyPlan);
         } catch (Exception ex) {
-            log.warn("Semantic intent analysis failed", ex);
+            log.warn("Semantic intent pass failed adjudication={}", adjudication, ex);
             return emptyPlan();
-        }
-    }
-
-    private IntentPlan guardrailIntent(String request, IntentPlan candidate) {
-        if (candidate == null) {
-            return emptyPlan();
-        }
-        if (!isExplicitTripPlanningRequest(request)) {
-            return TravelIntentNormalizer.normalize(request, candidate);
-        }
-        return candidate;
-    }
-
-    private boolean isExplicitTripPlanningRequest(String request) {
-        if (request == null) {
-            return false;
-        }
-        String lower = request.toLowerCase(java.util.Locale.ROOT);
-        return lower.matches(".*\\b(?:plan|planning|organize|arrange|prepare|design|build|create|make)\\b.{0,40}\\b(?:trip|travel|holiday|vacation|journey)\\b.*")
-                || lower.contains("itinerary")
-                || lower.contains("day-by-day")
-                || lower.contains("trip plan");
-    }
-
-    private IntentPlan adjudicateNoCapabilityRequest(String request) {
-        try {
-            String system = """
-                    You are the final semantic adjudicator for a travel agent.
-
-                    A previous intent analysis failed to identify an actionable
-                    capability. Re-evaluate the user's sentence from meaning,
-                    not literal spelling.
-
-                    The request may contain:
-                    - typos
-                    - speech-to-text errors
-                    - malformed words
-                    - missing grammar
-                    - abbreviations
-                    - very short requests
-
-                    Infer the most plausible human intention only when the
-                    surrounding meaning makes it clear. Do not invent a
-                    destination, dates, budget, flights, hotel booking, or
-                    itinerary that the user did not request.
-
-                    Capability meanings:
-                    flights = flight/airfare request
-                    hotels = accommodation/lodging request
-                    research = current recommendations/attractions/activities
-                    weather = current or forecast weather
-                    budget = cost calculation/comparison/optimization
-                    itinerary = organized trip schedule or day-by-day plan
-                    knowledge = general destination knowledge, advice, travel
-                               tips, culture, history, customs, safety, packing,
-                               visa guidance, or practical local guidance
-
-                    Return JSON only:
-                    {
-                      "requestType":"",
-                      "needsFlights":false,
-                      "needsHotels":false,
-                      "needsResearch":false,
-                      "needsWeather":false,
-                      "needsBudget":false,
-                      "needsItinerary":false,
-                      "needsKnowledge":false,
-                      "strategy":"",
-                      "priority":"",
-                      "confidence":0.0
-                    }
-
-                    If the sentence is truly unclear, return GENERAL with all
-                    capabilities false. Never choose a destination merely to
-                    make the request actionable.
-                    """;
-
-            String content = routedLlm.complete(
-                    AgentRole.EXTRACT,
-                    system,
-                    "USER REQUEST:\n" + request);
-
-            IntentPlan plan =
-                    jsonSupport.read(content, IntentPlan.class).orElse(null);
-
-            if (plan == null) {
-                return semanticIntentArbiter.recover(request, null);
-            }
-
-            return sanitizeSemanticPlan(plan);
-        } catch (Exception ex) {
-            log.warn("Semantic adjudication failed", ex);
-            return new IntentPlan();
         }
     }
 
@@ -311,77 +233,83 @@ public class IntentAgentService {
                 || plan.isNeedsKnowledge());
     }
 
-    private IntentPlan mergeSemanticSignals(IntentPlan llm, IntentPlan semantic) {
-        if (semantic == null || !hasAnyCapability(semantic)) {
-            return llm;
+    private IntentPlan finalizeSemanticPlan(IntentPlan plan) {
+        IntentPlan result = plan == null ? emptyPlan() : plan;
+        int count = (result.isNeedsFlights() ? 1 : 0)
+                + (result.isNeedsHotels() ? 1 : 0)
+                + (result.isNeedsResearch() ? 1 : 0)
+                + (result.isNeedsWeather() ? 1 : 0)
+                + (result.isNeedsBudget() ? 1 : 0)
+                + (result.isNeedsItinerary() ? 1 : 0)
+                + (result.isNeedsKnowledge() ? 1 : 0);
+
+        if (count == 0) {
+            result.setRequestType("GENERAL");
+            result.setStrategy("none");
+            result.setPriority("none");
+            return result;
         }
 
-        // Recovery is intentionally conservative: it may add a semantically
-        // strong missing capability, but it never invents a destination, dates,
-        // budget, or flight request.
-        if (semantic.isNeedsKnowledge()) {
-            llm.setNeedsKnowledge(true);
+        // Request type is derived from the semantic capability vector only.
+        // No request wording is inspected here.
+        if (result.isNeedsItinerary()) {
+            result.setRequestType(IntentPlan.TRIP_PLANNING);
+        } else if (count > 1) {
+            result.setRequestType("MULTI_CAPABILITY");
+        } else if (result.isNeedsFlights()) {
+            result.setRequestType(IntentPlan.FLIGHT_SEARCH);
+        } else if (result.isNeedsHotels()) {
+            result.setRequestType(IntentPlan.HOTEL_SEARCH);
+        } else if (result.isNeedsWeather()) {
+            result.setRequestType(IntentPlan.WEATHER);
+        } else if (result.isNeedsBudget()) {
+            result.setRequestType("BUDGET");
+        } else if (result.isNeedsResearch()) {
+            result.setRequestType(IntentPlan.RESEARCH);
+        } else {
+            result.setRequestType("TRAVEL_INFORMATION");
         }
 
-        // Semantic arbitration may also veto a weaker live-research capability.
-        // This is especially important with small local LLMs: they can label a
-        // general "precautions/advice" question as both knowledge and research.
-        // If the independent semantic model clearly prefers durable knowledge,
-        // preserve the user's intent as knowledge-only and avoid an unnecessary
-        // MCP/web call.
-        if (llm.isNeedsKnowledge()
-                && llm.isNeedsResearch()
-                && !semantic.isNeedsResearch()
-                && semantic.isNeedsKnowledge()
-                && semantic.getConfidence() >= 0.60) {
-            llm.setNeedsResearch(false);
-            llm.setRequestType("TRAVEL_INFORMATION");
-            llm.setStrategy("rag_only");
-            llm.setPriority("knowledge");
-            log.info("Intent semantic arbitration vetoed research for knowledge-dominant request confidence={}",
-                    semantic.getConfidence());
+        result.setStrategy(count > 1 ? "multi_capability" : result.getStrategy());
+        if (result.getStrategy() == null || result.getStrategy().isBlank() || "none".equalsIgnoreCase(result.getStrategy())) {
+            result.setStrategy(result.isNeedsItinerary() ? "trip_planning"
+                    : result.isNeedsFlights() ? "flight_only"
+                    : result.isNeedsHotels() ? "hotel_only"
+                    : result.isNeedsWeather() ? "weather_only"
+                    : result.isNeedsBudget() ? "budget_only"
+                    : result.isNeedsResearch() ? "research_only"
+                    : "rag_only");
         }
-
-        // For non-knowledge capabilities, only merge when the semantic model is
-        // materially more confident than the LLM's empty/uncertain decision.
-        if (llm.getConfidence() < 0.65) {
-            llm.setNeedsFlights(llm.isNeedsFlights() || semantic.isNeedsFlights());
-            llm.setNeedsHotels(llm.isNeedsHotels() || semantic.isNeedsHotels());
-            llm.setNeedsResearch(llm.isNeedsResearch() || semantic.isNeedsResearch());
-            llm.setNeedsWeather(llm.isNeedsWeather() || semantic.isNeedsWeather());
-            llm.setNeedsBudget(llm.isNeedsBudget() || semantic.isNeedsBudget());
-            llm.setNeedsItinerary(llm.isNeedsItinerary() || semantic.isNeedsItinerary());
+        if (result.getPriority() == null || result.getPriority().isBlank() || "none".equalsIgnoreCase(result.getPriority())) {
+            result.setPriority(result.isNeedsItinerary() ? "itinerary"
+                    : result.isNeedsFlights() ? "flights"
+                    : result.isNeedsHotels() ? "hotels"
+                    : result.isNeedsWeather() ? "weather"
+                    : result.isNeedsBudget() ? "budget"
+                    : result.isNeedsResearch() ? "research"
+                    : "knowledge");
         }
-
-        if (llm.isNeedsKnowledge()
-                && !llm.isNeedsFlights()
-                && !llm.isNeedsHotels()
-                && !llm.isNeedsResearch()
-                && !llm.isNeedsWeather()
-                && !llm.isNeedsBudget()
-                && !llm.isNeedsItinerary()) {
-            llm.setRequestType("TRAVEL_INFORMATION");
-            llm.setStrategy("rag_only");
-            llm.setPriority("knowledge");
-        }
-
-        llm.setConfidence(Math.max(llm.getConfidence(), semantic.getConfidence()));
-        return llm;
+        return result;
     }
 
     private IntentPlan sanitizeSemanticPlan(IntentPlan plan) {
+        if (plan == null) return emptyPlan();
         if (plan.getConfidence() <= 0) plan.setConfidence(0.5);
         if (plan.getConfidence() > 1) plan.setConfidence(1);
         if (plan.getRequestType() == null || plan.getRequestType().isBlank()) {
             plan.setRequestType("GENERAL");
         }
-        if (!plan.isNeedsFlights() && !plan.isNeedsHotels() && !plan.isNeedsResearch()
-                && !plan.isNeedsWeather() && !plan.isNeedsBudget() && !plan.isNeedsItinerary()
-                && !plan.isNeedsKnowledge()) {
-            plan.setStrategy("none");
-            plan.setPriority("none");
-        }
         return plan;
+    }
+
+    private String capabilitySummary(IntentPlan plan) {
+        return "[flights=" + plan.isNeedsFlights()
+                + ",hotels=" + plan.isNeedsHotels()
+                + ",research=" + plan.isNeedsResearch()
+                + ",weather=" + plan.isNeedsWeather()
+                + ",budget=" + plan.isNeedsBudget()
+                + ",itinerary=" + plan.isNeedsItinerary()
+                + ",knowledge=" + plan.isNeedsKnowledge() + "]";
     }
 
     /**
