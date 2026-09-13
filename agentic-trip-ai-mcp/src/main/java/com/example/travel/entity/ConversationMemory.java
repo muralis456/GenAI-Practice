@@ -31,6 +31,10 @@ public class ConversationMemory {
     @Column(nullable = false)
     private Instant createdAt;
 
+    /** Optional structured UI payload (for restoring the exact result from Recent Trips). */
+    @Column(columnDefinition = "TEXT")
+    private String structuredData;
+
     public Long getId() {
         return id;
     }
@@ -77,5 +81,13 @@ public class ConversationMemory {
 
     public void setCreatedAt(Instant createdAt) {
         this.createdAt = createdAt;
+    }
+
+    public String getStructuredData() {
+        return structuredData;
+    }
+
+    public void setStructuredData(String structuredData) {
+        this.structuredData = structuredData;
     }
 }

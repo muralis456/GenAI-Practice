@@ -6,6 +6,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
+import tools.jackson.databind.ObjectMapper;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,9 +24,11 @@ public class ConversationMemoryService {
     private static final int UI_CONTENT_MAX = 12000;
 
     private final ConversationMemoryRepository repository;
+    private final ObjectMapper objectMapper;
 
-    public ConversationMemoryService(ConversationMemoryRepository repository) {
+    public ConversationMemoryService(ConversationMemoryRepository repository, ObjectMapper objectMapper) {
         this.repository = repository;
+        this.objectMapper = objectMapper;
     }
 
     /**
@@ -47,15 +50,45 @@ public class ConversationMemoryService {
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void saveUiMessage(String userId, String sessionId, String role, String content) {
+        saveUiMessage(userId, sessionId, role, content, null);
+    }
+
+    /**
+     * Saves a UI message and, when supplied, the exact structured response so
+     * Recent Trips can restore the same result after a browser refresh.
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void saveUiMessage(String userId, String sessionId, String role, String content, Object structuredPayload) {
         ConversationMemory memory = new ConversationMemory();
         memory.setUserId(userId);
         memory.setSessionId(sessionId);
         memory.setRole(role);
         memory.setContent(truncate(content, UI_CONTENT_MAX));
         memory.setCreatedAt(Instant.now());
+        if (structuredPayload != null) {
+            try {
+                memory.setStructuredData(objectMapper.writeValueAsString(structuredPayload));
+            } catch (Exception ex) {
+                log.warn("Could not serialize structured UI payload userId={} sessionId={}", userId, sessionId, ex);
+            }
+        }
         ConversationMemory saved = repository.saveAndFlush(memory);
-        log.info("Saved UI conversation memory id={} userId={} role={} chars={}",
-                saved.getId(), userId, role, memory.getContent().length());
+        log.info("Saved UI conversation memory id={} userId={} role={} structured={} chars={}",
+                saved.getId(), userId, role, memory.getStructuredData() != null, memory.getContent().length());
+    }
+
+    /**
+     * Deletes all persisted conversation-memory rows for one owned session.
+     * Recent History uses sessionId/threadId as the conversation boundary.
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public long deleteSession(String userId, String sessionId) {
+        if (userId == null || userId.isBlank() || sessionId == null || sessionId.isBlank()) {
+            return 0;
+        }
+        long deleted = repository.deleteByUserIdAndSessionId(userId, sessionId);
+        log.info("Deleted conversation memory rows={} userId={} sessionId={}", deleted, userId, sessionId);
+        return deleted;
     }
 
     @Transactional(readOnly = true)
@@ -73,13 +106,38 @@ public class ConversationMemoryService {
                 .sorted((a, b) -> a.getCreatedAt().compareTo(b.getCreatedAt()))
                 .map(m -> new HistoryItem(
                         m.getId(),
+                        m.getSessionId(),
                         m.getRole(),
                         m.getContent(),
+                        m.getStructuredData(),
                         m.getCreatedAt() == null ? null : m.getCreatedAt().toString()))
                 .collect(Collectors.toList());
     }
 
-    public record HistoryItem(Long id, String role, String content, String createdAt) {
+    public record HistoryItem(Long id, String sessionId, String role, String content, String structuredData, String createdAt) {
+    }
+
+    @Transactional(readOnly = true)
+    public java.util.Optional<ConversationMemory> getMessageForUi(String userId, Long id) {
+        return repository.findById(id)
+                .filter(message -> userId.equals(message.getUserId()));
+    }
+
+    @Transactional(readOnly = true)
+    public List<HistoryItem> getHistoryForSessionUi(String userId, String sessionId, int limit) {
+        int size = Math.min(Math.max(limit, 1), 100);
+        PageRequest pageable = PageRequest.of(0, size);
+        return repository.findByUserIdAndSessionIdOrderByCreatedAtDesc(userId, sessionId, pageable)
+                .stream()
+                .sorted((a, b) -> a.getCreatedAt().compareTo(b.getCreatedAt()))
+                .map(m -> new HistoryItem(
+                        m.getId(),
+                        m.getSessionId(),
+                        m.getRole(),
+                        m.getContent(),
+                        m.getStructuredData(),
+                        m.getCreatedAt() == null ? null : m.getCreatedAt().toString()))
+                .collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)

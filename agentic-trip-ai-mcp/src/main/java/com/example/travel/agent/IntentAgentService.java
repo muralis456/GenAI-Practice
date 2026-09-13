@@ -7,6 +7,7 @@ import com.example.travel.model.IntentPlan;
 import com.example.travel.service.RoutedLlm;
 import com.example.travel.support.JsonSupport;
 import com.example.travel.support.TripRequirementsParser;
+import com.example.travel.support.TravelIntentNormalizer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -166,7 +167,7 @@ public class IntentAgentService {
                             recovered.isNeedsResearch(), recovered.isNeedsWeather(),
                             recovered.isNeedsBudget(), recovered.isNeedsItinerary(),
                             recovered.isNeedsKnowledge());
-                    return recovered;
+                    return guardrailIntent(state.userRequest(), recovered);
                 }
 
                 // Last-resort semantic adjudication. This is another
@@ -174,7 +175,7 @@ public class IntentAgentService {
                 IntentPlan adjudicated =
                         adjudicateNoCapabilityRequest(state.userRequest());
                 if (hasAnyCapability(adjudicated)) {
-                    return adjudicated;
+                    return guardrailIntent(state.userRequest(), adjudicated);
                 }
             }
 
@@ -191,11 +192,44 @@ public class IntentAgentService {
                     recovered.isNeedsBudget(), recovered.isNeedsItinerary(),
                     recovered.isNeedsKnowledge(), recovered.getConfidence());
             IntentPlan merged = mergeSemanticSignals(parsed, recovered);
+
+            // High-confidence explicit requests are authoritative guardrails.
+            // Small local models and embedding recovery can semantically drift
+            // a request such as "weather conditions in Bangalore to travel"
+            // toward generic travel knowledge. For non-trip-planning requests,
+            // the deterministic normalizer preserves the exact capabilities
+            // explicitly expressed by the user while still allowing combined
+            // requests such as "weather and travel tips".
+            if (!isExplicitTripPlanningRequest(state.userRequest())) {
+                merged = TravelIntentNormalizer.normalize(state.userRequest(), merged);
+            }
+
             return sanitizeSemanticPlan(merged);
         } catch (Exception ex) {
             log.warn("Semantic intent analysis failed", ex);
             return emptyPlan();
         }
+    }
+
+    private IntentPlan guardrailIntent(String request, IntentPlan candidate) {
+        if (candidate == null) {
+            return emptyPlan();
+        }
+        if (!isExplicitTripPlanningRequest(request)) {
+            return TravelIntentNormalizer.normalize(request, candidate);
+        }
+        return candidate;
+    }
+
+    private boolean isExplicitTripPlanningRequest(String request) {
+        if (request == null) {
+            return false;
+        }
+        String lower = request.toLowerCase(java.util.Locale.ROOT);
+        return lower.matches(".*\\b(?:plan|planning|organize|arrange|prepare|design|build|create|make)\\b.{0,40}\\b(?:trip|travel|holiday|vacation|journey)\\b.*")
+                || lower.contains("itinerary")
+                || lower.contains("day-by-day")
+                || lower.contains("trip plan");
     }
 
     private IntentPlan adjudicateNoCapabilityRequest(String request) {

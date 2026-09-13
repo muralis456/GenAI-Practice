@@ -64,4 +64,20 @@ class TravelIntentNormalizerTest {
         assertFalse(plan.isNeedsWeather());
         assertFalse(plan.isNeedsBudget());
     }
+    @Test
+    void weatherConditionsAreWeatherNotGenericKnowledge() {
+        IntentPlan plan = TravelIntentNormalizer.normalize(
+                "I want to know weather conditions in bangalore to travel",
+                new IntentPlan());
+
+        assertTrue(plan.isNeedsWeather());
+        assertFalse(plan.isNeedsKnowledge());
+        assertFalse(plan.isNeedsResearch());
+        assertFalse(plan.isNeedsFlights());
+        assertFalse(plan.isNeedsHotels());
+        assertFalse(plan.isNeedsBudget());
+        assertFalse(plan.isNeedsItinerary());
+        assertEquals(IntentPlan.WEATHER, plan.getRequestType());
+    }
+
 }

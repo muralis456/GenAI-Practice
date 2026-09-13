@@ -13,9 +13,11 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.CacheControl;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -60,7 +62,7 @@ public class TravelController {
         try {
             TravelPlanResponse response = travelPlannerAgentService.createTravelPlan(request, historyContext);
             conversationMemoryService.saveUiMessage(userId, response.getThreadId(), "assistant",
-                    responseMessage(response, "Plan ready"));
+                    responseMessage(response, "Plan ready"), response);
             tripHistoryService.saveOrUpdate(userId, response);
             return ResponseEntity.ok(response);
         } catch (RuntimeException ex) {
@@ -91,7 +93,7 @@ public class TravelController {
     @GetMapping("/chat/history")
     public ResponseEntity<?> chatHistory(@RequestParam(defaultValue = "anonymous") String userId,
                                          @RequestParam(defaultValue = "40") int limit) {
-        return ResponseEntity.ok(conversationMemoryService.getHistoryForUi(userId, limit));
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(conversationMemoryService.getHistoryForUi(userId, limit));
     }
 
     @PostMapping("/plan/approve")
@@ -101,7 +103,7 @@ public class TravelController {
             return ResponseEntity.badRequest().body(null);
         }
         TravelPlanResponse response = travelPlannerAgentService.approve(userId, request.getThreadId());
-        conversationMemoryService.saveUiMessage(userId, request.getThreadId(), "assistant", responseMessage(response, "Plan approved"));
+        conversationMemoryService.saveUiMessage(userId, request.getThreadId(), "assistant", responseMessage(response, "Plan approved"), response);
         tripHistoryService.saveOrUpdate(userId, response);
         return ResponseEntity.ok(response);
     }
@@ -121,7 +123,7 @@ public class TravelController {
                     request.getNotes() == null ? "Please adjust the plan" : request.getNotes(),
                     historyContext);
             conversationMemoryService.saveUiMessage(userId, request.getThreadId(), "assistant",
-                    responseMessage(response, "Modified plan ready"));
+                    responseMessage(response, "Modified plan ready"), response);
             tripHistoryService.saveOrUpdate(userId, response);
             return ResponseEntity.ok(response);
         } catch (RuntimeException ex) {
@@ -139,7 +141,7 @@ public class TravelController {
         }
         TravelPlanResponse response = travelPlannerAgentService.reject(userId, request.getThreadId());
         conversationMemoryService.saveUiMessage(userId, request.getThreadId(), "assistant",
-                responseMessage(response, "Plan rejected"));
+                responseMessage(response, "Plan rejected"), response);
         tripHistoryService.saveOrUpdate(userId, response);
         return ResponseEntity.ok(response);
     }
@@ -162,13 +164,56 @@ public class TravelController {
     @GetMapping("/trips")
     public ResponseEntity<?> trips(@RequestParam(defaultValue = "anonymous") String userId,
                                    @RequestParam(defaultValue = "50") int limit) {
-        return ResponseEntity.ok(tripHistoryService.list(userId, limit));
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(tripHistoryService.list(userId, limit));
     }
 
     @GetMapping("/trips/{id}")
     public ResponseEntity<?> trip(@PathVariable Long id,
                                   @RequestParam(defaultValue = "anonymous") String userId) {
-        return ResponseEntity.ok(tripHistoryService.getPlan(userId, id));
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(tripHistoryService.getPlan(userId, id));
+    }
+
+    @DeleteMapping("/history")
+    public ResponseEntity<?> deleteHistory(
+            @RequestParam(defaultValue = "anonymous") String userId,
+            @RequestParam(required = false) String sessionId,
+            @RequestParam(required = false) Long tripId) {
+        String owner = userId == null || userId.isBlank() ? "anonymous" : userId;
+
+        if (tripId != null) {
+            boolean deleted = tripHistoryService.deleteTripAndMemory(owner, tripId);
+            if (!deleted) {
+                return ResponseEntity.notFound().build();
+            }
+            return ResponseEntity.ok(Map.of("deleted", true, "type", "trip"));
+        }
+
+        if (sessionId == null || sessionId.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "History session is required"));
+        }
+        long deletedRows = conversationMemoryService.deleteSession(owner, sessionId);
+        return ResponseEntity.ok(Map.of("deleted", true, "type", "conversation", "memoryRows", deletedRows));
+    }
+
+    @GetMapping("/chat/session/{sessionId}")
+    public ResponseEntity<?> chatSession(@PathVariable String sessionId,
+                                         @RequestParam(defaultValue = "anonymous") String userId,
+                                         @RequestParam(defaultValue = "100") int limit) {
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(conversationMemoryService.getHistoryForSessionUi(userId, sessionId, limit));
+    }
+
+    @GetMapping("/chat/message/{id}")
+    public ResponseEntity<?> chatMessage(@PathVariable Long id,
+                                         @RequestParam(defaultValue = "anonymous") String userId) {
+        return conversationMemoryService.getMessageForUi(userId, id)
+                .map(message -> ResponseEntity.ok(message))
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    @GetMapping("/plan/{threadId}/restore")
+    public ResponseEntity<?> restorePlan(@PathVariable String threadId,
+                                         @RequestParam(defaultValue = "anonymous") String userId) {
+        return ResponseEntity.ok(travelPlannerAgentService.restore(userId, threadId));
     }
 
     @GetMapping("/plan/{threadId}/history")

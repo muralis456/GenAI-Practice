@@ -10,4 +10,5 @@ public interface ConversationMemoryRepository extends JpaRepository<Conversation
     List<ConversationMemory> findByUserIdAndSessionIdOrderByCreatedAtDesc(String userId, String sessionId, Pageable pageable);
     List<ConversationMemory> findByUserIdOrderByCreatedAtDesc(String userId, Pageable pageable);
     long countByUserId(String userId);
+    long deleteByUserIdAndSessionId(String userId, String sessionId);
 }

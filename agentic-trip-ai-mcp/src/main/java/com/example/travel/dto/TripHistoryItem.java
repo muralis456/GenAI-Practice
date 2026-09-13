@@ -16,5 +16,6 @@ public record TripHistoryItem(
         boolean awaitingApproval,
         int qualityScore,
         Instant createdAt,
-        Instant updatedAt) {
+        Instant updatedAt,
+        boolean legacy) {
 }

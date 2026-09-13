@@ -4,6 +4,7 @@ import com.example.travel.config.TravelModelsProperties.AgentRole;
 import com.example.travel.graph.TravelState;
 import com.example.travel.service.RoutedLlm;
 import com.example.travel.support.JsonSupport;
+import com.example.travel.support.TripSlotHeuristics;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.document.Document;
@@ -155,6 +156,22 @@ public class AgenticRagService {
     }
 
     private Decision decideRetrieval(TravelState state) {
+        // Explicit knowledge intent is a high-confidence retrieval requirement.
+        // This is especially important for combined requests such as
+        // "weather in Bangalore to travel": live weather and durable travel
+        // tips are complementary capabilities and must both execute.
+        if (state != null && state.needsKnowledge()) {
+            String destination = TravelState.firstNonBlank(
+                    state.destination(),
+                    TripSlotHeuristics.extractDestinationHint(state.userRequest()));
+            String query = destination.isBlank()
+                    ? state.userRequest()
+                    : "travel tips and practical guidance for " + destination
+                            + " including packing, weather planning, local transport, safety and useful travel advice";
+            return new Decision(true, query, "explicitKnowledgeCapability",
+                    destination, "", List.of("travel tips", "packing", "weather planning", "local transport", "safety"));
+        }
+
         String raw = routedLlm.complete(AgentRole.EXTRACT,
                 """
                 You are the Knowledge Router for a travel-planning agent.

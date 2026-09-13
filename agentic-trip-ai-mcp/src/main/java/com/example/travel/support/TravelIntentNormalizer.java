@@ -42,6 +42,16 @@ public final class TravelIntentNormalizer {
         boolean weather = explicitWeather(lower);
         boolean research = explicitResearch(lower);
         boolean knowledge = durableKnowledge(lower);
+
+        // A request that combines live weather with a travel objective asks for
+        // two different kinds of information: live conditions from the Weather
+        // specialist and durable practical guidance (packing, rain planning,
+        // local transport, etc.) from RAG. Keep both capabilities instead of
+        // making weather and knowledge mutually exclusive.
+        if (weather && travelContext(lower)) {
+            knowledge = true;
+        }
+
         boolean budget = explicitBudget(lower);
         boolean itinerary = explicitItinerary(lower);
 
@@ -63,12 +73,11 @@ public final class TravelIntentNormalizer {
             itinerary = true;
             plan.setRequestType(IntentPlan.TRIP_PLANNING);
         } else if (flights || hotels || weather || research || budget || itinerary || knowledge) {
-            // Keep the candidate's request type when useful, but ensure the
-            // capability vector reflects all explicit objectives.
-            if (plan.getRequestType() == null || plan.getRequestType().isBlank()
-                    || "GENERAL".equalsIgnoreCase(plan.getRequestType())) {
-                plan.setRequestType(inferRequestType(flights, hotels, research, weather, budget, itinerary, knowledge));
-            }
+            // For non-planning requests, explicit capabilities are authoritative.
+            // Do not preserve an LLM label such as TRAVEL_INFORMATION when the
+            // actual request explicitly asks for weather; the response renderer
+            // uses requestType to select the live specialist result.
+            plan.setRequestType(inferRequestType(flights, hotels, research, weather, budget, itinerary, knowledge));
         }
 
         // Explicit user requirements override an LLM omission. Existing state
@@ -158,6 +167,12 @@ public final class TravelIntentNormalizer {
 
     private static boolean durationMentioned(String t) {
         return DURATION.matcher(t).find();
+    }
+
+    private static boolean travelContext(String t) {
+        return containsAny(t, "to travel", "for travel", "when travelling",
+                "when traveling", "while travelling", "while traveling",
+                "during travel", "for my trip", "on my trip", "travel trip");
     }
 
     private static String inferRequestType(boolean f, boolean h, boolean r, boolean w,

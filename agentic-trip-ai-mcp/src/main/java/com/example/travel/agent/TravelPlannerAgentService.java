@@ -293,7 +293,8 @@ public class TravelPlannerAgentService {
                                     ? TravelState.firstNonBlank(
                                             plan.getPlan().getTrip().getTitle(),
                                             "Plan ready")
-                                    : "Plan ready");
+                                    : "Plan ready",
+                    plan);
             tripHistoryService.saveOrUpdate(userId, plan);
 
             Map<String, Object> done = new LinkedHashMap<>();
@@ -327,6 +328,17 @@ public class TravelPlannerAgentService {
             executionBudget.end();
             ModelRoutingContext.clear();
         }
+    }
+
+    /**
+     * Rebuilds the latest structured response for a completed/recent thread.
+     * This is used by Recent History when an older conversation-memory row
+     * does not yet contain structuredData.
+     */
+    public TravelPlanResponse restore(String userId, String threadId) {
+        String key = requireOwnedThread(userId, threadId);
+        TravelState state = requireCheckpointState(key);
+        return toResponse(state, key, isAwaitingHitl(key), "");
     }
 
     public TravelPlanResponse approve(

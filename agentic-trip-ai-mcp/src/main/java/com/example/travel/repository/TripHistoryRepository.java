@@ -11,4 +11,5 @@ public interface TripHistoryRepository extends JpaRepository<TripHistory, Long> 
     List<TripHistory> findByUserIdOrderByUpdatedAtDesc(String userId, PageRequest pageable);
     Optional<TripHistory> findByUserIdAndId(String userId, Long id);
     Optional<TripHistory> findByUserIdAndThreadId(String userId, String threadId);
+    long deleteByUserIdAndThreadId(String userId, String threadId);
 }

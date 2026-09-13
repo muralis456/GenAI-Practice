@@ -47,7 +47,8 @@ public class RagNode implements NodeAction<TravelState> {
             updates.put(TravelState.RAG_CANDIDATE_COUNT, result.candidateCount());
             updates.put(TravelState.RAG_RERANKED_COUNT, result.rerankedCount());
             updates.put(TravelState.RAG_CONTEXT_CHARS, result.contextChars());
-            updates.put(TravelState.RAG_DESTINATION, result.destination());
+            String ragDestination = TravelState.firstNonBlank(result.destination(), state.destination());
+            updates.put(TravelState.RAG_DESTINATION, ragDestination);
             updates.put(TravelState.RAG_COUNTRY, result.country());
             updates.put(TravelState.RAG_TOPICS, result.topics());
             updates.put(TravelState.RAG_EVIDENCE_SCORE, result.evidenceScore());
