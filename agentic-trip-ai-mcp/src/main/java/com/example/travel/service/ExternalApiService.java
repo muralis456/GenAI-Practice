@@ -66,7 +66,7 @@ public class ExternalApiService {
             return "Tavily search skipped: query must be a non-empty string.";
         }
         if (!executionBudget.tryConsumeTavily()) {
-            return "Tavily search skipped: Tavily call budget exhausted for this graph run.";
+            return "Additional web research is unavailable right now.";
         }
         if (tavilyApiKey == null || tavilyApiKey.isBlank()) {
             log.warn("Tavily API key is missing");
@@ -147,20 +147,14 @@ public class ExternalApiService {
             boolean dateRestricted = useDate && (exception.getStatusCode().value() == 403
                     || (body != null && body.contains("function_access_restricted")));
             if (dateRestricted) {
-                log.warn("AviationStack rejected flight_date (plan restriction). Retrying without date for {} -> {}",
+                log.warn("AviationStack rejected requested flight_date for {} -> {}; not substituting live flights",
                         departureIata, arrivalIata);
-                try {
-                    List<FlightOption> live = callAviationStack(departureIata, arrivalIata, null, date);
-                    annotateLiveSchedule(live, date);
-                    return live;
-                } catch (Exception retryException) {
-                    log.warn("AviationStack retry without date failed", retryException);
-                }
+                flights.add(unavailable("Flight availability for the requested date could not be confirmed by the configured AviationStack plan."));
+                return flights;
             }
             log.warn("AviationStack flights API returned status={} for from={}, to={}",
                     exception.getStatusCode(), departureIata, arrivalIata);
-            flights.add(unavailable("AviationStack flight search failed with status " + exception.getStatusCode()
-                    + ". Free plans cannot search by flight_date — set travel.aviation.include-flight-date=false."));
+            flights.add(unavailable("AviationStack flight search is temporarily unavailable. Requested flight dates were not confirmed."));
             return flights;
         } catch (Exception exception) {
             log.warn("AviationStack flights API failed for from={}, to={}", departureIata, arrivalIata, exception);

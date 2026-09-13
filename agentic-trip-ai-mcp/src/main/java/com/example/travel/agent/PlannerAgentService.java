@@ -46,6 +46,8 @@ public class PlannerAgentService {
                             + "\"returnDate\":\"yyyy-MM-dd\",\"travelers\":1,\"budget\":\"\",\"travelStyle\":\"\"}. "
                             + "For country-only destinations like Japan, set destination to the main city (Tokyo). "
                             + "Preserve budgets like '2 lakh' or '₹200000'. Use empty strings when unknown. "
+                            + "For departureDate and returnDate, return a value ONLY when the CURRENT REQUEST explicitly provides a calendar date. "
+                            + "A duration such as '7 days' is not a calendar date; leave both date fields empty. Never use today's date as an answer to a missing date. "
                             + "Never invent London/LHR unless the user said London. "
                             + "You may call the airport lookup tool to sanity-check city names.",
                     "CURRENT REQUEST: " + state.userRequest()
@@ -83,8 +85,11 @@ public class PlannerAgentService {
             origin = "Bengaluru";
         }
 
-        LocalDate departure = TravelState.parseDate(extraction == null ? null : extraction.getDepartureDate(), state.departureDate());
-        LocalDate returning = TravelState.parseDate(extraction == null ? null : extraction.getReturnDate(), state.returnDate());
+        String extractedDeparture = extraction == null ? null : extraction.getDepartureDate();
+        String extractedReturn = extraction == null ? null : extraction.getReturnDate();
+        boolean explicitDates = !TravelState.isBlank(extractedDeparture) || !TravelState.isBlank(extractedReturn) || !state.datesFlexible();
+        LocalDate departure = TravelState.parseDate(extractedDeparture, state.departureDate());
+        LocalDate returning = TravelState.parseDate(extractedReturn, state.returnDate());
         returning = TripSlotHeuristics.inferReturnDate(state.userRequest(), departure, returning);
 
         int travelers = extraction != null && extraction.getTravelers() != null
@@ -114,6 +119,8 @@ public class PlannerAgentService {
         updates.put(TravelState.BUDGET_LABEL, budgetLabel);
         updates.put(TravelState.BUDGET, budget);
         updates.put(TravelState.TRAVEL_STYLE, travelStyle);
+        updates.put(TravelState.DATES_FLEXIBLE, !explicitDates);
+        updates.put(TravelState.ROUND_TRIP, state.roundTrip());
         updates.put(TravelState.LAST_DECISION, new com.example.travel.model.AgentDecision(
                 "planner",
                 state.requestType(),

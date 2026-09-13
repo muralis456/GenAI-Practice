@@ -177,6 +177,8 @@ public class TripPlanAssembler {
         header.setDepartureDate(state.departureDate().toString());
 
         header.setReturnDate(state.returnDate().toString());
+        header.setDatesFlexible(state.datesFlexible());
+        header.setRoundTrip(state.roundTrip());
 
         header.setNights((int) state.nights());
 
@@ -187,6 +189,7 @@ public class TripPlanAssembler {
         header.setBudgetLabel(state.budgetLabel());
 
         header.setAudienceLabel(audienceLabel(state));
+        header.setRequirements(requirementLabels(state));
 
         header.setStatus(status);
 
@@ -196,7 +199,10 @@ public class TripPlanAssembler {
 
         if (quality != null && quality.getOverall() > 0) {
 
-            header.setQualityScore((int) Math.round(quality.getOverall() * 100));
+            int score = (int) Math.round(quality.getOverall() * 100);
+            header.setQualityScore(score);
+            header.setQualityLabel(qualityLabel(score));
+            header.setQualityExplanation(qualityExplanation(state, score));
 
         }
 
@@ -361,29 +367,39 @@ public class TripPlanAssembler {
 
 
     private String audienceLabel(TravelState state) {
-
-        String text = (state.userRequest() + " " + state.travelStyle()).toLowerCase(Locale.ROOT);
-
-        if (text.contains("family")) {
-
-            return "Family";
-
-        }
-
-        if (text.contains("couple")) {
-
-            return "Couple";
-
-        }
-
-        if (text.contains("solo")) {
-
-            return "Solo";
-
-        }
-
+        // Do not infer the party type from a preference such as "family-friendly".
+        // A family-friendly request can still be submitted with one traveler.
         return state.travelers() > 1 ? state.travelers() + " travelers" : "1 traveler";
+    }
 
+    private List<String> requirementLabels(TravelState state) {
+        TripRequirements r = state.tripRequirements();
+        List<String> labels = new ArrayList<>();
+        if (r.isFamilyFriendly()) labels.add("Family-friendly");
+        if (r.isFoodExperiences()) labels.add("Good food");
+        if (r.isLocalExperiences()) labels.add("Local experiences");
+        if (r.isBudgetConscious()) labels.add("Budget-aware");
+        return labels;
+    }
+
+    private String qualityLabel(int score) {
+        if (score >= 90) return "Excellent";
+        if (score >= 80) return "Good";
+        if (score >= 70) return "Fair";
+        return "Needs review";
+    }
+
+    private String qualityExplanation(TravelState state, int score) {
+        List<String> basis = new ArrayList<>();
+        if (state.needsBudget()) basis.add("budget fit");
+        if (state.needsFlights()) basis.add("flight availability");
+        if (state.needsHotels()) basis.add("hotel coverage");
+        if (state.needsItinerary()) basis.add("itinerary completeness");
+        if (state.tripRequirements().hasExplicitPreferences()) basis.add("requested preferences");
+        if (state.needsWeather()) basis.add("weather coverage");
+        if (basis.isEmpty()) basis.add("available plan evidence");
+        return "Plan score " + score + "/100 based on " + String.join(", ", basis)
+                + ". It is a planning-confidence indicator, not a guarantee of booking availability.";
     }
 
 }

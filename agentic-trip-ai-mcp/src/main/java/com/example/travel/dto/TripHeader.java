@@ -15,6 +15,8 @@ public class TripHeader implements Serializable {
     private String destinationIata = "";
     private String departureDate = "";
     private String returnDate = "";
+    private boolean datesFlexible;
+    private boolean roundTrip = true;
     private int nights;
     private int travelers = 1;
     private String travelStyle = "";
@@ -23,6 +25,9 @@ public class TripHeader implements Serializable {
     private String status = "";
     private boolean awaitingApproval;
     private int qualityScore;
+    private String qualityLabel = "";
+    private String qualityExplanation = "";
+    private java.util.List<String> requirements = new java.util.ArrayList<>();
 
     public String getTitle() {
         return title;
@@ -80,6 +85,11 @@ public class TripHeader implements Serializable {
         this.returnDate = returnDate == null ? "" : returnDate;
     }
 
+    public boolean isDatesFlexible() { return datesFlexible; }
+    public void setDatesFlexible(boolean datesFlexible) { this.datesFlexible = datesFlexible; }
+    public boolean isRoundTrip() { return roundTrip; }
+    public void setRoundTrip(boolean roundTrip) { this.roundTrip = roundTrip; }
+
     public int getNights() {
         return nights;
     }
@@ -135,6 +145,13 @@ public class TripHeader implements Serializable {
     public void setAwaitingApproval(boolean awaitingApproval) {
         this.awaitingApproval = awaitingApproval;
     }
+
+    public String getQualityLabel() { return qualityLabel; }
+    public void setQualityLabel(String qualityLabel) { this.qualityLabel = qualityLabel == null ? "" : qualityLabel; }
+    public String getQualityExplanation() { return qualityExplanation; }
+    public void setQualityExplanation(String qualityExplanation) { this.qualityExplanation = qualityExplanation == null ? "" : qualityExplanation; }
+    public java.util.List<String> getRequirements() { return requirements; }
+    public void setRequirements(java.util.List<String> requirements) { this.requirements = requirements == null ? new java.util.ArrayList<>() : new java.util.ArrayList<>(requirements); }
 
     public int getQualityScore() {
         return qualityScore;

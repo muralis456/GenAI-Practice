@@ -29,6 +29,8 @@ public final class TravelStateKeys {
         public static final String DEPARTURE_DATE = "departureDate";
         public static final String RETURN_DATE = "returnDate";
         public static final String TRAVELERS = "travelers";
+        public static final String DATES_FLEXIBLE = "datesFlexible";
+        public static final String ROUND_TRIP = "roundTrip";
         public static final String ORIGIN_IATA = "originIata";
         public static final String DESTINATION_IATA = "destinationIata";
         public static final String PREFERRED_AIRPORT = "preferredAirport";
@@ -51,6 +53,7 @@ public final class TravelStateKeys {
     public static final class Preferences {
         public static final String TRAVEL_STYLE = "travelStyle";
         public static final String HOTEL_CHEAPER = "hotelCheaper";
+        public static final String HOTEL_BUDGET = "hotelBudget";
         public static final String FLIGHT_PREFERENCE = "flightPreference";
         public static final String TRIP_REQUIREMENTS = "tripRequirements";
 

@@ -16,6 +16,8 @@ public class FlightOption implements Serializable {
     private String arrivalTime;
     private String status;
     private String notes;
+    private String direction = "outbound";
+    private String requestedDate = "";
 
     public FlightOption() {
     }
@@ -87,6 +89,11 @@ public class FlightOption implements Serializable {
     public void setStatus(String status) {
         this.status = status;
     }
+
+    public String getDirection() { return direction; }
+    public void setDirection(String direction) { this.direction = direction == null ? "outbound" : direction; }
+    public String getRequestedDate() { return requestedDate; }
+    public void setRequestedDate(String requestedDate) { this.requestedDate = requestedDate == null ? "" : requestedDate; }
 
     public String getNotes() {
         return notes;

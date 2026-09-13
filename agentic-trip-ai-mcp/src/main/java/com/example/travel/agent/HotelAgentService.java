@@ -78,9 +78,10 @@ public class HotelAgentService {
         McpHotelSearchClient mcpClient = mcpHotelSearchClient.getIfAvailable();
         if (mcpClient != null && !TravelState.isBlank(destination)) {
             List<HotelOption> directHotels = mcpClient.search(
-                    destination, state.travelStyle(), cheaper);
+                    destination, state.travelStyle(), cheaper, state.hotelBudget());
             directHotels = directHotels.stream()
-                    .filter(this::hasHotelName)
+                    .map(this::scrubPlaceholders)
+                    .filter(this::isValidHotelOption)
                     .filter(hotel -> isRelevantToDestination(hotel, destination))
                     .toList();
             if (!directHotels.isEmpty()) {
@@ -96,6 +97,7 @@ public class HotelAgentService {
         String user =
                 "Destination=" + destination
                         + "\nCheaper=" + cheaper
+                        + "\nHotel budget ceiling INR=" + (state.hotelBudget() == null ? "none" : state.hotelBudget())
                         + "\nStyle=" + state.travelStyle()
                         + "\nTravelers=" + state.travelers()
                         + "\nReplan notes=" + state.replanNotes();
@@ -114,7 +116,8 @@ public class HotelAgentService {
                 "You are the Hotel Research Agent. "
                         + "Find fresh hotel information for the requested destination. "
                         + "Use HotelSearchTool when fresh hotel data is required. "
-                        + "Prefer 2-4 real hotel names. "
+                        + "Prefer 2-4 real, identifiable hotel properties. "
+                        + "Never treat an article title, listicle, travel guide, neighborhood guide, search-result title, or generic phrase as a hotel name. "
                         + "Collect hotel name, area, price range, rating, "
                         + "family suitability and useful notes. "
                         + "After completing the search, return the findings as normal text. "
@@ -176,7 +179,7 @@ public class HotelAgentService {
                         + "]}. "
                         + "Use only information present in the research. "
                         + "Do not invent hotels or prices. "
-                        + "Prefer 2-4 real hotels. "
+                        + "Prefer 2-4 real hotels. Never convert an article title or research heading into a hotel. "
                         + "If a field is unavailable, use an empty string. "
                         + "Never use placeholders such as "
                         + "'Not specified', 'N/A', 'unknown', or 'none'.";
@@ -184,8 +187,10 @@ public class HotelAgentService {
         String extractionUser =
                 "Destination=" + destination
                         + "\nCheaper=" + cheaper
+                        + "\nHotel budget ceiling INR=" + (state.hotelBudget() == null ? "none" : state.hotelBudget())
                         + "\nStyle=" + state.travelStyle()
                         + "\nTravelers=" + state.travelers()
+                        + "\nHotel budget ceiling INR=" + (state.hotelBudget() == null ? "none" : state.hotelBudget())
                         + "\n\nHotel research:\n"
                         + researchContent;
 
@@ -228,12 +233,8 @@ public class HotelAgentService {
                 .orElseGet(ArrayList::new)
                 .stream()
                 .map(this::scrubPlaceholders)
-                .filter(hotel ->
-                        hotel != null
-                                && !TravelState.isBlank(
-                                hotel.getName()
-                        )
-                )
+                .filter(this::isValidHotelOption)
+                .filter(hotel -> isRelevantToDestination(hotel, destination))
                 .toList();
 
         if (hotels.isEmpty()) {
@@ -245,6 +246,24 @@ public class HotelAgentService {
                 new ArrayList<>(hotels),
                 List.of()
         );
+    }
+
+    private boolean isValidHotelOption(HotelOption hotel) {
+        if (hotel == null || TravelState.isBlank(hotel.getName())) return false;
+        String name = hotel.getName().trim();
+        if (name.length() < 2 || name.length() > 120) return false;
+        String lower = name.toLowerCase(Locale.ROOT);
+        // Research/article titles must never become hotel entities.
+        if (lower.contains("best areas") || lower.contains("hotels to stay")
+                || lower.contains("where to stay") || lower.contains("top hotels")
+                || lower.contains("hotel guide") || lower.contains("accommodation guide")
+                || lower.matches(".*\\b(10|20|25|50|100)\\s+(best|top|hotels?).*")) return false;
+        if (name.contains("http://") || name.contains("https://") || name.contains("|")) return false;
+        // A structured hotel should have at least a name and one supporting field.
+        return !TravelState.isBlank(hotel.getArea())
+                || !TravelState.isBlank(hotel.getPriceRange())
+                || !TravelState.isBlank(hotel.getRating())
+                || !TravelState.isBlank(hotel.getSuitableFor());
     }
 
     private boolean hasHotelName(HotelOption hotel) {
@@ -331,27 +350,9 @@ public class HotelAgentService {
             String destination,
             boolean cheaper) {
 
-        HotelOption fallback = new HotelOption();
-
-        fallback.setName(
-                "Hotel options in " + destination
-        );
-
-        fallback.setArea(destination);
-
-        fallback.setPriceRange(
-                cheaper ? "budget" : "mid-range"
-        );
-
-        fallback.setNotes(
-                "Hotel search did not return structured options; "
-                        + "try modifying budget or style."
-        );
-
-        return new HotelSearchResult(
-                new ArrayList<>(List.of(fallback)),
-                List.of()
-        );
+        // Never fabricate a hotel-shaped record when research/tool output is not structured.
+        // The UI will render the empty state instead of turning an article title into a hotel.
+        return new HotelSearchResult(new ArrayList<>(), List.of());
     }
 
     public static final class HotelSearchResult {

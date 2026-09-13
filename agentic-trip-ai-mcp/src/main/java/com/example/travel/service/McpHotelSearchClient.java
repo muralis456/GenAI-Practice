@@ -24,11 +24,20 @@ public class McpHotelSearchClient {
     }
 
     public List<HotelOption> search(String destination, String travelStyle, boolean cheaper) {
+        return search(destination, travelStyle, cheaper, null);
+    }
+
+    public List<HotelOption> search(String destination, String travelStyle, boolean cheaper, java.math.BigDecimal hotelBudget) {
         try {
-            JsonNode root = client.callByUserInput("Find accommodation/hotels", "Find hotel accommodation for destination " + (destination == null ? "" : destination) + ", travel style " + (travelStyle == null ? "balanced" : travelStyle) + ", cheaper=" + cheaper, Map.of(
-                    "destination", destination == null ? "" : destination,
-                    "travelStyle", travelStyle == null ? "balanced" : travelStyle,
-                    "cheaper", cheaper));
+            String budgetText = hotelBudget == null ? "" : ", hotel budget ceiling INR=" + hotelBudget.toPlainString();
+            Map<String, Object> arguments = new java.util.LinkedHashMap<>();
+            arguments.put("destination", destination == null ? "" : destination);
+            arguments.put("travelStyle", travelStyle == null ? "balanced" : travelStyle);
+            arguments.put("cheaper", cheaper);
+            if (hotelBudget != null) {
+                arguments.put("hotelBudget", hotelBudget);
+            }
+            JsonNode root = client.callByUserInput("Find accommodation/hotels", "Find hotel accommodation for destination " + (destination == null ? "" : destination) + ", travel style " + (travelStyle == null ? "balanced" : travelStyle) + ", cheaper=" + cheaper + budgetText, arguments);
             List<HotelOption> hotels = new ArrayList<>();
             for (JsonNode node : root.path("hotels")) {
                 HotelOption hotel = new HotelOption();

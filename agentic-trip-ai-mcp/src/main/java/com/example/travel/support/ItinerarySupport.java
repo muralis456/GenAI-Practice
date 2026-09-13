@@ -32,15 +32,58 @@ public final class ItinerarySupport {
                 : source.getDays();
 
         List<ItineraryDay> days = new ArrayList<>();
+        java.util.Set<String> usedActivities = new java.util.LinkedHashSet<>();
+        java.util.Set<String> usedTitles = new java.util.LinkedHashSet<>();
         for (int i = 1; i <= expected; i++) {
             ItineraryDay fromModel = i <= incoming.size() ? incoming.get(i - 1) : null;
-            days.add(buildDay(i, expected, destination, attractions, fromModel));
+            ItineraryDay day = buildDay(i, expected, destination, attractions, fromModel);
+            day = enforceVariety(day, i, expected, destination, attractions, usedActivities, usedTitles);
+            days.add(day);
         }
 
         String summary = source == null || source.getSummary() == null || source.getSummary().isBlank()
                 ? expected + "-day plan for " + (destination == null || destination.isBlank() ? "the trip" : destination)
                 : source.getSummary();
         return new Itinerary(summary, days);
+    }
+
+    private static ItineraryDay enforceVariety(ItineraryDay day, int dayNumber, int expected,
+                                               String destination, List<TravelAttraction> attractions,
+                                               java.util.Set<String> usedActivities,
+                                               java.util.Set<String> usedTitles) {
+        if (day == null) return day;
+        String title = day.getTitle() == null ? "" : day.getTitle().trim();
+        String titleKey = title.toLowerCase(Locale.ROOT);
+        if (dayNumber > 1 && dayNumber < expected && usedTitles.contains(titleKey)) {
+            day.setTitle("Explore " + (destination == null || destination.isBlank() ? "the destination" : destination)
+                    + " — Day " + dayNumber);
+        }
+        usedTitles.add((day.getTitle() == null ? "" : day.getTitle()).toLowerCase(Locale.ROOT));
+
+        List<ItineraryActivity> cleaned = new ArrayList<>();
+        if (day.getActivities() != null) {
+            for (ItineraryActivity activity : day.getActivities()) {
+                if (activity == null || activity.getName() == null || activity.getName().isBlank()) continue;
+                String key = activity.getName().trim().toLowerCase(Locale.ROOT);
+                if (usedActivities.add(key)) cleaned.add(activity);
+            }
+        }
+        if (cleaned.isEmpty() && dayNumber > 1 && dayNumber < expected) {
+            cleaned.add(varietyFallback(dayNumber, destination));
+        }
+        day.setActivities(cleaned);
+        return day;
+    }
+
+    private static ItineraryActivity varietyFallback(int day, String destination) {
+        String place = destination == null || destination.isBlank() ? "the destination" : destination;
+        return switch (Math.floorMod(day - 2, 5)) {
+            case 0 -> activity("Explore a central neighborhood in " + place, "neighborhood", "outdoor", true, false, true);
+            case 1 -> activity("Visit a museum or cultural venue in " + place, "culture", "indoor", true, false, true);
+            case 2 -> activity("Sample a local food area in " + place, "food", "indoor", true, true, true);
+            case 3 -> activity("Spend time in a park or scenic area in " + place, "nature", "outdoor", true, false, true);
+            default -> activity("Free time for shopping and local discovery in " + place, "leisure", "mixed", true, false, true);
+        };
     }
 
     public static Itinerary skeleton(long nights, String destination, List<TravelAttraction> attractions) {

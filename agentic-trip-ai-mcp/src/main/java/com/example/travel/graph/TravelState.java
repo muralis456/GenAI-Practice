@@ -49,6 +49,8 @@ public class TravelState extends AgentState {
     public static final String DEPARTURE_DATE = TravelStateKeys.Trip.DEPARTURE_DATE;
     public static final String RETURN_DATE = TravelStateKeys.Trip.RETURN_DATE;
     public static final String TRAVELERS = TravelStateKeys.Trip.TRAVELERS;
+    public static final String DATES_FLEXIBLE = TravelStateKeys.Trip.DATES_FLEXIBLE;
+    public static final String ROUND_TRIP = TravelStateKeys.Trip.ROUND_TRIP;
     public static final String BUDGET = TravelStateKeys.Budget.BUDGET;
     public static final String BUDGET_LABEL = TravelStateKeys.Budget.BUDGET_LABEL;
     public static final String TRAVEL_STYLE = TravelStateKeys.Preferences.TRAVEL_STYLE;
@@ -96,6 +98,7 @@ public class TravelState extends AgentState {
     public static final String SEMANTIC_NOTES = TravelStateKeys.Validation.SEMANTIC_NOTES;
     public static final String PROVENANCE = TravelStateKeys.Control.PROVENANCE;
     public static final String HOTEL_CHEAPER = TravelStateKeys.Preferences.HOTEL_CHEAPER;
+    public static final String HOTEL_BUDGET = TravelStateKeys.Preferences.HOTEL_BUDGET;
     public static final String FLIGHT_PREFERENCE = TravelStateKeys.Preferences.FLIGHT_PREFERENCE;
     public static final String TRIP_REQUIREMENTS = TravelStateKeys.Preferences.TRIP_REQUIREMENTS;
     public static final String MODEL_POLICY = TravelStateKeys.Request.MODEL_POLICY;
@@ -138,6 +141,8 @@ public class TravelState extends AgentState {
         LocalDate today = LocalDate.now();
         String prompt = firstNonBlank(request.getPrompt(), request.getPreferences(),
                 "Plan a balanced family-friendly trip with good food and local experiences.");
+        boolean datesFlexible = isBlank(request.getDepartureDate()) && isBlank(request.getReturnDate());
+        boolean roundTrip = !containsOneWayIntent(prompt);
         int travelers = defaultInt(request.getAdults(), 1) + defaultInt(request.getChildren(), 0);
 
         Map<String, Object> input = new LinkedHashMap<>();
@@ -159,6 +164,8 @@ public class TravelState extends AgentState {
         input.put(DESTINATION, TripSlotHeuristics.normalizePlace(requestedDestination));
         input.put(DEPARTURE_DATE, parseDate(request.getDepartureDate(), today));
         input.put(RETURN_DATE, parseDate(request.getReturnDate(), today.plusDays(5)));
+        input.put(DATES_FLEXIBLE, datesFlexible);
+        input.put(ROUND_TRIP, roundTrip);
         input.put(TRAVELERS, Math.max(travelers, 1));
         BigDecimal budget = parseBudget(request.getBudget());
         input.put(BUDGET, budget == null ? UNSET_BUDGET : budget);
@@ -168,6 +175,7 @@ public class TravelState extends AgentState {
         input.put(MAX_RETRIES, 2);
         input.put(COST_FACTOR, BigDecimal.ONE);
         input.put(HOTEL_CHEAPER, Boolean.FALSE);
+        input.put(HOTEL_BUDGET, UNSET_BUDGET);
         input.put(FLIGHT_PREFERENCE, "balanced");
 
         // Every routing flag is explicitly initialized. Missing flags must never
@@ -326,6 +334,14 @@ public class TravelState extends AgentState {
 
     public Integer travelers() {
         return this.<Integer>value(TRAVELERS).orElse(1);
+    }
+
+    public boolean datesFlexible() {
+        return Boolean.TRUE.equals(this.<Boolean>value(DATES_FLEXIBLE).orElse(Boolean.FALSE));
+    }
+
+    public boolean roundTrip() {
+        return Boolean.TRUE.equals(this.<Boolean>value(ROUND_TRIP).orElse(Boolean.TRUE));
     }
 
     public BigDecimal budget() {
@@ -605,6 +621,11 @@ public class TravelState extends AgentState {
         return Boolean.TRUE.equals(this.<Boolean>value(HOTEL_CHEAPER).orElse(Boolean.FALSE));
     }
 
+    public BigDecimal hotelBudget() {
+        BigDecimal value = this.<BigDecimal>value(HOTEL_BUDGET).orElse(UNSET_BUDGET);
+        return UNSET_BUDGET.compareTo(value) == 0 ? null : value;
+    }
+
     public String flightPreference() {
         return this.<String>value(FLIGHT_PREFERENCE).orElse("balanced");
     }
@@ -668,6 +689,14 @@ public class TravelState extends AgentState {
 
     public boolean shouldReplanForBudget() {
         return overBudget() && retryCount() < maxRetries();
+    }
+
+    private static boolean containsOneWayIntent(String request) {
+        if (request == null || request.isBlank()) {
+            return false;
+        }
+        String lower = request.toLowerCase(java.util.Locale.ROOT);
+        return lower.contains("one-way") || lower.contains("one way") || lower.contains("single journey");
     }
 
     public static boolean isBlank(String value) {

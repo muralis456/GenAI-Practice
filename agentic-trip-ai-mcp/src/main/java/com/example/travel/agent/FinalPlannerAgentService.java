@@ -173,13 +173,27 @@ public class FinalPlannerAgentService {
                             state.research().stream().map(r -> r.toDisplay()).limit(4).toList(),
                             state.ragContext(),
                             state.ragSources()));
-            if (tips != null && !tips.isBlank()) {
+            if (isSafeTips(tips)) {
                 return tips.trim();
+            }
+            if (tips != null && !tips.isBlank()) {
+                log.warn("Final tips response rejected because it contains an internal/error or oversized response");
             }
         } catch (Exception exception) {
             log.warn("Final tips LLM failed; using default tips", exception);
         }
         return defaultTips(state);
+    }
+
+    private boolean isSafeTips(String tips) {
+        if (tips == null || tips.isBlank() || tips.length() > 1200) return false;
+        String lower = tips.toLowerCase(java.util.Locale.ROOT);
+        return !lower.contains("llm budget exhausted")
+                && !lower.contains("budget exhausted")
+                && !lower.contains("rate limit")
+                && !lower.contains("quota exceeded")
+                && !lower.contains("model unavailable")
+                && !lower.contains("stack trace");
     }
 
     private String defaultTips(TravelState state) {
@@ -188,9 +202,11 @@ public class FinalPlannerAgentService {
             sb.append("- Pack a light rain jacket; keep indoor museum/cafe backups for wet hours.\n");
         }
         sb.append("- Keep some cash/card ready for transit and casual meals.\n");
-        sb.append("- Confirm hotel check-in time after landing at ")
-                .append(TravelState.firstNonBlank(state.destinationIata(), "the airport"))
-                .append(".\n");
+        if (state.needsHotels()) {
+            sb.append("- Confirm the hotel's check-in time and arrival instructions before travel.\n");
+        } else {
+            sb.append("- Keep a small time and cash buffer for local transport and unexpected delays.\n");
+        }
         return sb.toString().trim();
     }
 

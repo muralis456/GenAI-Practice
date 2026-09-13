@@ -55,6 +55,8 @@ public final class TravelStateSchema {
         schema.put(Trip.DEPARTURE_DATE, Channels.base(() -> LocalDate.now()));
         schema.put(Trip.RETURN_DATE, Channels.base(() -> LocalDate.now().plusDays(5)));
         schema.put(Trip.TRAVELERS, Channels.base(() -> 1));
+        schema.put(Trip.DATES_FLEXIBLE, Channels.base(() -> Boolean.TRUE));
+        schema.put(Trip.ROUND_TRIP, Channels.base(() -> Boolean.TRUE));
         schema.put(Budget.BUDGET, Channels.base(() -> TravelState.UNSET_BUDGET));
         schema.put(Budget.BUDGET_LABEL, Channels.base(() -> "medium"));
         schema.put(Preferences.TRAVEL_STYLE, Channels.base(() -> "balanced"));
@@ -99,6 +101,7 @@ public final class TravelStateSchema {
         schema.put(Validation.SEMANTIC_NOTES, Channels.base(() -> new ArrayList<String>()));
         schema.put(Control.PROVENANCE, Channels.appender(() -> new ArrayList<ProvenanceEvent>()));
         schema.put(Preferences.HOTEL_CHEAPER, Channels.base(() -> Boolean.FALSE));
+        schema.put(Preferences.HOTEL_BUDGET, Channels.base(() -> TravelState.UNSET_BUDGET));
         schema.put(Preferences.FLIGHT_PREFERENCE, Channels.base(() -> "balanced"));
         schema.put(Preferences.TRIP_REQUIREMENTS, Channels.base(TripRequirements::new));
         schema.put(Request.MODEL_POLICY, Channels.base(() -> "BALANCED"));

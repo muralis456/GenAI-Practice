@@ -32,7 +32,11 @@ public class PlanQualityScorer {
                 .allMatch(f -> "unavailable".equalsIgnoreCase(f.getStatus()))) {
             quality.setFlight(0.4);
         } else {
-            quality.setFlight(0.85);
+            boolean dateUnconfirmed = state.flights().stream()
+                    .filter(f -> f != null && !"unavailable".equalsIgnoreCase(f.getStatus()))
+                    .anyMatch(f -> f.getNotes() != null
+                            && f.getNotes().toLowerCase(java.util.Locale.ROOT).contains("not independently confirmed"));
+            quality.setFlight(dateUnconfirmed ? 0.60 : 0.85);
         }
 
         if (!state.needsHotels()) {
@@ -56,10 +60,10 @@ public class PlanQualityScorer {
 
         if (!state.needsWeather() || state.weather() == null) {
             quality.setWeather(1.0);
-        } else if (state.weather().isRainLikely()) {
-            quality.setWeather(0.75);
         } else {
-            quality.setWeather(0.9);
+            // Rain is a destination condition, not a defect in the plan.
+            // Score weather coverage/reliability rather than penalizing bad weather itself.
+            quality.setWeather(0.90);
         }
 
         quality.recomputeWeighted(requirements);

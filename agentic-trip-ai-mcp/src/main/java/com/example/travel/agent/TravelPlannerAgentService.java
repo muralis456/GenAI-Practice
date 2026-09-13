@@ -562,9 +562,11 @@ public class TravelPlannerAgentService {
          * HOTEL / BUDGET
          */
         if (modification.getHotelBudget() != null) {
-
+            // A hotel ceiling is a hotel-search constraint, not the overall trip
+            // budget. Keep the original trip budget untouched so a modification
+            // cannot accidentally turn "hotel under ₹X" into "trip under ₹X".
             decision.put(
-                    TravelState.BUDGET,
+                    TravelState.HOTEL_BUDGET,
                     modification.getHotelBudget());
         }
 

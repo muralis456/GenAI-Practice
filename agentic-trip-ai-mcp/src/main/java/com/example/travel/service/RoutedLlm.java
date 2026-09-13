@@ -39,7 +39,8 @@ public class RoutedLlm {
 
     public LlmExecutionResult completeWithMeta(AgentRole role, String system, String user, Object... tools) {
         if (!executionBudget.tryConsumeLlm()) {
-            return new LlmExecutionResult("LLM budget exhausted for this graph run.", "", "", 0);
+            log.warn("LLM execution budget exhausted; returning an empty model result so internal state is never exposed to the user");
+            return new LlmExecutionResult("", "", "", 0);
         }
         String policy = ModelRoutingContext.get();
         ModelRoutingContext.Complexity complexity = ModelRoutingContext.getComplexity();

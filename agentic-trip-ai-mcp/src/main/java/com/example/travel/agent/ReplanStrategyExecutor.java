@@ -47,6 +47,7 @@ public class ReplanStrategyExecutor {
         BigDecimal factor = state.costFactor();
 
         boolean hotelCheaper = state.hotelCheaper();
+        BigDecimal hotelBudget = state.hotelBudget();
 
         String flightPreference = state.flightPreference();
 
@@ -92,11 +93,14 @@ public class ReplanStrategyExecutor {
                 }
 
                 case REDUCE_HOTEL_BUDGET -> {
-
+                    // Re-run ONLY the hotel specialist for a hotel-cost change.
+                    // Budget and itinerary are deliberately not scheduled here:
+                    // they describe the existing plan and are not needed to answer
+                    // the user's targeted hotel change.
                     hotelCheaper = true;
-
-                    factor = factor.multiply(
-                            BigDecimal.valueOf(0.90));
+                    if (state.modification() != null && state.modification().getHotelBudget() != null) {
+                        hotelBudget = state.modification().getHotelBudget();
+                    }
                 }
 
                 case HOTEL_UPGRADE -> {
@@ -236,6 +240,10 @@ public class ReplanStrategyExecutor {
                 hotelCheaper);
 
         updates.put(
+                TravelState.HOTEL_BUDGET,
+                hotelBudget == null ? TravelState.UNSET_BUDGET : hotelBudget);
+
+        updates.put(
                 TravelState.FLIGHT_PREFERENCE,
                 flightPreference);
 
@@ -250,6 +258,15 @@ public class ReplanStrategyExecutor {
         updates.put(
                 TravelState.REPLAN_STRATEGY,
                 strategy);
+
+        // A user modification starts a fresh validation pass. Do not let stale
+        // errors/semantic notes from the previous version of the plan trigger
+        // unrelated recovery specialists. New validation issues will be added
+        // by ValidatorNode after the targeted specialist completes.
+        if ("modify".equalsIgnoreCase(state.hitlDecision())) {
+            updates.put(TravelState.VALIDATION_ERRORS, new ArrayList<String>());
+            updates.put(TravelState.SEMANTIC_NOTES, new ArrayList<String>());
+        }
 
         updates.put(
                 TravelState.LAST_DECISION,
@@ -355,12 +372,11 @@ public class ReplanStrategyExecutor {
                         needsBudget = true;
                     }
                     case REDUCE_HOTEL_BUDGET -> {
+                        // Targeted modification: only the hotel specialist runs.
+                        // The existing flight/weather/itinerary/budget state remains
+                        // intact in the checkpoint.
                         runHotels = true;
-                        runBudget = true;
-                        runItinerary = true;
                         needsHotels = true;
-                        needsBudget = true;
-                        needsItinerary = true;
                     }
                     case REMOVE_EXPENSIVE_ATTRACTIONS -> {
                         runResearch = true;

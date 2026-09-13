@@ -51,15 +51,65 @@ public class FlightAgentService {
                     "No departure city was provided, so flight options are unavailable.");
         }
 
-        log.info("Flight agent searching {} -> {} on {}", originIata, destinationIata, state.departureDate());
+        log.info("Flight agent searching roundTrip={} datesFlexible={} {} -> {}",
+                state.roundTrip(), state.datesFlexible(), originIata, destinationIata);
         McpFlightSearchClient mcpClient = mcpFlightSearchClient.getIfAvailable();
+        java.time.LocalDate outboundDate = state.datesFlexible() ? null : state.departureDate();
         List<FlightOption> flights = mcpClient == null
-                ? flightSearchTool.search(originIata, destinationIata, state.departureDate())
-                : mcpClient.search(originIata, destinationIata, state.departureDate(), state.travelers(), state.userRequest());
-        if (flights == null || flights.isEmpty()) {
+                ? flightSearchTool.search(originIata, destinationIata, outboundDate)
+                : mcpClient.search(originIata, destinationIata, outboundDate, state.travelers(), state.userRequest());
+        flights = normalizeResults(flights, "outbound", outboundDate, state.datesFlexible());
+
+        if (state.roundTrip()) {
+            java.time.LocalDate returnDate = state.datesFlexible() ? null : state.returnDate();
+            List<FlightOption> returns = mcpClient == null
+                    ? flightSearchTool.search(destinationIata, originIata, returnDate)
+                    : mcpClient.search(destinationIata, originIata, returnDate, state.travelers(),
+                    state.userRequest() + " Return journey");
+            flights.addAll(normalizeResults(returns, "return", returnDate, state.datesFlexible()));
+        }
+
+        if (flights.isEmpty()) {
             return new FlightSearchResult(originIata, destinationIata, List.of());
         }
         return new FlightSearchResult(originIata, destinationIata, flights);
+    }
+
+    private List<FlightOption> normalizeResults(List<FlightOption> input, String direction,
+                                                 java.time.LocalDate requestedDate, boolean flexible) {
+        if (input == null) {
+            return new java.util.ArrayList<>();
+        }
+        List<FlightOption> result = new java.util.ArrayList<>();
+        for (FlightOption flight : input) {
+            if (flight == null) continue;
+            if ("unavailable".equalsIgnoreCase(flight.getStatus())) {
+                // Keep one provider message only; the UI should not display it as a flight card.
+                if (result.stream().noneMatch(f -> "unavailable".equalsIgnoreCase(f.getStatus()))) {
+                    flight.setDirection(direction);
+                    result.add(flight);
+                }
+                continue;
+            }
+            flight.setDirection(direction);
+            flight.setRequestedDate(requestedDate == null ? "" : requestedDate.toString());
+            if (flexible) {
+                flight.setNotes(mergeNote(flight.getNotes(), "live schedule · date flexible"));
+            } else if (requestedDate != null) {
+                String current = flight.getNotes() == null ? "" : flight.getNotes();
+                if (!current.toLowerCase(java.util.Locale.ROOT).contains("date=" + requestedDate)) {
+                    flight.setNotes(mergeNote(current, "requested date " + requestedDate + " not independently confirmed"));
+                }
+            }
+            result.add(flight);
+        }
+        return result;
+    }
+
+    private String mergeNote(String existing, String addition) {
+        if (existing == null || existing.isBlank()) return addition;
+        if (existing.contains(addition)) return existing;
+        return existing + " · " + addition;
     }
 
     private String resolveDestinationQuery(String destination, String hint) {
