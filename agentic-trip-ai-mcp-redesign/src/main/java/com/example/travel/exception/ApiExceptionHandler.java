@@ -6,6 +6,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.Map;
@@ -37,6 +38,18 @@ public class ApiExceptionHandler {
     public ResponseEntity<Map<String, String>> handleNotFound(NoResourceFoundException ex) {
         log.debug("Resource not found: {}", ex.getResourcePath());
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "Not found"));
+    }
+
+    /**
+     * SSE clients can disconnect while a graph node is still publishing progress.
+     * At that point the servlet response is already committed/closed. Returning a
+     * JSON ResponseEntity would make Spring try to serialize JSON as text/event-stream,
+     * producing a second HttpMessageNotWritableException. Treat this as a transport
+     * lifecycle event instead: the SSE hub already owns cleanup.
+     */
+    @ExceptionHandler(AsyncRequestNotUsableException.class)
+    public void handleSseTransportClosed(AsyncRequestNotUsableException ex) {
+        log.debug("SSE response is no longer usable: {}", ex.getMessage());
     }
 
     @ExceptionHandler(Exception.class)

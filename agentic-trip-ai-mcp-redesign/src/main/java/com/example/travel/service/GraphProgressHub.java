@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 @Component
 public class GraphProgressHub {
@@ -35,9 +36,17 @@ public class GraphProgressHub {
         SseEmitter emitter = new SseEmitter(SSE_TIMEOUT_MS);
         hubSession.addEmitter(emitter);
         emitter.onCompletion(() -> hubSession.removeEmitter(emitter));
-        emitter.onTimeout(() -> hubSession.removeEmitter(emitter));
+        emitter.onTimeout(() -> {
+            hubSession.removeEmitter(emitter);
+            log.debug("SSE timeout threadId={}", threadId);
+        });
+        emitter.onError(error -> {
+            hubSession.removeEmitter(emitter);
+            log.debug("SSE transport error threadId={} message={}", threadId,
+                    error == null ? "unknown" : error.getMessage());
+        });
         for (Map<String, Object> event : hubSession.copyReplay()) {
-            send(emitter, event);
+            send(hubSession, emitter, event);
         }
         return emitter;
     }
@@ -50,11 +59,11 @@ public class GraphProgressHub {
         HubSession hubSession = hubSession(threadId);
         hubSession.appendReplay(event);
         for (SseEmitter emitter : hubSession.copyEmitters()) {
-            send(emitter, event);
+            send(hubSession, emitter, event);
         }
         if ("complete".equals(type) || "failed".equals(type)) {
             for (SseEmitter emitter : hubSession.copyEmitters()) {
-                completeQuietly(emitter);
+                completeQuietly(hubSession, emitter);
             }
         }
     }
@@ -65,7 +74,7 @@ public class GraphProgressHub {
             return;
         }
         for (SseEmitter emitter : hubSession.copyEmitters()) {
-            completeQuietly(emitter);
+            completeQuietly(hubSession, emitter);
         }
     }
 
@@ -73,35 +82,53 @@ public class GraphProgressHub {
         return sessions.computeIfAbsent(threadId, key -> new HubSession());
     }
 
-    private void send(SseEmitter emitter, Map<String, Object> event) {
+    private void send(HubSession session, SseEmitter emitter, Map<String, Object> event) {
         try {
             String name = String.valueOf(event.getOrDefault("type", "node"));
             String json = objectMapper.writeValueAsString(event);
             emitter.send(SseEmitter.event().name(name).data(json));
         } catch (Exception ex) {
-            log.debug("SSE send failed: {}", ex.getMessage());
-            completeQuietly(emitter);
+            log.debug("SSE send failed; removing emitter: {}", ex.getMessage());
+            session.removeEmitter(emitter);
+            // Once send() fails, the servlet response is no longer usable. Remove
+            // the emitter immediately and never call complete() on this failed
+            // response. Spring may otherwise raise AsyncRequestNotUsableException
+            // while trying to complete an already-broken async response.
+            // The completion callback will also remove it, making this idempotent.
         }
     }
 
-    private static void completeQuietly(SseEmitter emitter) {
+    private static void completeQuietly(HubSession session, SseEmitter emitter) {
+        session.removeEmitter(emitter);
+        if (!session.markClosed(emitter)) {
+            return;
+        }
         try {
             emitter.complete();
         } catch (RuntimeException ignored) {
-            // client already gone
+            // The client may already have disconnected. The emitter is already removed.
         }
     }
 
     private static final class HubSession {
         private final List<Map<String, Object>> replay = new ArrayList<>();
         private final List<SseEmitter> emitters = new CopyOnWriteArrayList<>();
+        private final Map<SseEmitter, AtomicBoolean> closedEmitters = new ConcurrentHashMap<>();
 
         private void addEmitter(SseEmitter emitter) {
             emitters.add(emitter);
+            closedEmitters.put(emitter, new AtomicBoolean(false));
         }
 
         private void removeEmitter(SseEmitter emitter) {
             emitters.remove(emitter);
+            // Keep the closed marker briefly for idempotent completion. It is
+            // removed when a new emitter is created for the same object only.
+        }
+
+        private boolean markClosed(SseEmitter emitter) {
+            return closedEmitters.computeIfAbsent(emitter, ignored -> new AtomicBoolean(false))
+                    .compareAndSet(false, true);
         }
 
         private List<SseEmitter> copyEmitters() {

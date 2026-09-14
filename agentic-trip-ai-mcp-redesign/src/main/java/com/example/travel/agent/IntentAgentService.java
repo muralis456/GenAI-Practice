@@ -84,20 +84,27 @@ public class IntentAgentService {
                 request, primary.getRequestType(), primary.getConfidence(), capabilitySummary(primary));
 
         // Memory retrieval is a separate semantic concern from travel planning.
-        // Small local models can legitimately interpret "my recent trip details"
-        // as an itinerary request even when the user's real objective is to READ
-        // persistent memory. Run a focused semantic memory pass for every turn so
-        // that retrieval can override a conflicting live-planning interpretation.
-        // This is intentionally NOT a keyword/regex rule.
-        MemoryIntentDecision memoryIntent = runMemoryIntentPass(request);
+        // Do not invoke another LLM on every ordinary travel request: with local
+        // models this pass can add tens of seconds and can starve the executor.
+        // Run it when the primary result is uncertain, already indicates history,
+        // or looks like a possible history-vs-itinerary conflict. This remains
+        // semantic-only; no keyword/regex detection is introduced.
+        boolean memoryCheckNeeded = primary.isNeedsHistory()
+                || primary.getConfidence() < 0.70d
+                || primary.isNeedsItinerary() && !primary.isNeedsFlights()
+                    && !primary.isNeedsHotels() && !primary.isNeedsResearch()
+                    && !primary.isNeedsWeather() && !primary.isNeedsBudget();
+        MemoryIntentDecision memoryIntent = memoryCheckNeeded
+                ? runMemoryIntentPass(request)
+                : new MemoryIntentDecision(false, false, 0.0);
         log.info("Intent memory semantic result request={} history={} historyOnly={} selection={} confidence={}",
                 request, memoryIntent.isNeedsHistory(), memoryIntent.isHistoryOnly(), memoryIntent.getSelection(), memoryIntent.getConfidence());
 
         // If the dedicated LLM memory pass is weak or conflicts with an itinerary
         // interpretation, obtain an independent semantic signal from the embedding
         // model. This is still meaning-based; no request text is inspected.
-        if (!memoryIntent.isNeedsHistory() || memoryIntent.getConfidence() < 0.70d
-                || (memoryIntent.isNeedsHistory() && !memoryIntent.isHistoryOnly() && primary.isNeedsItinerary())) {
+        if (memoryCheckNeeded && (!memoryIntent.isNeedsHistory() || memoryIntent.getConfidence() < 0.70d
+                || (memoryIntent.isNeedsHistory() && !memoryIntent.isHistoryOnly() && primary.isNeedsItinerary()))) {
             MemoryIntentDecision semanticRecovery = semanticMemoryArbiter.recover(request);
             if (semanticRecovery.getConfidence() > memoryIntent.getConfidence()) {
                 memoryIntent = semanticRecovery;
