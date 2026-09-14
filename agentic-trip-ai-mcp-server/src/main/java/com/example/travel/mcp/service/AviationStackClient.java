@@ -14,6 +14,7 @@ import org.springframework.web.util.UriComponentsBuilder;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
+import java.io.IOException;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -111,8 +112,20 @@ public class AviationStackClient {
                 }
             }
             return body.length() > 500 ? body.substring(0, 500) : body;
+        } catch (IOException ignored) {
+            log.error("Failed to read AviationStack error response body", ignored.getMessage());
+            return "AviationStack returned HTTP " + safeStatusCode(response) + " without readable error details.";
         } catch (Exception ignored) {
-            return "AviationStack returned HTTP " + response.getStatusCode().value() + " without readable error details.";
+            log.error("Unexpected error occurred while processing AviationStack error response", ignored.getMessage());
+            return "AviationStack returned HTTP " + safeStatusCode(response) + " without readable error details.";
+        }
+    }
+
+    private int safeStatusCode(org.springframework.http.client.ClientHttpResponse response) {
+        try {
+            return response.getStatusCode().value();
+        } catch (IOException ignored) {
+            return 0;
         }
     }
 
