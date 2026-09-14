@@ -78,23 +78,7 @@ public class IgnavClient {
                     roundTrip ? "round-trip" : "one-way", origin, destination,
                     request.departureDate(), request.returnDate(), request.normalizedPassengers(), market);
 
-            String body = restClient.post()
-                    .uri(apiUrl + endpoint)
-                    .header("X-Api-Key", apiKey)
-                    .header("Content-Type", "application/json")
-                    .body(payload)
-                    .retrieve()
-                    .onStatus(HttpStatusCode::isError, (ignored, response) -> {
-                        int status = response.getStatusCode().value();
-                        String providerMessage = extractProviderMessage(response);
-                        String providerCode = extractProviderCode(providerMessage);
-                        String message = buildProviderErrorMessage(status, providerCode, providerMessage);
-                        log.error(
-                                "MCP search_flights provider=Ignav failed httpStatus={} providerCode={} providerMessage={} origin={} destination={}",
-                                status, providerCode, providerMessage, origin, destination);
-                        throw new IgnavException("IGNAV_HTTP_" + status, message);
-                    })
-                    .body(String.class);
+            String body = executeWithTransientRetry(endpoint, payload, origin, destination);
 
             SearchFlightsResponse result = parse(body, origin, destination, request);
             log.info("MCP search_flights provider=Ignav completed success={} results={} durationMs={}",
@@ -112,6 +96,51 @@ public class IgnavClient {
             log.warn("MCP search_flights provider=Ignav response could not be processed error={} durationMs={}",
                     safeMessage(exception), elapsedMs(started));
             return SearchFlightsResponse.failure("PROVIDER_RESPONSE", "Ignav returned an unreadable response: " + safeMessage(exception));
+        }
+    }
+
+
+    private String executeWithTransientRetry(String endpoint, String payload, String origin, String destination) {
+        final int maxAttempts = 2; // Ignav documents HTTP 424 as a transient upstream failure.
+        for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+            final int currentAttempt = attempt;
+            try {
+                return restClient.post()
+                        .uri(apiUrl + endpoint)
+                        .header("X-Api-Key", apiKey)
+                        .header("Content-Type", "application/json")
+                        .body(payload)
+                        .retrieve()
+                        .onStatus(HttpStatusCode::isError, (ignored, response) -> {
+                            int status = response.getStatusCode().value();
+                            String providerMessage = extractProviderMessage(response);
+                            String providerCode = extractProviderCode(providerMessage);
+                            String message = buildProviderErrorMessage(status, providerCode, providerMessage);
+                            log.warn(
+                                    "MCP search_flights provider=Ignav failed httpStatus={} providerCode={} attempt={} origin={} destination={}",
+                                    status, providerCode, currentAttempt, origin, destination);
+                            throw new IgnavException("IGNAV_HTTP_" + status, message);
+                        })
+                        .body(String.class);
+            } catch (IgnavException exception) {
+                if ("IGNAV_HTTP_424".equals(exception.code) && attempt < maxAttempts) {
+                    log.warn("MCP search_flights provider=Ignav retrying transient HTTP 424 attempt={} nextAttempt={}",
+                            attempt, attempt + 1);
+                    sleepBeforeRetry(attempt);
+                    continue;
+                }
+                throw exception;
+            }
+        }
+        throw new IllegalStateException("Ignav request retry loop exhausted unexpectedly.");
+    }
+
+    private void sleepBeforeRetry(int attempt) {
+        try {
+            Thread.sleep(500L * attempt);
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            throw new IgnavException("IGNAV_RETRY_INTERRUPTED", "Ignav retry was interrupted.");
         }
     }
 

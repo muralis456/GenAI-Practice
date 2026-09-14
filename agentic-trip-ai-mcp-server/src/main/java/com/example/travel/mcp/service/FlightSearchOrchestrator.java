@@ -43,7 +43,6 @@ public class FlightSearchOrchestrator {
     }
 
     public SearchFlightsResponse search(SearchFlightsRequest request) {
-        SearchFlightsResponse firstFailure = null;
         List<FlightResult> collected = new ArrayList<>();
         List<String> providersUsed = new ArrayList<>();
         List<String> diagnostics = new ArrayList<>();
@@ -83,7 +82,6 @@ public class FlightSearchOrchestrator {
 
                 boolean countFailure = isTransientFailure(response);
                 state.failure(countFailure);
-                if (!response.success() && firstFailure == null) firstFailure = response;
                 diagnostics.add(provider.name() + " " + (response.success() ? "empty" : response.errorCode()));
                 log.warn("flight.provider.no-usable-results provider={} success={} code={} results={} circuitFailures={} durationMs={}",
                         provider.name(), response.success(), response.errorCode(), response.flights().size(), state.failures(), elapsedMs(started));
@@ -102,9 +100,6 @@ public class FlightSearchOrchestrator {
         }
 
         String message = diagnostics.isEmpty() ? "No enabled flight provider is available." : String.join("; ", diagnostics);
-        if (firstFailure != null && firstFailure.message() != null && !firstFailure.message().isBlank()) {
-            message += ". Last provider message: " + firstFailure.message();
-        }
         return SearchFlightsResponse.failure("FLIGHT_PROVIDERS_UNAVAILABLE", message);
     }
 
