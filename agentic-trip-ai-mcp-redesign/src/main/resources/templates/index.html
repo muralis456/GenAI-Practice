@@ -2059,6 +2059,66 @@
 .flight-card.is-extra-flight{display:none!important}
 .flight-list.expanded .flight-card.is-extra-flight{display:block!important}
 
+/* V43 rich flight results widget — decision-first, provider-aware, responsive */
+.flight-rich-widget{display:grid;gap:10px}
+.flight-summary-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 12px;border:1px solid rgba(91,160,239,.15);border-radius:12px;background:linear-gradient(90deg,rgba(48,112,191,.10),rgba(255,255,255,.018))}
+.flight-summary-main{display:flex;align-items:center;gap:9px;min-width:0}
+.flight-summary-icon{width:30px;height:30px;display:grid;place-items:center;border-radius:9px;background:rgba(67,146,238,.13);border:1px solid rgba(93,166,255,.18);font-size:15px;flex:0 0 auto}
+.flight-summary-title{font-size:12px;font-weight:850;color:#e7f1ff}
+.flight-summary-sub{margin-top:2px;color:#7891ae;font-size:9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.flight-summary-count{padding:5px 8px;border-radius:999px;background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.07);color:#9fc7f7;font-size:10px;font-weight:800;white-space:nowrap}
+.rich-flight-card{position:relative;display:grid;grid-template-columns:148px minmax(0,1fr) auto;gap:14px;align-items:center;padding:14px;border:1px solid rgba(255,255,255,.065);border-radius:14px;background:linear-gradient(135deg,rgba(255,255,255,.035),rgba(255,255,255,.018));transition:border-color .16s ease,transform .16s ease,background .16s ease}
+.rich-flight-card:hover{border-color:rgba(92,163,244,.25);background:linear-gradient(135deg,rgba(66,137,219,.07),rgba(255,255,255,.02));transform:translateY(-1px)}
+.rich-flight-card.is-extra-flight{display:none!important}
+.flight-list.expanded .rich-flight-card.is-extra-flight{display:grid!important}
+.flight-airline{display:flex;align-items:center;gap:9px;min-width:0}
+.flight-airline-mark{width:36px;height:36px;display:grid;place-items:center;border-radius:10px;background:linear-gradient(145deg,rgba(76,145,231,.20),rgba(39,82,135,.20));border:1px solid rgba(110,174,244,.18);color:#d9ebff;font-size:11px;font-weight:900;letter-spacing:.02em;flex:0 0 auto}
+.flight-airline-copy{min-width:0}
+.flight-airline-name{font-size:12px;font-weight:850;color:#eef6ff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.flight-number{margin-top:3px;color:#7891ae;font-size:9px;font-weight:700}
+.flight-path{min-width:0}
+.flight-times{display:grid;grid-template-columns:minmax(55px,1fr) 100px minmax(55px,1fr);align-items:center;gap:8px}
+.flight-time-point{min-width:0}
+.flight-time-point:last-child{text-align:right}
+.flight-time{font-size:16px;line-height:1;font-weight:900;letter-spacing:-.025em;color:#f0f6ff}
+.flight-airport{margin-top:4px;color:#9db4ce;font-size:10px;font-weight:800;letter-spacing:.05em}
+.flight-date{margin-top:3px;color:#687f9b;font-size:8px}
+.flight-route-line{position:relative;display:flex;align-items:center;gap:5px;color:#7891ae;font-size:8px;font-weight:750;text-align:center;white-space:nowrap}
+.flight-route-line:before{content:"";height:1px;flex:1;background:linear-gradient(90deg,transparent,rgba(104,159,220,.38))}
+.flight-route-line:after{content:"";height:1px;flex:1;background:linear-gradient(90deg,rgba(104,159,220,.38),transparent)}
+.flight-route-plane{color:#83bbf6;font-size:11px;transform:rotate(90deg);display:inline-block}
+.flight-meta-row{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
+.flight-pill{display:inline-flex;align-items:center;gap:4px;padding:4px 6px;border-radius:6px;background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.055);color:#91a8c2;font-size:8px;font-weight:800}
+.flight-pill.live{color:#9cecc0;background:rgba(39,190,111,.08);border-color:rgba(39,190,111,.18)}
+.flight-pill.warn{color:#ffd18b;background:rgba(245,168,60,.08);border-color:rgba(245,168,60,.18)}
+.flight-fare{text-align:right;min-width:105px}
+.flight-price{font-size:16px;font-weight:900;color:#c5f6d8;letter-spacing:-.02em;white-space:nowrap}
+.flight-price-muted{font-size:10px;font-weight:750;color:#7891ae;white-space:nowrap}
+.flight-provider{margin-top:5px;color:#637a96;font-size:8px;font-weight:750;white-space:nowrap}
+.flight-note{margin-top:8px;padding-top:7px;border-top:1px dashed rgba(255,255,255,.07);color:#7891ae;font-size:9px;line-height:1.45;grid-column:1/-1}
+.flight-group + .flight-group{margin-top:13px;padding-top:12px;border-top:1px solid rgba(255,255,255,.055)}
+.flight-group-title{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 2px 7px;color:#b8cbe2;font-size:10px;font-weight:850;letter-spacing:.04em;text-transform:uppercase}
+.flight-group-title .flight-group-count{color:#7189a7;font-weight:700;text-transform:none;letter-spacing:0}
+.flight-more-btn{margin-top:7px}
+@media(max-width:720px){
+ .rich-flight-card{grid-template-columns:1fr auto;gap:10px}
+ .flight-airline{grid-column:1/-1}
+ .flight-path{grid-column:1/-1}
+ .flight-fare{grid-column:2;grid-row:2;align-self:end}
+ .flight-meta-row{padding-right:110px}
+}
+@media(max-width:480px){
+ .flight-summary-sub{display:none}
+ .flight-summary-bar{padding:9px 10px}
+ .rich-flight-card{padding:12px}
+ .flight-times{grid-template-columns:minmax(48px,1fr) 72px minmax(48px,1fr);gap:5px}
+ .flight-time{font-size:14px}
+ .flight-fare{min-width:88px}
+ .flight-price{font-size:14px}
+ .flight-meta-row{padding-right:0}
+}
+
+
 .hotel-card{padding:10px 11px!important;min-height:0!important}
 .hotel-card-main{min-width:0}
 .hotel-fit{display:inline-block;margin-top:5px;padding:3px 7px;border-radius:5px;background:rgba(38,185,120,.09);border:1px solid rgba(38,185,120,.15);color:#9de0bf;font-size:9px;font-weight:700}
@@ -3158,37 +3218,128 @@
         const usable = (flights || []).filter(f => f && String(f.status || '').toLowerCase() !== 'unavailable');
         if (!usable.length) return '<div class="specialist-empty">No confirmed flight options are available for the requested route/date.</div>';
 
+        const escape = value => escapeHtml(value == null ? '' : String(value));
+        const initials = value => {
+            const words = String(value || 'Flight').trim().split(/\s+/).filter(Boolean);
+            return words.slice(0, 2).map(w => w[0]).join('').toUpperCase() || '✈';
+        };
+        const firstMatch = (text, regex) => {
+            const match = String(text || '').match(regex);
+            return match && match[1] ? match[1].trim() : '';
+        };
+        const noteText = f => String(f.notes || '');
+        const price = f => f.price != null ? String(f.price) : firstMatch(noteText(f), /(?:price|fare)\s*[=:]\s*([^,;|]+)/i);
+        const currency = f => f.currency || firstMatch(noteText(f), /(?:currency)\s*[=:]\s*([A-Z]{3}|₹|\$|€|£)/i) || '';
+        const provider = f => f.provider || firstMatch(noteText(f), /provider\s*[=:]\s*([^,;|]+)/i) || '';
+        const segmentCount = f => {
+            const raw = f.segmentCount != null ? f.segmentCount : firstMatch(noteText(f), /segments?\s*[=:]\s*(\d+)/i);
+            const n = Number(raw);
+            return Number.isFinite(n) && n > 0 ? n : 1;
+        };
+        const selfTransfer = f => f.selfTransfer === true || /selfTransfer\s*[=:]\s*true/i.test(noteText(f));
+        const ignavId = f => f.ignavId || firstMatch(noteText(f), /ignavId\s*[=:]\s*([A-Za-z0-9_-]+)/i);
+        const isIso = value => /^\d{4}-\d{2}-\d{2}T/.test(String(value || ''));
+        const formatTime = value => {
+            if (!value) return '';
+            const text = String(value);
+            if (!isIso(text)) return text.length > 24 ? text.slice(0, 24) : text;
+            const d = new Date(text);
+            if (Number.isNaN(d.getTime())) return text;
+            return new Intl.DateTimeFormat(undefined, { hour:'2-digit', minute:'2-digit', hour12:false }).format(d);
+        };
+        const formatDate = value => {
+            if (!value) return '';
+            const text = String(value);
+            if (!isIso(text)) return text;
+            const d = new Date(text);
+            if (Number.isNaN(d.getTime())) return text.slice(0, 10);
+            return new Intl.DateTimeFormat(undefined, { day:'2-digit', month:'short' }).format(d);
+        };
+        const duration = (dep, arr) => {
+            if (!dep || !arr) return '';
+            const a = new Date(dep).getTime(), b = new Date(arr).getTime();
+            if (!Number.isFinite(a) || !Number.isFinite(b) || b <= a) return '';
+            const mins = Math.round((b-a)/60000), h = Math.floor(mins/60), m = mins%60;
+            return h ? h + 'h' + (m ? ' ' + m + 'm' : '') : m + 'm';
+        };
+        const airport = value => escape(value || '—');
+        const cleanNote = f => noteText(f)
+            .replace(/provider\s*[=:]\s*[^,;|]+/ig, '')
+            .replace(/(?:price|fare)\s*[=:]\s*[^,;|]+/ig, '')
+            .replace(/segments?\s*[=:]\s*\d+/ig, '')
+            .replace(/selfTransfer\s*[=:]\s*(?:true|false)/ig, '')
+            .replace(/ignavId\s*[=:]\s*[A-Za-z0-9_-]+/ig, '')
+            .replace(/^[\s·,;|-]+|[\s·,;|-]+$/g, '')
+            .replace(/\s{2,}/g, ' ')
+            .trim();
+
         const renderFlight = (f, index) => {
-            const direction = String(f.direction || 'outbound').toLowerCase() === 'return' ? 'RETURN' : 'OUTBOUND';
+            const direction = String(f.direction || 'outbound').toLowerCase() === 'return' ? 'return' : 'outbound';
+            const dep = f.departureTime || f.departureScheduled || '';
+            const arr = f.arrivalTime || f.arrivalScheduled || '';
+            const airline = f.airline || 'Flight option';
+            const flightNo = f.flightNumber || '';
             const route = (f.origin && f.destination) ? f.origin + ' → ' + f.destination : '';
-            const times = [f.departureTime, f.arrivalTime].filter(Boolean).join(' → ');
-            const meta = [route, times].filter(Boolean).join(' · ');
-            const dateNote = f.requestedDate ? 'Requested ' + f.requestedDate : '';
+            const dur = f.duration || duration(dep, arr);
+            const segments = segmentCount(f);
+            const stops = f.stops != null ? Number(f.stops) : Math.max(0, segments - 1);
+            const fare = price(f);
+            const fareCurrency = currency(f);
+            const providerName = provider(f);
+            const self = selfTransfer(f);
             const extraClass = index >= 3 ? ' is-extra-flight' : '';
-            return '<div class="flight-card compact-flight-card' + extraClass + '">'
-                + '<div class="flight-topline"><span class="flight-direction">' + direction + '</span><div class="item-title">' + escapeHtml([f.airline, f.flightNumber].filter(Boolean).join(' · ') || 'Flight option') + '</div></div>'
-                + (meta ? '<div class="flight-route-line">' + escapeHtml(meta) + '</div>' : '')
-                + ((dateNote || f.notes) ? '<div class="item-note">' + escapeHtml([dateNote, f.notes].filter(Boolean).join(' · ')) + '</div>' : '')
-                + '</div>';
+            const dateLabel = f.requestedDate || formatDate(dep);
+            const note = cleanNote(f);
+            const status = String(f.status || '').toLowerCase();
+            const isLive = /live|scheduled|confirmed/.test(status) || /provider\s*[=:]\s*(aviationstack|ignav)/i.test(noteText(f));
+            const stopsLabel = stops === 0 ? 'Non-stop' : (stops === 1 ? '1 stop' : stops + ' stops');
+            const meta = [dur, stopsLabel, self ? 'Self-transfer' : ''].filter(Boolean);
+            return '<article class="rich-flight-card' + extraClass + '" data-flight-index="' + index + '">' 
+                + '<div class="flight-airline"><div class="flight-airline-mark">' + escape(initials(airline)) + '</div><div class="flight-airline-copy"><div class="flight-airline-name">' + escape(airline) + '</div><div class="flight-number">' + escape(flightNo || 'Flight details') + '</div></div></div>'
+                + '<div class="flight-path">'
+                + '<div class="flight-times">'
+                + '<div class="flight-time-point"><div class="flight-time">' + escape(formatTime(dep) || '—') + '</div><div class="flight-airport">' + airport(f.origin) + '</div><div class="flight-date">' + escape(dateLabel) + '</div></div>'
+                + '<div class="flight-route-line"><span>' + escape(dur || 'journey') + '</span><span class="flight-route-plane">✈</span></div>'
+                + '<div class="flight-time-point"><div class="flight-time">' + escape(formatTime(arr) || '—') + '</div><div class="flight-airport">' + airport(f.destination) + '</div><div class="flight-date">' + escape(formatDate(arr)) + '</div></div>'
+                + '</div>'
+                + '<div class="flight-meta-row">'
+                + meta.map((item, i) => '<span class="flight-pill' + (i === 1 && stops > 0 ? ' warn' : '') + '">' + escape(item) + '</span>').join('')
+                + (isLive ? '<span class="flight-pill live">● Live schedule</span>' : '')
+                + (direction === 'return' ? '<span class="flight-pill">↩ Return</span>' : '<span class="flight-pill">↗ Outbound</span>')
+                + (providerName ? '<span class="flight-pill">via ' + escape(providerName) + '</span>' : '')
+                + '</div>'
+                + '</div>'
+                + '<div class="flight-fare">'
+                + (fare ? '<div class="flight-price">' + escape(fareCurrency ? fareCurrency + ' ' + fare : fare) + '</div><div class="flight-price-muted">fare returned</div>' : '<div class="flight-price-muted">Schedule only</div><div class="flight-price-muted">fare not returned</div>')
+                + (providerName ? '<div class="flight-provider">' + escape(providerName) + '</div>' : '')
+                + '</div>'
+                + (note ? '<div class="flight-note">' + escape(note) + '</div>' : '')
+                + '</article>';
         };
 
+        // Keep this as an object list because Thymeleaf reserves nested bracket syntax.
+        // Object literals keep this script valid JavaScript without colliding with Thymeleaf syntax.
         const groups = [
-            ['outbound', 'Outbound'],
-            ['return', 'Return']
+            { key: 'outbound', label: 'Outbound' },
+            { key: 'return', label: 'Return' }
         ];
-        let html = '';
-        groups.forEach(([key, label]) => {
+        let total = 0, html = '<div class="flight-rich-widget">';
+        groups.forEach(group => {
+            const key = group.key;
+            const label = group.label;
             const items = usable.filter(f => String(f.direction || 'outbound').toLowerCase() === key);
             if (!items.length) return;
+            total += items.length;
             const extraCount = Math.max(0, items.length - 3);
-            const listClass = extraCount ? ' flight-list has-extra-flights' : ' flight-list';
+            const listClass = extraCount ? 'flight-list has-extra-flights' : 'flight-list';
             html += '<div class="flight-group">'
-                + '<div class="flight-group-title"><span>' + label + '</span><span>' + items.length + ' option' + (items.length === 1 ? '' : 's') + '</span></div>'
-                + '<div class="' + listClass.trim() + '">' + items.map(renderFlight).join('') + '</div>'
+                + '<div class="flight-group-title"><span>' + label + '</span><span class="flight-group-count">' + items.length + ' option' + (items.length === 1 ? '' : 's') + '</span></div>'
+                + '<div class="' + listClass + '">' + items.map(renderFlight).join('') + '</div>'
                 + (extraCount ? '<button type="button" class="flight-more-btn" data-flights-more>＋ ' + extraCount + ' more available option' + (extraCount === 1 ? '' : 's') + '</button>' : '')
                 + '</div>';
         });
-        return html;
+        html = html.replace('<div class="flight-rich-widget">', '<div class="flight-rich-widget"><div class="flight-summary-bar"><div class="flight-summary-main"><div class="flight-summary-icon">✈</div><div><div class="flight-summary-title">Live flight options</div><div class="flight-summary-sub">Compare departure, arrival, duration, stops and returned fare data</div></div></div><span class="flight-summary-count">' + total + ' option' + (total === 1 ? '' : 's') + '</span></div>');
+        return html + '</div>';
     };
 
     const cleanHotelText = (value) => String(value || '')

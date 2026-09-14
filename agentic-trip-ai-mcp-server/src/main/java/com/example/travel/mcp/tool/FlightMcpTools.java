@@ -23,7 +23,7 @@ public class FlightMcpTools {
         this.governance = governance;
     }
 
-    @McpTool(name = "search_flights", description = "Search live AviationStack flight schedules by IATA airport code.")
+    @McpTool(name = "search_flights", description = "Search live flight fares/schedules by IATA airport code. Uses AviationStack first and automatically falls back to Ignav when AviationStack is unavailable or returns no usable flights.")
     public SearchFlightsResponse searchFlights(
             @McpToolParam(description = "Three-letter origin IATA code, for example BLR", required = true) String origin,
             @McpToolParam(description = "Three-letter destination IATA code, for example BOM", required = true) String destination,

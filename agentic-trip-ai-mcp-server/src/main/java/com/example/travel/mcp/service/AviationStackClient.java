@@ -7,6 +7,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatusCode;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
@@ -14,8 +15,8 @@ import org.springframework.web.util.UriComponentsBuilder;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
-import java.io.IOException;
 import java.time.LocalDate;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -36,12 +37,21 @@ public class AviationStackClient {
             ObjectMapper objectMapper,
             @Value("${travel.aviation.api-url}") String apiUrl,
             @Value("${travel.aviation.api-key}") String apiKey,
-            @Value("${travel.aviation.include-flight-date:false}") boolean includeFlightDate) {
-        this.restClient = restClientBuilder.build();
+            @Value("${travel.aviation.include-flight-date:false}") boolean includeFlightDate,
+            @Value("${travel.aviation.connect-timeout:5s}") Duration connectTimeout,
+            @Value("${travel.aviation.read-timeout:15s}") Duration readTimeout) {
+        SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
+        requestFactory.setConnectTimeout(connectTimeout);
+        requestFactory.setReadTimeout(readTimeout);
+        this.restClient = restClientBuilder.requestFactory(requestFactory).build();
         this.objectMapper = objectMapper;
         this.apiUrl = apiUrl;
         this.apiKey = apiKey;
         this.includeFlightDate = includeFlightDate;
+    }
+
+    public boolean enabled() {
+        return apiKey != null && !apiKey.isBlank();
     }
 
     public SearchFlightsResponse search(SearchFlightsRequest request) {
@@ -112,11 +122,7 @@ public class AviationStackClient {
                 }
             }
             return body.length() > 500 ? body.substring(0, 500) : body;
-        } catch (IOException ignored) {
-            log.error("Failed to read AviationStack error response body", ignored.getMessage());
-            return "AviationStack returned HTTP " + safeStatusCode(response) + " without readable error details.";
         } catch (Exception ignored) {
-            log.error("Unexpected error occurred while processing AviationStack error response", ignored.getMessage());
             return "AviationStack returned HTTP " + safeStatusCode(response) + " without readable error details.";
         }
     }
@@ -124,8 +130,8 @@ public class AviationStackClient {
     private int safeStatusCode(org.springframework.http.client.ClientHttpResponse response) {
         try {
             return response.getStatusCode().value();
-        } catch (IOException ignored) {
-            return 0;
+        } catch (Exception ignored) {
+            return -1;
         }
     }
 

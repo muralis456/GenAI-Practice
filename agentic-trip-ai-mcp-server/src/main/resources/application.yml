@@ -21,6 +21,13 @@ travel:
     include-flight-date: ${AVIATIONSTACK_INCLUDE_FLIGHT_DATE:false}
     connect-timeout: ${AVIATIONSTACK_CONNECT_TIMEOUT:5s}
     read-timeout: ${AVIATIONSTACK_READ_TIMEOUT:15s}
+  ignav:
+    enabled: ${IGNAV_ENABLED:true}
+    api-url: ${IGNAV_API_URL:https://ignav.com/api}
+    api-key: ${IGNAV_API_KEY:}
+    market: ${IGNAV_MARKET:IN}
+    connect-timeout: ${IGNAV_CONNECT_TIMEOUT:5s}
+    read-timeout: ${IGNAV_READ_TIMEOUT:15s}
   tavily:
     api-url: ${TAVILY_API_URL:https://api.tavily.com/search}
     api-key: ${TAVILY_API_KEY:}
@@ -38,3 +45,10 @@ travel:
     provider:
       connect-timeout: ${MCP_PROVIDER_CONNECT_TIMEOUT:5s}
       read-timeout: ${MCP_PROVIDER_READ_TIMEOUT:15s}
+
+  flights:
+    strategy: FALLBACK
+    max-results: ${FLIGHT_MAX_RESULTS:10}
+    circuit-breaker:
+      failure-threshold: ${FLIGHT_CB_FAILURE_THRESHOLD:3}
+      cooldown: ${FLIGHT_CB_COOLDOWN:60s}
