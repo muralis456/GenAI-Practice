@@ -31,7 +31,7 @@ public class RoutedLlm {
                      AgentExecutionBudget executionBudget,
                      @Value("${travel.models.max-tokens.extraction:384}") int extractionMaxTokens,
                      @Value("${travel.models.max-tokens.planner:512}") int plannerMaxTokens,
-                     @Value("${travel.models.max-tokens.itinerary:900}") int itineraryMaxTokens,
+                     @Value("${travel.models.max-tokens.itinerary:1400}") int itineraryMaxTokens,
                      @Value("${travel.models.max-tokens.final:700}") int finalMaxTokens) {
         this.chatClient = chatClient;
         this.models = models;

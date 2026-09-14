@@ -17,6 +17,13 @@ public class ItineraryActivity implements Serializable {
     private boolean familyFriendly;
     private boolean foodExperience;
     private boolean localExperience;
+    private String description = "";
+    private String location = "";
+    private String duration = "";
+    private String estimatedCost = "";
+    private String currency = "";
+    private String bookingUrl = "";
+    private String imageUrl = "";
 
     public ItineraryActivity() {
     }
@@ -78,6 +85,21 @@ public class ItineraryActivity implements Serializable {
     public void setLocalExperience(boolean localExperience) {
         this.localExperience = localExperience;
     }
+
+    public String getDescription() { return description; }
+    public void setDescription(String description) { this.description = description == null ? "" : description; }
+    public String getLocation() { return location; }
+    public void setLocation(String location) { this.location = location == null ? "" : location; }
+    public String getDuration() { return duration; }
+    public void setDuration(String duration) { this.duration = duration == null ? "" : duration; }
+    public String getEstimatedCost() { return estimatedCost; }
+    public void setEstimatedCost(String estimatedCost) { this.estimatedCost = estimatedCost == null ? "" : estimatedCost; }
+    public String getCurrency() { return currency; }
+    public void setCurrency(String currency) { this.currency = currency == null ? "" : currency; }
+    public String getBookingUrl() { return bookingUrl; }
+    public void setBookingUrl(String bookingUrl) { this.bookingUrl = bookingUrl == null ? "" : bookingUrl; }
+    public String getImageUrl() { return imageUrl; }
+    public void setImageUrl(String imageUrl) { this.imageUrl = imageUrl == null ? "" : imageUrl; }
 
     public String toDisplay() {
         StringBuilder sb = new StringBuilder(name);

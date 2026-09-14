@@ -9,6 +9,8 @@ import com.example.travel.support.JsonSupport;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Value;
 
 import java.time.LocalDate;
 
@@ -19,10 +21,16 @@ public class ItineraryAgentService {
 
     private final RoutedLlm routedLlm;
     private final JsonSupport jsonSupport;
+    private final ObjectProvider<com.example.travel.service.McpItineraryClient> mcpItineraryClientProvider;
+    private final String itineraryProvider;
 
-    public ItineraryAgentService(RoutedLlm routedLlm, JsonSupport jsonSupport) {
+    public ItineraryAgentService(RoutedLlm routedLlm, JsonSupport jsonSupport,
+                                 ObjectProvider<com.example.travel.service.McpItineraryClient> mcpItineraryClientProvider,
+                                 @Value("${travel.itinerary.provider:jettova}") String itineraryProvider) {
         this.routedLlm = routedLlm;
         this.jsonSupport = jsonSupport;
+        this.mcpItineraryClientProvider = mcpItineraryClientProvider;
+        this.itineraryProvider = itineraryProvider == null ? "jettova" : itineraryProvider;
     }
 
     public Itinerary build(TravelState state) {
@@ -33,15 +41,46 @@ public class ItineraryAgentService {
 
         LocalDate departure = state.departureDate();
         LocalDate returning = state.returnDate();
+
+        if ("jettova".equalsIgnoreCase(itineraryProvider) || "auto".equalsIgnoreCase(itineraryProvider)) {
+            try {
+                var client = mcpItineraryClientProvider.getIfAvailable();
+                if (client != null) {
+                    var requirements = state.tripRequirements();
+                    Itinerary jettova = client.generate(
+                            state.destination(), departure, returning, state.travelers(), state.travelStyle(),
+                            requirements != null && requirements.isFoodExperiences(),
+                            requirements != null && requirements.isLocalExperiences(),
+                            requirements != null && requirements.isFamilyFriendly(),
+                            state.budgetLabel());
+                    Itinerary normalized = ItinerarySupport.normalize(jettova, nights, state.destination(), state.attractions());
+                    ensureRequestedPreferenceCoverage(normalized, state);
+                    log.info("Itinerary provider=Jettova generated {} day(s) destination={}",
+                            normalized.getDays() == null ? 0 : normalized.getDays().size(), state.destination());
+                    return normalized;
+                }
+            } catch (Exception exception) {
+                log.warn("Jettova itinerary unavailable; falling back to local Ollama itinerary destination={} reason={}",
+                        state.destination(), exception.getMessage());
+            }
+        }
+
         String content;
         try {
             content = routedLlm.complete(AgentRole.ITINERARY,
                     "You are the Itinerary Agent. Return JSON only with shape "
                             + "{\"summary\":\"\",\"days\":[{\"day\":1,\"title\":\"\","
+                            + "\"summary\":\"short day summary\",\"estimatedCost\":\"\",\"currency\":\"\","
                             + "\"activities\":[{\"name\":\"\",\"type\":\"sightseeing\","
                             + "\"indoorOutdoor\":\"indoor|outdoor|mixed\","
-                            + "\"familyFriendly\":true,\"foodExperience\":false,\"localExperience\":true}]}]}. "
-                            + "CRITICAL: days MUST contain exactly " + expectedDays + " objects (day 1.." + expectedDays + "). "
+                            + "\"familyFriendly\":true,\"foodExperience\":false,\"localExperience\":true,"
+                            + "\"description\":\"short useful visitor description\","
+                            + "\"location\":\"specific area or venue location\","
+                            + "\"duration\":\"e.g. 2 hours\","
+                            + "\"estimatedCost\":\"estimated amount or empty\","
+                            + "\"currency\":\"JPY|USD|INR\","
+                            + "\"bookingUrl\":\"booking URL or empty\","
+                            + "\"imageUrl\":\"image URL or empty\"}]}]}. " + "CRITICAL: days MUST contain exactly " + expectedDays + " objects (day 1.." + expectedDays + "). "
                             + "Each activity must have structured fields — never append '(indoor activity)' to names. "
                             + "Day 1 MUST mention arrival/check-in. Day " + expectedDays + " MUST mention departure/checkout. "
                             + "Use at most 2 activities per day plus one short food/local item when requested. Keep every activity name under 12 words. "

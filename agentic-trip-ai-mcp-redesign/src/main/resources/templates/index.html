@@ -955,6 +955,38 @@
         .item-title { font-weight:750; color:#eef5ff; font-size:14px; }
         .item-meta { color:var(--muted); font-size:12px; margin-top:5px; line-height:1.5; }
         .item-note { color:#a9c2df; font-size:12px; margin-top:6px; line-height:1.5; }
+        .itin-rich-list { display:grid; gap:18px; }
+        .itin-overview { display:flex; gap:14px; align-items:flex-start; padding:18px 20px; border:1px solid rgba(108,153,255,.18); background:linear-gradient(135deg,rgba(56,96,173,.18),rgba(20,31,55,.72)); border-radius:18px; }
+        .itin-overview-icon { width:44px; height:44px; display:grid; place-items:center; border-radius:13px; background:rgba(90,137,255,.16); font-size:22px; flex:0 0 44px; }
+        .itin-provider-badge { display:inline-block; margin-left:7px; padding:3px 7px; border-radius:999px; background:rgba(92,160,255,.12); color:#8dbaff; font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:.06em; vertical-align:middle; }
+        .itin-overview-title { font-size:17px; font-weight:800; color:#eef5ff; }
+        .itin-overview-text { margin-top:5px; color:#9fb3ce; font-size:13px; line-height:1.55; }
+        .itin-rich-day { overflow:hidden; border:1px solid rgba(255,255,255,.07); border-radius:20px; background:linear-gradient(180deg,rgba(29,44,72,.66),rgba(15,26,46,.78)); box-shadow:0 10px 30px rgba(0,0,0,.12); }
+        .itin-rich-day-head { display:flex; align-items:center; gap:15px; padding:18px 20px; border-bottom:1px solid rgba(255,255,255,.06); }
+        .itin-rich-day-number { width:58px; min-width:58px; height:58px; display:grid; place-items:center; border-radius:15px; background:linear-gradient(135deg,#294d8f,#1c315b); color:#b9d5ff; font-size:12px; font-weight:900; letter-spacing:.04em; }
+        .itin-rich-day-title-wrap { flex:1; min-width:0; }
+        .itin-rich-day-title-wrap h3 { margin:0; color:#f1f6ff; font-size:18px; font-weight:800; }
+        .itin-rich-day-title-wrap p { margin:5px 0 0; color:#94a9c4; font-size:12px; line-height:1.5; }
+        .itin-day-cost { color:#9ed6b1; font-size:13px; font-weight:800; text-align:right; }
+        .itin-day-cost small { display:block; margin-top:2px; color:#7187a4; font-size:9px; font-weight:600; text-transform:uppercase; letter-spacing:.08em; }
+        .itin-rich-activities { padding:16px; display:grid; gap:12px; }
+        .itin-rich-activity { display:flex; gap:14px; padding:13px; border:1px solid rgba(255,255,255,.055); border-radius:15px; background:rgba(7,17,32,.35); }
+        .itin-rich-activity-media { width:145px; min-width:145px; height:112px; overflow:hidden; border-radius:12px; background:linear-gradient(135deg,#1d2d4a,#111d31); }
+        .itin-rich-activity-media img { width:100%; height:100%; object-fit:cover; display:block; }
+        .itin-rich-activity-placeholder { width:100%; height:100%; display:flex; align-items:center; justify-content:center; font-size:32px; background:linear-gradient(135deg,rgba(57,91,146,.28),rgba(15,27,48,.72)); }
+        .itin-rich-activity-body { flex:1; min-width:0; }
+        .itin-rich-activity-top { display:flex; justify-content:space-between; gap:12px; align-items:flex-start; }
+        .itin-rich-activity-name { color:#eef4ff; font-size:15px; font-weight:800; line-height:1.35; }
+        .itin-rich-type { display:inline-block; margin-top:6px; color:#86b2f3; font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.07em; }
+        .itin-activity-cost { color:#9fe0b5; font-size:13px; font-weight:800; white-space:nowrap; }
+        .itin-rich-description { margin-top:8px; color:#9eb1ca; font-size:12px; line-height:1.55; }
+        .itin-rich-meta { display:flex; flex-wrap:wrap; gap:7px 14px; margin-top:9px; color:#8298b4; font-size:11px; }
+        .itin-rich-tags { display:flex; flex-wrap:wrap; gap:6px; margin-top:9px; }
+        .itin-rich-tags span { padding:4px 8px; border-radius:999px; background:rgba(95,130,184,.12); border:1px solid rgba(95,130,184,.12); color:#a9bdd7; font-size:10px; }
+        .itin-book-btn { display:inline-flex; margin-top:10px; padding:7px 11px; border-radius:9px; background:#356fca; color:#fff; text-decoration:none; font-size:11px; font-weight:800; }
+        .itin-book-btn:hover { background:#4482df; }
+        .itin-rich-empty { padding:20px; color:#8095b0; font-size:12px; }
+        @media (max-width:720px) { .itin-rich-activity { flex-direction:column; } .itin-rich-activity-media { width:100%; height:150px; } .itin-rich-day-head { align-items:flex-start; } .itin-day-cost { font-size:11px; } }
         .itin-list { display:grid; gap:10px; }
         .itin-item { display:grid; grid-template-columns:54px 1fr; gap:12px; }
         .itin-day-badge { align-self:start; text-align:center; padding:7px 4px; border-radius:10px; background:rgba(59,139,255,.12); border:1px solid rgba(91,155,255,.2); color:#bcd8ff; font-size:11px; font-weight:800; }
@@ -1559,6 +1591,32 @@
         .itin-compact .itin-day-badge { color:#86baff; font-size:10px; font-weight:800; letter-spacing:.08em; }
         .itin-compact .itin-day-title { margin-top:4px; font-size:13px; font-weight:750; }
         .itin-compact .itin-activities { margin:7px 0 0; padding-left:15px; color:#a7bad2; font-size:11px; line-height:1.55; }
+        .jettova-itinerary { display:grid; gap:14px; }
+        .jettova-itinerary-head { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; padding:14px 16px; border-radius:16px; background:linear-gradient(135deg,rgba(59,139,255,.12),rgba(112,77,255,.08)); border:1px solid rgba(116,161,255,.16); }
+        .jettova-itinerary-title { font-size:16px; font-weight:800; color:#f2f7ff; }
+        .jettova-itinerary-summary { margin-top:5px; color:#9fb3cc; font-size:12px; line-height:1.5; max-width:760px; }
+        .jettova-provider-badge { white-space:nowrap; border-radius:999px; padding:6px 9px; font-size:10px; font-weight:800; color:#dbeaff; background:rgba(59,139,255,.14); border:1px solid rgba(91,155,255,.22); }
+        .jettova-day { border:1px solid rgba(255,255,255,.07); border-radius:16px; background:rgba(255,255,255,.025); overflow:hidden; }
+        .jettova-day-head { display:flex; align-items:flex-start; gap:12px; padding:14px 15px; border-bottom:1px solid rgba(255,255,255,.055); }
+        .jettova-day-number { min-width:44px; height:44px; display:grid; place-items:center; border-radius:12px; background:rgba(59,139,255,.13); color:#9ac5ff; font-size:11px; font-weight:900; }
+        .jettova-day-title { font-size:14px; font-weight:800; color:#edf5ff; }
+        .jettova-day-summary { margin-top:4px; color:#8fa5bf; font-size:11px; line-height:1.45; }
+        .jettova-day-cost { margin-left:auto; white-space:nowrap; color:#c9ddf6; font-size:11px; font-weight:750; }
+        .jettova-activities { display:grid; gap:10px; padding:12px; }
+        .jettova-activity { display:grid; grid-template-columns:112px 1fr; gap:12px; padding:10px; border-radius:13px; background:rgba(0,0,0,.13); border:1px solid rgba(255,255,255,.045); }
+        .jettova-activity-media { width:112px; height:84px; border-radius:10px; overflow:hidden; background:linear-gradient(135deg,rgba(59,139,255,.12),rgba(255,255,255,.03)); }
+        .jettova-activity-media img { width:100%; height:100%; object-fit:cover; display:block; }
+        .jettova-activity-fallback { width:100%; height:100%; display:grid; place-items:center; font-size:26px; }
+        .jettova-activity-top { display:flex; justify-content:space-between; gap:10px; }
+        .jettova-activity-name { font-size:13px; font-weight:800; color:#edf5ff; }
+        .jettova-activity-type { color:#7faef0; font-size:10px; font-weight:750; text-transform:uppercase; letter-spacing:.05em; }
+        .jettova-activity-desc { margin-top:4px; color:#9db0c8; font-size:11px; line-height:1.5; }
+        .jettova-activity-meta { display:flex; flex-wrap:wrap; gap:6px; margin-top:7px; }
+        .jettova-activity-chip { padding:4px 7px; border-radius:999px; background:rgba(255,255,255,.045); color:#b8cbe1; font-size:10px; }
+        .jettova-activity-actions { display:flex; flex-wrap:wrap; gap:8px; margin-top:8px; }
+        .jettova-activity-book { display:inline-flex; align-items:center; gap:4px; text-decoration:none; border-radius:8px; padding:6px 9px; background:rgba(59,139,255,.15); border:1px solid rgba(91,155,255,.22); color:#bcd8ff; font-size:10px; font-weight:800; }
+        .jettova-activity-location { color:#7f95ad; font-size:10px; }
+        @media (max-width:620px){ .jettova-activity{grid-template-columns:1fr}.jettova-activity-media{width:100%;height:130px}.jettova-day-cost{margin-left:0}.jettova-day-head{flex-wrap:wrap} }
         .trip-side-card { background:linear-gradient(180deg,rgba(15,34,58,.94),rgba(9,22,39,.94)); border:1px solid rgba(255,255,255,.075); border-radius:16px; padding:16px; margin-bottom:14px; }
         .trip-side-title { font-size:14px; font-weight:800; margin-bottom:12px; }
         .summary-row { display:flex; justify-content:space-between; gap:10px; padding:9px 0; border-bottom:1px solid rgba(255,255,255,.055); font-size:12px; }
@@ -3440,17 +3498,68 @@
             + '<div class="hotel-rich-list">' + cards + '</div>' + more + '</div>';
     };
     const buildItinerarySection = (itinerary) => {
-        const days = itinerary && itinerary.days ? itinerary.days : [];
+        const days = itinerary && Array.isArray(itinerary.days) ? itinerary.days : [];
         if (!days.length) return '';
-        let html = '<div class="itin-list itin-compact">';
+        const text = value => value == null ? '' : String(value).trim();
+        const safeUrl = value => { const url = text(value); return /^https?:\/\//i.test(url) ? url : ''; };
+        const money = (value, currency) => { const v = text(value); if (!v) return ''; const c = text(currency); return c ? c + ' ' + v : v; };
+        const activityIcon = type => {
+            const t = text(type).toLowerCase();
+            if (t.includes('food') || t.includes('restaurant') || t.includes('dining')) return '🍜';
+            if (t.includes('culture') || t.includes('museum') || t.includes('history')) return '🏛️';
+            if (t.includes('nature') || t.includes('park') || t.includes('scenic')) return '🌿';
+            if (t.includes('transport') || t.includes('airport')) return '✈️';
+            if (t.includes('lodging') || t.includes('hotel')) return '🏨';
+            if (t.includes('shopping')) return '🛍️';
+            if (t.includes('leisure') || t.includes('walk')) return '🚶';
+            return '📍';
+        };
+        let html = '<div class="itin-rich-list">';
+        if (text(itinerary.summary)) {
+            html += '<div class="itin-overview"><div class="itin-overview-icon">🗺️</div><div style="flex:1"><div class="itin-overview-title">Day-by-day itinerary' + (itinerary.provider ? ' <span class="itin-provider-badge">' + escapeHtml(itinerary.provider) + '</span>' : '') + '</div><div class="itin-overview-text">' + escapeHtml(itinerary.summary) + '</div></div></div>';
+        }
         days.forEach(day => {
-            const acts = (day.activities || []).filter(a => a && a.name).map(a => {
-                const tags = activityTags(a);
-                return '<li>' + escapeHtml(a.name) + (a.type ? ' · ' + escapeHtml(a.type) : '') + (tags.length ? ' <span class="item-meta">(' + escapeHtml(tags.join(' · ')) + ')</span>' : '') + '</li>';
-            }).join('');
-            html += '<div class="itin-item"><div class="itin-day-badge">DAY ' + escapeHtml(String(day.day || '')) + '</div><div>'
-                + '<div class="itin-day-title">' + escapeHtml(day.title || 'Explore') + '</div>'
-                + (acts ? '<ul class="itin-activities">' + acts + '</ul>' : '') + '</div></div>';
+            const activities = Array.isArray(day.activities) ? day.activities.filter(a => a && text(a.name)) : [];
+            const dayCost = money(day.estimatedCost, day.currency);
+            html += '<article class="itin-rich-day"><div class="itin-rich-day-head">'
+                + '<div class="itin-rich-day-number">DAY ' + escapeHtml(String(day.day || '')) + '</div>'
+                + '<div class="itin-rich-day-title-wrap"><h3>' + escapeHtml(text(day.title) || 'Explore') + '</h3>'
+                + (text(day.summary) ? '<p>' + escapeHtml(day.summary) + '</p>' : '') + '</div>'
+                + (dayCost ? '<div class="itin-day-cost">' + escapeHtml(dayCost) + '<small>estimated</small></div>' : '')
+                + '</div>';
+            if (activities.length) {
+                html += '<div class="itin-rich-activities">';
+                activities.forEach(a => {
+                    const tags = activityTags(a);
+                    const image = safeUrl(a.imageUrl || a.image || a.photoUrl);
+                    const booking = safeUrl(a.bookingUrl || a.url || a.link);
+                    const cost = money(a.estimatedCost || a.cost || a.price, a.currency);
+                    const location = text(a.location || a.address || a.area);
+                    const duration = text(a.duration || a.durationText);
+                    const description = text(a.description || a.details || a.notes);
+                    html += '<div class="itin-rich-activity">'
+                        + '<div class="itin-rich-activity-media">'
+                        + (image ? '<img src="' + escapeHtml(image) + '" alt="' + escapeHtml(a.name) + '" loading="lazy" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\';">' : '')
+                        + '<div class="itin-rich-activity-placeholder"' + (image ? ' style="display:none"' : '') + '>' + activityIcon(a.type) + '</div>'
+                        + '</div><div class="itin-rich-activity-body">'
+                        + '<div class="itin-rich-activity-top"><div><div class="itin-rich-activity-name">' + escapeHtml(a.name) + '</div>'
+                        + (a.type ? '<span class="itin-rich-type">' + escapeHtml(a.type) + '</span>' : '') + '</div>'
+                        + (cost ? '<div class="itin-activity-cost">' + escapeHtml(cost) + '</div>' : '') + '</div>'
+                        + (description ? '<div class="itin-rich-description">' + escapeHtml(description) + '</div>' : '')
+                        + '<div class="itin-rich-meta">'
+                        + (location ? '<span>📍 ' + escapeHtml(location) + '</span>' : '')
+                        + (duration ? '<span>⏱ ' + escapeHtml(duration) + '</span>' : '')
+                        + (a.indoorOutdoor && String(a.indoorOutdoor).toLowerCase() !== 'mixed' ? '<span>◉ ' + escapeHtml(a.indoorOutdoor) + '</span>' : '')
+                        + '</div>'
+                        + (tags.length ? '<div class="itin-rich-tags">' + tags.map(tag => '<span>✓ ' + escapeHtml(tag) + '</span>').join('') + '</div>' : '')
+                        + (booking ? '<a class="itin-book-btn" href="' + escapeHtml(booking) + '" target="_blank" rel="noopener noreferrer">View / book ↗</a>' : '')
+                        + '</div></div>';
+                });
+                html += '</div>';
+            } else {
+                html += '<div class="itin-rich-empty">No activities were returned for this day.</div>';
+            }
+            html += '</article>';
         });
         return html + '</div>';
     };

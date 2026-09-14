@@ -38,7 +38,7 @@ travel:
     current-url: ${OPENWEATHER_CURRENT_URL:https://api.openweathermap.org/data/2.5/weather}
     forecast-url: ${OPENWEATHER_FORECAST_URL:https://api.openweathermap.org/data/2.5/forecast}
   mcp:
-    allowed-tools: ${MCP_ALLOWED_TOOLS:search_flights,search_hotels,get_weather,resolve_airport,search_travel_research}
+    allowed-tools: ${MCP_ALLOWED_TOOLS:search_flights,search_hotels,get_weather,resolve_airport,search_travel_research,generate_itinerary}
     security:
       enabled: ${MCP_SECURITY_ENABLED:false}
       api-key: ${MCP_API_KEY:}
@@ -63,6 +63,12 @@ travel:
     max-results: ${SERPAPI_MAX_RESULTS:8}
     connect-timeout: ${SERPAPI_CONNECT_TIMEOUT:5s}
     read-timeout: ${SERPAPI_READ_TIMEOUT:15s}
+  jettova:
+    enabled: ${JETTOVA_ENABLED:true}
+    api-url: ${JETTOVA_API_URL:https://www.jettova.com/api/v1}
+    api-key: ${JETTOVA_API_KEY:}
+    connect-timeout: ${JETTOVA_CONNECT_TIMEOUT:5s}
+    read-timeout: ${JETTOVA_READ_TIMEOUT:60s}
   hotels:
     strategy: FALLBACK
     max-results: ${HOTEL_MAX_RESULTS:8}

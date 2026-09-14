@@ -1122,17 +1122,68 @@
     };
 
     const buildItinerarySection = (itinerary) => {
-        const days = itinerary && itinerary.days ? itinerary.days : [];
+        const days = itinerary && Array.isArray(itinerary.days) ? itinerary.days : [];
         if (!days.length) return '';
-        let html = '<div class="itin-list itin-compact">';
+        const text = value => value == null ? '' : String(value).trim();
+        const safeUrl = value => { const url = text(value); return /^https?:\/\//i.test(url) ? url : ''; };
+        const money = (value, currency) => { const v = text(value); if (!v) return ''; const c = text(currency); return c ? c + ' ' + v : v; };
+        const activityIcon = type => {
+            const t = text(type).toLowerCase();
+            if (t.includes('food') || t.includes('restaurant') || t.includes('dining')) return '🍜';
+            if (t.includes('culture') || t.includes('museum') || t.includes('history')) return '🏛️';
+            if (t.includes('nature') || t.includes('park') || t.includes('scenic')) return '🌿';
+            if (t.includes('transport') || t.includes('airport')) return '✈️';
+            if (t.includes('lodging') || t.includes('hotel')) return '🏨';
+            if (t.includes('shopping')) return '🛍️';
+            if (t.includes('leisure') || t.includes('walk')) return '🚶';
+            return '📍';
+        };
+        let html = '<div class="itin-rich-list">';
+        if (text(itinerary.summary)) {
+            html += '<div class="itin-overview"><div class="itin-overview-icon">🗺️</div><div style="flex:1"><div class="itin-overview-title">Day-by-day itinerary' + (itinerary.provider ? ' <span class="itin-provider-badge">' + escapeHtml(itinerary.provider) + '</span>' : '') + '</div><div class="itin-overview-text">' + escapeHtml(itinerary.summary) + '</div></div></div>';
+        }
         days.forEach(day => {
-            const acts = (day.activities || []).filter(a => a && a.name).map(a => {
-                const tags = activityTags(a);
-                return '<li>' + escapeHtml(a.name) + (a.type ? ' · ' + escapeHtml(a.type) : '') + (tags.length ? ' <span class="item-meta">(' + escapeHtml(tags.join(' · ')) + ')</span>' : '') + '</li>';
-            }).join('');
-            html += '<div class="itin-item"><div class="itin-day-badge">DAY ' + escapeHtml(String(day.day || '')) + '</div><div>'
-                + '<div class="itin-day-title">' + escapeHtml(day.title || 'Explore') + '</div>'
-                + (acts ? '<ul class="itin-activities">' + acts + '</ul>' : '') + '</div></div>';
+            const activities = Array.isArray(day.activities) ? day.activities.filter(a => a && text(a.name)) : [];
+            const dayCost = money(day.estimatedCost, day.currency);
+            html += '<article class="itin-rich-day"><div class="itin-rich-day-head">'
+                + '<div class="itin-rich-day-number">DAY ' + escapeHtml(String(day.day || '')) + '</div>'
+                + '<div class="itin-rich-day-title-wrap"><h3>' + escapeHtml(text(day.title) || 'Explore') + '</h3>'
+                + (text(day.summary) ? '<p>' + escapeHtml(day.summary) + '</p>' : '') + '</div>'
+                + (dayCost ? '<div class="itin-day-cost">' + escapeHtml(dayCost) + '<small>estimated</small></div>' : '')
+                + '</div>';
+            if (activities.length) {
+                html += '<div class="itin-rich-activities">';
+                activities.forEach(a => {
+                    const tags = activityTags(a);
+                    const image = safeUrl(a.imageUrl || a.image || a.photoUrl);
+                    const booking = safeUrl(a.bookingUrl || a.url || a.link);
+                    const cost = money(a.estimatedCost || a.cost || a.price, a.currency);
+                    const location = text(a.location || a.address || a.area);
+                    const duration = text(a.duration || a.durationText);
+                    const description = text(a.description || a.details || a.notes);
+                    html += '<div class="itin-rich-activity">'
+                        + '<div class="itin-rich-activity-media">'
+                        + (image ? '<img src="' + escapeHtml(image) + '" alt="' + escapeHtml(a.name) + '" loading="lazy" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\';">' : '')
+                        + '<div class="itin-rich-activity-placeholder"' + (image ? ' style="display:none"' : '') + '>' + activityIcon(a.type) + '</div>'
+                        + '</div><div class="itin-rich-activity-body">'
+                        + '<div class="itin-rich-activity-top"><div><div class="itin-rich-activity-name">' + escapeHtml(a.name) + '</div>'
+                        + (a.type ? '<span class="itin-rich-type">' + escapeHtml(a.type) + '</span>' : '') + '</div>'
+                        + (cost ? '<div class="itin-activity-cost">' + escapeHtml(cost) + '</div>' : '') + '</div>'
+                        + (description ? '<div class="itin-rich-description">' + escapeHtml(description) + '</div>' : '')
+                        + '<div class="itin-rich-meta">'
+                        + (location ? '<span>📍 ' + escapeHtml(location) + '</span>' : '')
+                        + (duration ? '<span>⏱ ' + escapeHtml(duration) + '</span>' : '')
+                        + (a.indoorOutdoor && String(a.indoorOutdoor).toLowerCase() !== 'mixed' ? '<span>◉ ' + escapeHtml(a.indoorOutdoor) + '</span>' : '')
+                        + '</div>'
+                        + (tags.length ? '<div class="itin-rich-tags">' + tags.map(tag => '<span>✓ ' + escapeHtml(tag) + '</span>').join('') + '</div>' : '')
+                        + (booking ? '<a class="itin-book-btn" href="' + escapeHtml(booking) + '" target="_blank" rel="noopener noreferrer">View / book ↗</a>' : '')
+                        + '</div></div>';
+                });
+                html += '</div>';
+            } else {
+                html += '<div class="itin-rich-empty">No activities were returned for this day.</div>';
+            }
+            html += '</article>';
         });
         return html + '</div>';
     };

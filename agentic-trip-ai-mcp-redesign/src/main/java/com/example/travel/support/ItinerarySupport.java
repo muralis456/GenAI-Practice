@@ -44,7 +44,9 @@ public final class ItinerarySupport {
         String summary = source == null || source.getSummary() == null || source.getSummary().isBlank()
                 ? expected + "-day plan for " + (destination == null || destination.isBlank() ? "the trip" : destination)
                 : source.getSummary();
-        return new Itinerary(summary, days);
+        Itinerary normalized = new Itinerary(summary, days);
+        if (source != null) normalized.setProvider(source.getProvider());
+        return normalized;
     }
 
     private static ItineraryDay enforceVariety(ItineraryDay day, int dayNumber, int expected,
@@ -105,21 +107,34 @@ public final class ItinerarySupport {
             List<ItineraryActivity> activities = fromModel == null || fromModel.getActivities().isEmpty()
                     ? arrivalActivities(place)
                     : sanitizeActivities(fromModel.getActivities());
-            return new ItineraryDay(1, "Arrival", activities);
+            ItineraryDay result = new ItineraryDay(1, "Arrival", activities);
+            copyDayMetadata(fromModel, result);
+            return result;
         }
 
         if (day == expected) {
             List<ItineraryActivity> activities = fromModel == null || fromModel.getActivities().isEmpty()
                     ? departureActivities(place)
                     : sanitizeActivities(fromModel.getActivities());
-            return new ItineraryDay(day, "Departure", activities);
+            ItineraryDay result = new ItineraryDay(day, "Departure", activities);
+            copyDayMetadata(fromModel, result);
+            return result;
         }
 
         String title = sanitizeExploreTitle(fromModel == null ? null : fromModel.getTitle(), place, day);
         List<ItineraryActivity> activities = fromModel != null && !fromModel.getActivities().isEmpty()
                 ? sanitizeActivities(fromModel.getActivities())
                 : exploreActivities(day, attractions, place);
-        return new ItineraryDay(day, title, activities);
+        ItineraryDay result = new ItineraryDay(day, title, activities);
+        copyDayMetadata(fromModel, result);
+        return result;
+    }
+
+    private static void copyDayMetadata(ItineraryDay source, ItineraryDay target) {
+        if (source == null || target == null) return;
+        target.setSummary(source.getSummary());
+        target.setEstimatedCost(source.getEstimatedCost());
+        target.setCurrency(source.getCurrency());
     }
 
     private static List<ItineraryActivity> arrivalActivities(String place) {

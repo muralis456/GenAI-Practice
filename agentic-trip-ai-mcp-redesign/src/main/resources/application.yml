@@ -60,6 +60,8 @@ travel:
     client:
       enabled: ${TRAVEL_MCP_CLIENT_ENABLED:true}
       max-attempts: ${TRAVEL_MCP_CLIENT_MAX_ATTEMPTS:2}
+  itinerary:
+    provider: ${TRAVEL_ITINERARY_PROVIDER:jettova}
   rag:
     enabled: ${TRAVEL_RAG_ENABLED:true}
     top-k: ${TRAVEL_RAG_TOP_K:5}
@@ -93,7 +95,7 @@ travel:
     max-tokens:
       extraction: ${TRAVEL_MODEL_MAX_TOKENS_EXTRACTION:384}
       planner: ${TRAVEL_MODEL_MAX_TOKENS_PLANNER:512}
-      itinerary: ${TRAVEL_MODEL_MAX_TOKENS_ITINERARY:900}
+      itinerary: ${TRAVEL_MODEL_MAX_TOKENS_ITINERARY:1400}
       final: ${TRAVEL_MODEL_MAX_TOKENS_FINAL:700}
   tavily:
     api-url: https://api.tavily.com/search

@@ -13,6 +13,9 @@ public class ItineraryDay implements Serializable {
     private int day;
     private String title;
     private List<ItineraryActivity> activities = new ArrayList<>();
+    private String summary = "";
+    private String estimatedCost = "";
+    private String currency = "";
 
     public ItineraryDay() {
     }
@@ -46,6 +49,13 @@ public class ItineraryDay implements Serializable {
     public void setActivities(List<ItineraryActivity> activities) {
         this.activities = activities == null ? new ArrayList<>() : activities;
     }
+
+    public String getSummary() { return summary; }
+    public void setSummary(String summary) { this.summary = summary == null ? "" : summary; }
+    public String getEstimatedCost() { return estimatedCost; }
+    public void setEstimatedCost(String estimatedCost) { this.estimatedCost = estimatedCost == null ? "" : estimatedCost; }
+    public String getCurrency() { return currency; }
+    public void setCurrency(String currency) { this.currency = currency == null ? "" : currency; }
 
     public String activitiesText() {
         if (activities == null || activities.isEmpty()) {

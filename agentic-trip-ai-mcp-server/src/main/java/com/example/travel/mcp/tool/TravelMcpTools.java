@@ -53,6 +53,37 @@ public class TravelMcpTools {
         return response;
     }
 
+    @McpTool(name = "generate_itinerary", description = "Generate a real day-by-day travel itinerary using Jettova, including named venues/restaurants, costs and booking links when available.")
+    public com.example.travel.mcp.service.JettovaItineraryProvider.JettovaItineraryResponse generateItinerary(
+            @McpToolParam(description = "Destination city", required = true) String destination,
+            @McpToolParam(description = "Number of itinerary days, 1 to 14", required = true) Integer days,
+            @McpToolParam(description = "Trip start date yyyy-MM-dd", required = false) String startDate,
+            @McpToolParam(description = "Trip end date yyyy-MM-dd", required = false) String endDate,
+            @McpToolParam(description = "Number of adults", required = false) Integer adults,
+            @McpToolParam(description = "Travel style such as balanced, family, luxury or budget", required = false) String travelStyle,
+            @McpToolParam(description = "Prefer food experiences", required = false) Boolean foodExperience,
+            @McpToolParam(description = "Prefer local experiences", required = false) Boolean localExperience,
+            @McpToolParam(description = "Prefer family-friendly activities", required = false) Boolean familyFriendly,
+            @McpToolParam(description = "Budget label such as low, medium or high", required = false) String budgetLabel) {
+        governance.check("generate_itinerary");
+        long started = System.nanoTime();
+        LocalDate start = parse(startDate, LocalDate.now());
+        LocalDate end = parse(endDate, start.plusDays(Math.max(1, days == null ? 1 : days)));
+        int dayCount = Math.max(1, Math.min(14, days == null ? Math.max(1, (int) java.time.temporal.ChronoUnit.DAYS.between(start, end)) : days));
+        int adultCount = adults == null ? 2 : Math.max(1, adults);
+        log.info("mcp.tool.request name=generate_itinerary destination={} days={} startDate={} endDate={} adults={} style={}",
+                destination, dayCount, start, end, adultCount, travelStyle);
+        var response = services.generateItinerary(destination, dayCount, start, end, adultCount,
+                travelStyle == null ? "balanced" : travelStyle,
+                Boolean.TRUE.equals(foodExperience), Boolean.TRUE.equals(localExperience),
+                Boolean.TRUE.equals(familyFriendly), budgetLabel);
+        log.info("mcp.tool.response name=generate_itinerary success={} days={} provider={} message={}",
+                response.success(), response.days().size(), response.provider(), response.message());
+        log.info("mcp.tool.complete name=generate_itinerary success={} days={} durationMs={}",
+                response.success(), response.days().size(), elapsedMs(started));
+        return response;
+    }
+
     @McpTool(name = "get_weather", description = "Get weather forecast for a destination and date range.")
     public WeatherResult getWeather(
             @McpToolParam(description = "Destination city or country", required = true) String destination,

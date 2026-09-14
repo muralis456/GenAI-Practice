@@ -12,6 +12,7 @@ public class Itinerary implements Serializable {
 
     private String summary;
     private List<ItineraryDay> days = new ArrayList<>();
+    private String provider = "";
 
     public Itinerary() {
     }
@@ -36,6 +37,10 @@ public class Itinerary implements Serializable {
     public void setDays(List<ItineraryDay> days) {
         this.days = days;
     }
+
+    public String getProvider() { return provider; }
+
+    public void setProvider(String provider) { this.provider = provider == null ? "" : provider; }
 
     public boolean isEmpty() {
         return (summary == null || summary.isBlank()) && (days == null || days.isEmpty());

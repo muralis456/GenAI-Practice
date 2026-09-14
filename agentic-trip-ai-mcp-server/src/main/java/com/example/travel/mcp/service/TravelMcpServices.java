@@ -40,6 +40,7 @@ public class TravelMcpServices {
     private final String forecastWeatherUrl;
     private final String openWeatherApiKey;
     private final HotelSearchOrchestrator hotelSearchOrchestrator;
+    private final JettovaItineraryProvider jettovaItineraryProvider;
 
     public TravelMcpServices(RestClient.Builder builder,
                              ObjectMapper objectMapper,
@@ -49,7 +50,8 @@ public class TravelMcpServices {
                              @Value("${travel.weather.current-url:https://api.openweathermap.org/data/2.5/weather}") String currentWeatherUrl,
                              @Value("${travel.weather.forecast-url:https://api.openweathermap.org/data/2.5/forecast}") String forecastWeatherUrl,
                              @Value("${travel.weather.api-key:}") String openWeatherApiKey,
-                             HotelSearchOrchestrator hotelSearchOrchestrator) {
+                             HotelSearchOrchestrator hotelSearchOrchestrator,
+                             JettovaItineraryProvider jettovaItineraryProvider) {
         this.restClient = builder.build();
         this.objectMapper = objectMapper;
         this.tavilyUrl = tavilyUrl;
@@ -59,6 +61,7 @@ public class TravelMcpServices {
         this.forecastWeatherUrl = forecastWeatherUrl;
         this.openWeatherApiKey = openWeatherApiKey;
         this.hotelSearchOrchestrator = hotelSearchOrchestrator;
+        this.jettovaItineraryProvider = jettovaItineraryProvider;
     }
 
     public SearchHotelsResponse searchHotels(String destination, String travelStyle, boolean cheaper,
@@ -74,6 +77,14 @@ public class TravelMcpServices {
                 Math.max(0, children),
                 maxPricePerNight);
         return hotelSearchOrchestrator.search(request);
+    }
+
+    public JettovaItineraryProvider.JettovaItineraryResponse generateItinerary(
+            String destination, int days, LocalDate startDate, LocalDate endDate, int adults,
+            String travelStyle, boolean foodExperience, boolean localExperience, boolean familyFriendly,
+            String budgetLabel) {
+        return jettovaItineraryProvider.generate(destination, days, startDate, endDate, adults,
+                travelStyle, foodExperience, localExperience, familyFriendly, budgetLabel);
     }
 
     public SearchHotelsResponse searchHotels(String destination, String travelStyle, boolean cheaper) {
