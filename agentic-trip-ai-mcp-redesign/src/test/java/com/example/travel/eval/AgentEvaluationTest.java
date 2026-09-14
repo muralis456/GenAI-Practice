@@ -146,7 +146,8 @@ class AgentEvaluationTest {
         assertFalse(ToolFailureClassifier.fromHttp(403, "").isRetryable());
         assertEquals(ToolErrorCode.INVALID_INPUT, ToolFailureClassifier.fromHttp(422, "query null"));
         assertFalse(ToolFailureClassifier.fromHttp(422, "").isRetryable());
-        assertTrue(ToolFailureClassifier.fromHttp(429, "rate limit").isRetryable());
+        assertEquals(ToolErrorCode.RATE_LIMITED, ToolFailureClassifier.fromHttp(429, "rate limit"));
+        assertFalse(ToolFailureClassifier.fromHttp(429, "rate limit").isRetryable());
         assertTrue(ToolFailureClassifier.fromHttp(503, "").isRetryable());
     }
 

@@ -84,6 +84,19 @@ public class SupervisorAgentService {
             return TravelGraphNodes.ROUTE_RETRY;
         }
 
+        // A provider failure explicitly classified as non-retryable (for example
+        // AviationStack HTTP 429 quota/rate-limit exhaustion) must not be turned
+        // back into a retry just because the specialist result is empty. The
+        // specialist has already recorded the authoritative failure reason.
+        NodeFailureInfo nonRetryableFailure = state.nodeFailure();
+        if (nonRetryableFailure != null
+                && !TravelState.isBlank(nonRetryableFailure.getLastFailedNode())
+                && !nonRetryableFailure.isRetryable()) {
+            log.warn("Supervisor: non-retryable specialist failure node={} error={}; proceeding without retry",
+                    nonRetryableFailure.getLastFailedNode(), nonRetryableFailure.getLastError());
+            return TravelGraphNodes.ROUTE_PROCEED;
+        }
+
         // Validate ONLY specialists requested in the current graph pass.
         // NEEDS_* is historical/cumulative and must never drive retry routing.
         //

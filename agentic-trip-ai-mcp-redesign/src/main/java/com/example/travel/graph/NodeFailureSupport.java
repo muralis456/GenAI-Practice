@@ -13,7 +13,11 @@ public final class NodeFailureSupport {
     public static Map<String, Object> record(String node, TravelState state, Exception ex, boolean retryable, int previousRetries) {
         NodeFailureInfo failure = new NodeFailureInfo();
         failure.setLastFailedNode(node);
-        failure.setLastError(ex.getMessage() == null ? ex.getClass().getSimpleName() : ex.getMessage());
+        String errorMessage = ex.getMessage() == null ? ex.getClass().getSimpleName() : ex.getMessage();
+        failure.setLastError(errorMessage);
+        if (!retryable && errorMessage.toLowerCase(java.util.Locale.ROOT).contains("rate limit")) {
+            failure.setFailureType("RATE_LIMITED");
+        }
         failure.setFailureType(ex.getClass().getSimpleName());
         failure.setRetryable(retryable);
         failure.setNodeRetryCount(previousRetries + 1);

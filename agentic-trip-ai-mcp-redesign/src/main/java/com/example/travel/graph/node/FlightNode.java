@@ -3,6 +3,7 @@ package com.example.travel.graph.node;
 import com.example.travel.graph.TravelGraphNodes;
 import com.example.travel.graph.TravelState;
 import com.example.travel.model.ProvenanceEvent;
+import com.example.travel.service.McpFlightSearchClient;
 import com.example.travel.agent.FlightAgentService;
 import com.example.travel.graph.GraphExecutionLogger;
 import com.example.travel.graph.NodeFailureSupport;
@@ -51,8 +52,10 @@ public class FlightNode implements NodeAction<TravelState> {
                     "flights", "AviationStack", "", 0, result.originIata() + "->" + result.destinationIata())));
             return updates;
         } catch (Exception ex) {
-            return NodeFailureSupport.record(TravelGraphNodes.FLIGHT, state, ex,
-                    ToolFailureClassifier.fromException(ex).isRetryable(),
+            boolean retryable = ex instanceof McpFlightSearchClient.FlightProviderException providerException
+                    ? providerException.retryable()
+                    : ToolFailureClassifier.fromException(ex).isRetryable();
+            return NodeFailureSupport.record(TravelGraphNodes.FLIGHT, state, ex, retryable,
                     state.nodeFailure().getNodeRetryCount());
         }
     }

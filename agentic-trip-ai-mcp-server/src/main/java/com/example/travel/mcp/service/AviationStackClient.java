@@ -58,8 +58,14 @@ public class AviationStackClient {
                     .uri(url)
                     .retrieve()
                     .onStatus(HttpStatusCode::isError, (ignored, response) -> {
-                        throw new AviationStackException("PROVIDER_HTTP_" + response.getStatusCode().value(),
-                                "AviationStack flight search failed.");
+                        int status = response.getStatusCode().value();
+                        String providerMessage = extractProviderMessage(response);
+                        String providerCode = extractProviderCode(providerMessage);
+                        String message = buildProviderErrorMessage(status, providerCode, providerMessage);
+                        log.error(
+                                "MCP search_flights provider=AviationStack failed httpStatus={} providerCode={} providerMessage={} origin={} destination={}",
+                                status, providerCode, providerMessage, origin, destination);
+                        throw new AviationStackException("PROVIDER_HTTP_" + status, message);
                     })
                     .body(String.class);
             SearchFlightsResponse result = parse(body, origin, destination, request);
@@ -67,7 +73,8 @@ public class AviationStackClient {
                     result.success(), result.flights().size(), elapsedMs(started));
             return result;
         } catch (AviationStackException exception) {
-            log.warn("MCP search_flights failed code={} durationMs={}", exception.code, elapsedMs(started));
+            log.warn("MCP search_flights failed code={} message={} durationMs={}",
+                    exception.code, exception.getMessage(), elapsedMs(started));
             return SearchFlightsResponse.failure(exception.code, exception.getMessage());
         } catch (RestClientException exception) {
             log.warn("MCP search_flights provider unavailable durationMs={}", elapsedMs(started));
@@ -87,6 +94,56 @@ public class AviationStackClient {
             builder.queryParam("flight_date", departureDate.trim());
         }
         return builder.build().toUriString();
+    }
+
+    private String extractProviderMessage(org.springframework.http.client.ClientHttpResponse response) {
+        try {
+            String body = new String(response.getBody().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+            if (body.isBlank()) {
+                return "No error details returned by AviationStack.";
+            }
+            JsonNode root = objectMapper.readTree(body);
+            JsonNode error = root.path("error");
+            if (error.isObject()) {
+                String message = nonBlank(error.path("message").asString(), "");
+                if (!message.isBlank()) {
+                    return message;
+                }
+            }
+            return body.length() > 500 ? body.substring(0, 500) : body;
+        } catch (Exception ignored) {
+            return "AviationStack returned HTTP " + response.getStatusCode().value() + " without readable error details.";
+        }
+    }
+
+    private String extractProviderCode(String providerMessage) {
+        if (providerMessage == null) {
+            return "";
+        }
+        String lower = providerMessage.toLowerCase(Locale.ROOT);
+        if (lower.contains("rate") || lower.contains("limit") || lower.contains("quota")) {
+            return "rate_limit_reached";
+        }
+        return "";
+    }
+
+    private String buildProviderErrorMessage(int status, String providerCode, String providerMessage) {
+        if (status == 429 || "rate_limit_reached".equals(providerCode)) {
+            return "AviationStack rate limit/quota reached (HTTP 429). "
+                    + providerMessage
+                    + " Flight search will not be retried automatically.";
+        }
+        if (status == 401) {
+            return "AviationStack authentication failed (HTTP 401). Check AVIATIONSTACK_API_KEY.";
+        }
+        if (status == 403) {
+            return "AviationStack access denied (HTTP 403). Check the subscription plan and endpoint permissions. "
+                    + providerMessage;
+        }
+        if (status == 400 || status == 422) {
+            return "AviationStack rejected the flight search request (HTTP " + status + "). " + providerMessage;
+        }
+        return "AviationStack flight search failed (HTTP " + status + "). " + providerMessage;
     }
 
     private SearchFlightsResponse parse(String body, String origin, String destination, SearchFlightsRequest request)

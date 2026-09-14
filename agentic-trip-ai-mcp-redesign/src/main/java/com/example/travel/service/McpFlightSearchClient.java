@@ -44,16 +44,24 @@ public class McpFlightSearchClient {
                     "returnDate", "",
                     "passengers", Math.max(1, passengers));
                 return parse(mcpToolClient.invokePreferred("search_flights", "Live flight schedule search", userInput, input));
+        } catch (FlightProviderException exception) {
+            log.error("mcp.client.error client=McpFlightSearchClient operation=search origin={} destination={} departureDate={} passengers={} errorCode={} retryable={} errorMessage={}",
+                    origin, destination, departureDate, passengers, exception.errorCode(), exception.retryable(), exception.getMessage());
+            throw exception;
         } catch (Exception exception) {
             log.error("mcp.client.error client=McpFlightSearchClient operation=search origin={} destination={} departureDate={} passengers={} errorType={} errorMessage={}",
                     origin, destination, departureDate, passengers, exception.getClass().getName(), safeMessage(exception), exception);
-            return List.of(unavailable("MCP flight search is unavailable: " + safeMessage(exception)));
+            throw new FlightProviderException("PROVIDER_UNAVAILABLE",
+                    "MCP flight search is unavailable: " + safeMessage(exception), true, exception);
         }
     }
 
     private List<FlightOption> parse(JsonNode root) throws Exception {
         if (!root.path("success").asBoolean(false)) {
-            return List.of(unavailable(root.path("message").asString("MCP flight search failed.")));
+            String errorCode = root.path("errorCode").asString("PROVIDER_ERROR");
+            String message = root.path("message").asString("MCP flight search failed.");
+            boolean retryable = !isNonRetryableProviderError(errorCode, message);
+            throw new FlightProviderException(errorCode, message, retryable, null);
         }
 
         List<FlightOption> flights = new ArrayList<>();
@@ -77,6 +85,33 @@ public class McpFlightSearchClient {
         option.setStatus("unavailable");
         option.setNotes(message);
         return option;
+    }
+
+    private boolean isNonRetryableProviderError(String errorCode, String message) {
+        String code = errorCode == null ? "" : errorCode.toUpperCase(java.util.Locale.ROOT);
+        String text = message == null ? "" : message.toLowerCase(java.util.Locale.ROOT);
+        return code.contains("429") || code.contains("RATE_LIMIT") || code.contains("401")
+                || code.contains("403") || code.contains("400") || code.contains("422") || code.contains("404")
+                || text.contains("rate limit") || text.contains("quota") || text.contains("too many requests");
+    }
+
+    public static final class FlightProviderException extends RuntimeException {
+        private final String errorCode;
+        private final boolean retryable;
+
+        public FlightProviderException(String errorCode, String message, boolean retryable, Throwable cause) {
+            super(message, cause);
+            this.errorCode = errorCode == null ? "PROVIDER_ERROR" : errorCode;
+            this.retryable = retryable;
+        }
+
+        public String errorCode() {
+            return errorCode;
+        }
+
+        public boolean retryable() {
+            return retryable;
+        }
     }
 
     private String safeMessage(Exception exception) {

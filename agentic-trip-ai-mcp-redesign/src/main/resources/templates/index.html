@@ -1563,25 +1563,24 @@
         @media (max-width:1100px) { .travel-dashboard{grid-template-columns:1fr;} .travel-side{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;} .travel-side .trip-side-card{margin-bottom:0;} }
         @media (max-width:760px) { .workspace-grid{grid-template-columns:1fr;} .workspace-card.full{grid-column:auto;} .travel-side{grid-template-columns:1fr;} .content{padding-left:14px;padding-right:14px;} .trip-banner{padding:18px;} }
 
-        .weather-dashboard-card{border:1px solid rgba(93,166,255,.16);border-radius:14px;background:linear-gradient(180deg,rgba(20,44,72,.72),rgba(8,22,39,.68));padding:14px;box-shadow:0 12px 28px rgba(0,0,0,.12)}
-        .weather-dashboard-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:13px}
-        .weather-location-title{font-size:15px;font-weight:800;color:#edf6ff}.weather-location-sub{margin-top:3px;color:#8fa9c5;font-size:11px}
-        .weather-live-badge{white-space:nowrap;color:#8fc5ff;background:rgba(55,139,235,.10);border:1px solid rgba(76,157,255,.20);border-radius:999px;padding:5px 8px;font-size:10px;font-weight:800}
-        .weather-days-grid{display:grid;grid-template-columns:repeat(5,minmax(105px,1fr));gap:8px;overflow:auto;padding-bottom:2px}
-        .weather-day-card{min-width:105px;padding:11px 9px;border-radius:11px;background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.055);text-align:center}
-        .weather-day-date{font-size:10px;font-weight:800;color:#9eb8d5;text-transform:uppercase;letter-spacing:.06em}.weather-day-icon{font-size:26px;margin:8px 0 4px}.weather-day-condition{height:29px;font-size:10px;color:#c9d9eb;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.weather-day-temp{margin-top:5px;font-size:12px}.weather-day-temp strong{font-size:16px;color:#f3f8ff}.weather-day-temp span{color:#8da5bf}.weather-day-rain{margin-top:6px;font-size:10px;color:#8fbdf1}
-        .weather-insight{display:flex;gap:9px;margin-top:10px;padding:10px 11px;border-radius:10px;background:rgba(75,151,235,.08);border:1px solid rgba(75,151,235,.15);color:#a9c4e2;font-size:11px;line-height:1.5}.weather-insight strong{display:block;color:#dcecff;margin-bottom:2px}.weather-insight-icon{font-size:16px}
-        .weather-current{display:grid;grid-template-columns:minmax(190px,1.25fr) minmax(0,2fr);gap:12px;margin-bottom:12px}
-        .weather-current-main{position:relative;overflow:hidden;padding:16px;border-radius:13px;background:linear-gradient(145deg,rgba(46,110,177,.25),rgba(16,38,61,.72));border:1px solid rgba(104,177,255,.20)}
-        .weather-current-main:after{content:'';position:absolute;width:150px;height:150px;right:-65px;top:-75px;border-radius:50%;background:rgba(111,190,255,.10);filter:blur(2px)}
-        .weather-current-label{font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#8eb9e5}
-        .weather-current-condition{display:flex;align-items:center;gap:8px;margin-top:8px}.weather-current-icon{width:54px;height:54px;object-fit:contain}.weather-current-temp{font-size:36px;font-weight:850;letter-spacing:-.04em;color:#f5faff;line-height:1}.weather-current-temp small{font-size:17px;font-weight:700;color:#a9c3dd}.weather-current-desc{margin-top:5px;color:#c5d9ed;font-size:12px;text-transform:capitalize}.weather-current-feels{margin-top:8px;color:#8fa9c3;font-size:11px}
-        .weather-metrics{display:grid;grid-template-columns:repeat(4,minmax(92px,1fr));gap:7px}.weather-metric{padding:10px 9px;border-radius:10px;background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.055)}.weather-metric-label{font-size:9px;color:#7f9bb7;text-transform:uppercase;letter-spacing:.05em}.weather-metric-value{margin-top:5px;color:#e9f3fd;font-size:12px;font-weight:800}.weather-metric-sub{margin-top:2px;color:#718da8;font-size:9px}
-        .weather-sunline{display:flex;gap:7px;margin-top:8px}.weather-sun{flex:1;padding:8px 9px;border-radius:9px;background:rgba(255,255,255,.03);color:#9db6ce;font-size:10px}.weather-sun strong{display:block;color:#e7f2fc;font-size:11px;margin-top:2px}
-        .weather-source{margin-top:9px;color:#6f8ba6;font-size:9px}.weather-source strong{color:#88afd2}
-        .weather-empty-state{padding:16px}.weather-empty-message{display:flex;align-items:center;gap:12px;padding:16px;border-radius:12px;background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.06)}.weather-empty-icon{width:46px;height:46px;display:flex;align-items:center;justify-content:center;border-radius:12px;background:rgba(255,255,255,.055);font-size:25px}.weather-empty-title{font-size:14px;font-weight:800;color:#eef6ff}.weather-empty-detail{margin-top:4px;color:#91a8c0;font-size:11px;line-height:1.5}
-        .weather-forecast-title{margin:12px 0 8px;color:#cfe0f1;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.07em}
-        .weather-focused .weather-current{grid-template-columns:minmax(230px,1fr) minmax(0,2fr)}.weather-focused .weather-current-main{padding:20px}.weather-focused .weather-current-temp{font-size:44px}
+        .weather-dashboard-card{border:1px solid rgba(103,167,236,.18);border-radius:18px;background:linear-gradient(145deg,rgba(18,39,67,.92),rgba(7,20,37,.96));padding:18px;box-shadow:0 18px 42px rgba(0,0,0,.20);overflow:hidden;position:relative}
+        .weather-dashboard-card:before{content:"";position:absolute;inset:0;pointer-events:none;background:radial-gradient(circle at 86% 8%,rgba(92,174,255,.13),transparent 25%),radial-gradient(circle at 12% 92%,rgba(71,123,190,.08),transparent 28%)}
+        .weather-dashboard-head{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;margin-bottom:16px;position:relative;z-index:1}
+        .weather-location-title{font-size:17px;font-weight:850;color:#f1f7ff;letter-spacing:-.01em}.weather-location-sub{margin-top:4px;color:#8fa9c5;font-size:11px}
+        .weather-live-badge{white-space:nowrap;color:#9dceff;background:rgba(55,139,235,.10);border:1px solid rgba(76,157,255,.24);border-radius:999px;padding:6px 10px;font-size:10px;font-weight:850}
+        .weather-current{display:grid;grid-template-columns:minmax(230px,1.05fr) minmax(0,2fr);gap:12px;margin-bottom:15px;position:relative;z-index:1}
+        .weather-current-main{position:relative;overflow:hidden;padding:20px;border-radius:16px;background:linear-gradient(145deg,rgba(49,111,180,.30),rgba(13,34,58,.90));border:1px solid rgba(104,177,255,.22);min-height:205px}
+        .weather-current-main:after{content:'';position:absolute;width:190px;height:190px;right:-70px;top:-95px;border-radius:50%;background:rgba(111,190,255,.11);filter:blur(3px)}
+        .weather-current-label{font-size:10px;font-weight:850;letter-spacing:.10em;text-transform:uppercase;color:#91b9e1}.weather-current-condition{display:flex;align-items:center;gap:10px;margin-top:10px}.weather-current-icon{width:72px;height:72px;object-fit:contain;filter:drop-shadow(0 8px 14px rgba(0,0,0,.20))}.weather-current-temp{font-size:46px;font-weight:900;letter-spacing:-.055em;color:#f7fbff;line-height:.98}.weather-current-temp small{font-size:18px;font-weight:750;color:#b0c8df}.weather-current-desc{margin-top:7px;color:#d1e2f3;font-size:13px;text-transform:capitalize}.weather-current-feels{margin-top:13px;color:#94abc2;font-size:11px}
+        .weather-metrics{display:grid;grid-template-columns:repeat(4,minmax(92px,1fr));gap:8px}.weather-metric{padding:11px 10px;border-radius:12px;background:rgba(255,255,255,.038);border:1px solid rgba(255,255,255,.065);transition:transform .18s ease,border-color .18s ease}.weather-metric:hover{transform:translateY(-2px);border-color:rgba(111,185,255,.22)}.weather-metric-label{font-size:9px;color:#829bb6;text-transform:uppercase;letter-spacing:.055em}.weather-metric-value{margin-top:6px;color:#eef6ff;font-size:12px;font-weight:850}.weather-metric-sub{margin-top:3px;color:#718da8;font-size:9px}
+        .weather-sunline{display:flex;gap:8px;margin-top:9px}.weather-sun{flex:1;padding:9px 10px;border-radius:11px;background:rgba(255,255,255,.028);border:1px solid rgba(255,255,255,.045);color:#9db6ce;font-size:10px}.weather-sun strong{display:block;color:#e7f2fc;font-size:11px;margin-top:3px}
+        .weather-source{margin-top:11px;color:#6f8ba6;font-size:9px;position:relative;z-index:1}.weather-source strong{color:#88afd2}
+        .weather-empty-state{padding:18px}.weather-empty-message{display:flex;align-items:center;gap:12px;padding:18px;border-radius:14px;background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.06)}.weather-empty-icon{width:48px;height:48px;display:flex;align-items:center;justify-content:center;border-radius:14px;background:rgba(255,255,255,.055);font-size:25px}.weather-empty-title{font-size:14px;font-weight:850;color:#eef6ff}.weather-empty-detail{margin-top:4px;color:#91a8c0;font-size:11px;line-height:1.5}
+        .weather-outlook{margin-top:18px;position:relative;z-index:1}.weather-outlook-head{display:flex;align-items:end;justify-content:space-between;gap:12px;margin-bottom:11px}.weather-outlook-title{color:#e7f2fd;font-size:13px;font-weight:900;text-transform:uppercase;letter-spacing:.075em}.weather-outlook-sub{margin-top:3px;color:#7892ad;font-size:10px}.weather-outlook-count{color:#8fb8df;font-size:10px;font-weight:800;padding:6px 9px;border:1px solid rgba(91,160,223,.16);border-radius:999px;background:rgba(66,135,201,.07)}
+        .weather-days-grid{display:grid;grid-template-columns:repeat(6,minmax(145px,1fr));gap:9px;overflow-x:auto;padding:2px 2px 7px;scrollbar-width:thin}.weather-day-card{min-width:145px;padding:13px 12px 12px;border-radius:15px;background:linear-gradient(180deg,rgba(255,255,255,.055),rgba(255,255,255,.025));border:1px solid rgba(255,255,255,.065);text-align:left;position:relative;overflow:hidden;transition:transform .18s ease,border-color .18s ease,background .18s ease}.weather-day-card:hover{transform:translateY(-3px);border-color:rgba(104,177,255,.25);background:linear-gradient(180deg,rgba(65,132,201,.12),rgba(255,255,255,.025))}.weather-day-card.today{border-color:rgba(105,187,255,.36);box-shadow:inset 0 1px 0 rgba(154,214,255,.08)}
+        .weather-day-top{display:flex;justify-content:space-between;align-items:center;gap:8px}.weather-day-date{font-size:10px;font-weight:900;color:#b6cce2;text-transform:uppercase;letter-spacing:.065em}.weather-day-badge{font-size:8px;font-weight:900;color:#9dd0ff;padding:4px 6px;border-radius:999px;background:rgba(61,143,225,.12);border:1px solid rgba(83,161,235,.18);text-transform:uppercase}.weather-day-main{display:flex;align-items:center;gap:8px;margin:12px 0 9px}.weather-day-icon{width:48px;height:48px;object-fit:contain;filter:drop-shadow(0 5px 8px rgba(0,0,0,.18))}.weather-day-condition{font-size:10px;color:#c9d9eb;line-height:1.3;text-transform:capitalize;min-height:27px}.weather-day-temp{display:flex;align-items:baseline;gap:7px}.weather-day-temp strong{font-size:21px;color:#f3f8ff}.weather-day-temp span{font-size:12px;color:#8199b3}.weather-day-rain{margin-top:10px;display:flex;align-items:center;justify-content:space-between;font-size:10px;color:#91c1ed}.weather-rain-track{height:4px;margin-top:7px;border-radius:999px;background:rgba(255,255,255,.06);overflow:hidden}.weather-rain-fill{height:100%;border-radius:999px;background:linear-gradient(90deg,#5ea8ef,#8bc9ff)}
+        .weather-day-note{margin-top:8px;color:#738da8;font-size:9px}.weather-insight{display:flex;gap:10px;margin-top:12px;padding:12px 13px;border-radius:13px;background:linear-gradient(90deg,rgba(75,151,235,.10),rgba(75,151,235,.045));border:1px solid rgba(75,151,235,.17);color:#a9c4e2;font-size:11px;line-height:1.5}.weather-insight strong{display:block;color:#dcecff;margin-bottom:2px}.weather-insight-icon{font-size:17px}
+        .weather-focused .weather-current{grid-template-columns:minmax(250px,1fr) minmax(0,2fr)}.weather-focused .weather-current-main{padding:22px}.weather-focused .weather-current-temp{font-size:48px}
         @media(max-width:900px){.weather-current{grid-template-columns:1fr}.weather-metrics{grid-template-columns:repeat(2,minmax(100px,1fr))}.weather-focused .weather-current{grid-template-columns:1fr}}
         @media(max-width:760px){.weather-days-grid{grid-template-columns:repeat(5,105px)}.weather-dashboard-head{flex-direction:column}.weather-live-badge{align-self:flex-start}}
 
@@ -3277,8 +3276,15 @@
         const fmtDate = (value) => {
             if (!value) return '';
             const d = new Date(value + (String(value).length === 10 ? 'T00:00:00' : ''));
+            return Number.isNaN(d.getTime()) ? String(value) : d.toLocaleDateString(undefined, { weekday:'short', month:'short', day:'numeric' });
+        };
+        const shortDate = (value) => {
+            if (!value) return '';
+            const d = new Date(value + (String(value).length === 10 ? 'T00:00:00' : ''));
             return Number.isNaN(d.getTime()) ? String(value) : d.toLocaleDateString(undefined, { month:'short', day:'numeric' });
         };
+        const dayKey = (value) => String(value || '').slice(0,10);
+        const todayKey = new Date().toISOString().slice(0,10);
         const fmtTime = (unix) => {
             if (unix == null || unix === '') return '—';
             const d = new Date(Number(unix) * 1000);
@@ -3291,10 +3297,10 @@
             const dirs = ['N','NE','E','SE','S','SW','W','NW'];
             return dirs[Math.round(Number(deg) / 45) % 8] + ' · ' + Math.round(Number(deg)) + '°';
         };
-        const safeIcon = (icon) => /^[0-9]{2}[dn]$/.test(String(icon || ''))
-            ? '<img class="weather-current-icon" src="https://openweathermap.org/img/wn/' + escapeHtml(String(icon)) + '@2x.png" alt="Weather icon">'
-            : '<span class="weather-current-icon" style="display:flex;align-items:center;justify-content:center;font-size:34px">🌤️</span>';
-        const dateRange = days.length ? fmtDate(days[0].date) + (days.length > 1 ? ' – ' + fmtDate(days[days.length - 1].date) : '') : '';
+        const weatherIcon = (icon, cls) => /^[0-9]{2}[dn]$/.test(String(icon || ''))
+            ? '<img class="' + cls + '" src="https://openweathermap.org/img/wn/' + escapeHtml(String(icon)) + '@2x.png" alt="Weather icon">'
+            : '<span class="' + cls + '" style="display:flex;align-items:center;justify-content:center;font-size:30px">🌤️</span>';
+        const dateRange = days.length ? shortDate(days[0].date) + (days.length > 1 ? ' – ' + shortDate(days[days.length - 1].date) : '') : '';
         let html = '<div class="weather-dashboard-card' + (focused ? ' weather-focused' : '') + '">';
         html += '<div class="weather-dashboard-head"><div><div class="weather-location-title">🌤️ ' + escapeHtml(weather.location || 'Destination') + ' Weather</div>'
             + '<div class="weather-location-sub">' + escapeHtml(dateRange || 'Current conditions') + '</div></div>'
@@ -3306,7 +3312,7 @@
             const snowNow = current.snow1h != null ? Number(current.snow1h).toFixed(1) + ' mm/h' : 'None reported';
             html += '<div class="weather-current">'
                 + '<div class="weather-current-main"><div class="weather-current-label">Current conditions</div>'
-                + '<div class="weather-current-condition">' + safeIcon(current.icon) + '<div><div class="weather-current-temp">' + num(current.temperature) + '°<small>C</small></div><div class="weather-current-desc">' + escapeHtml(desc) + '</div></div></div>'
+                + '<div class="weather-current-condition">' + weatherIcon(current.icon, 'weather-current-icon') + '<div><div class="weather-current-temp">' + num(current.temperature) + '°<small>C</small></div><div class="weather-current-desc">' + escapeHtml(desc) + '</div></div></div>'
                 + '<div class="weather-current-feels">Feels like ' + num(current.feelsLike) + '°C · Updated ' + escapeHtml(fmtTime(current.observedAt)) + '</div></div>'
                 + '<div><div class="weather-metrics">'
                 + metric('💧','Humidity', current.humidity != null ? Math.round(Number(current.humidity)) + '%' : '—')
@@ -3326,24 +3332,40 @@
         }
 
         if (days.length) {
-            html += '<div class="weather-forecast-title">Travel-date outlook</div><div class="weather-days-grid">';
-            html += days.map(day => {
-                const high = day.high != null ? Math.round(Number(day.high)) + '°' : '—';
-                const low = day.low != null ? Math.round(Number(day.low)) + '°' : '—';
-                const rain = day.rainProbability != null ? 'Rain ' + Math.round(Number(day.rainProbability)) + '%' : 'Rain —';
-                return '<div class="weather-day-card"><div class="weather-day-date">' + escapeHtml(fmtDate(day.date)) + '</div>'
-                    + '<div class="weather-day-icon">' + escapeHtml(day.icon || '🌤️') + '</div>'
-                    + '<div class="weather-day-condition">' + escapeHtml(day.condition || 'Forecast') + '</div>'
-                    + '<div class="weather-day-temp"><strong>' + escapeHtml(high) + '</strong> <span>' + escapeHtml(low) + '</span></div>'
-                    + '<div class="weather-day-rain">' + escapeHtml(rain) + '</div></div>';
-            }).join('') + '</div>';
-            let insight = '';
             const wet = days.reduce((best, day) => Number(day.rainProbability || 0) > Number(best?.rainProbability || 0) ? day : best, null);
             const maxRain = Number(wet?.rainProbability || 0);
-            if (maxRain >= 50) insight = 'Higher rain probability on ' + fmtDate(wet.date) + ' — consider keeping indoor activities such as museums for that day.';
-            else if (maxRain >= 30) insight = 'Mostly good travel conditions, with a moderate chance of rain on ' + fmtDate(wet.date) + '. Keep a light rain layer handy.';
-            else insight = 'Good travel conditions overall. Outdoor sightseeing should be comfortable across the forecast period.';
+            html += '<div class="weather-outlook">'
+                + '<div class="weather-outlook-head"><div><div class="weather-outlook-title">Travel-date outlook</div>'
+                + '<div class="weather-outlook-sub">A quick view of conditions across your travel window</div></div>'
+                + '<div class="weather-outlook-count">' + days.length + ' day' + (days.length === 1 ? '' : 's') + '</div></div>'
+                + '<div class="weather-days-grid">';
+            html += days.map((day, index) => {
+                const high = day.high != null ? Math.round(Number(day.high)) + '°' : '—';
+                const low = day.low != null ? Math.round(Number(day.low)) + '°' : '—';
+                const rainValue = day.rainProbability != null ? Math.max(0, Math.min(100, Math.round(Number(day.rainProbability)))) : null;
+                const rain = rainValue != null ? rainValue + '%' : '—';
+                const isToday = dayKey(day.date) === todayKey || index === 0 && dayKey(day.date) === todayKey;
+                const condition = day.condition || 'Forecast';
+                let note = 'Good for plans';
+                if (rainValue != null && rainValue >= 70) note = 'Plan rain cover';
+                else if (rainValue != null && rainValue >= 40) note = 'Keep plans flexible';
+                else if (rainValue != null && rainValue < 20) note = 'Great for outdoors';
+                return '<div class="weather-day-card' + (isToday ? ' today' : '') + '">'
+                    + '<div class="weather-day-top"><div class="weather-day-date">' + escapeHtml(fmtDate(day.date)) + '</div>'
+                    + (isToday ? '<span class="weather-day-badge">Today</span>' : '') + '</div>'
+                    + '<div class="weather-day-main">' + weatherIcon(day.icon, 'weather-day-icon') + '<div class="weather-day-condition">' + escapeHtml(condition) + '</div></div>'
+                    + '<div class="weather-day-temp"><strong>' + escapeHtml(high) + '</strong><span>Low ' + escapeHtml(low) + '</span></div>'
+                    + '<div class="weather-day-rain"><span>🌧 Rain chance</span><strong>' + escapeHtml(rain) + '</strong></div>'
+                    + (rainValue != null ? '<div class="weather-rain-track"><div class="weather-rain-fill" style="width:' + rainValue + '%"></div></div>' : '')
+                    + '<div class="weather-day-note">' + escapeHtml(note) + '</div></div>';
+            }).join('');
+            html += '</div>';
+            let insight = '';
+            if (maxRain >= 70) insight = 'Rain is most likely around ' + shortDate(wet.date) + '. Consider indoor attractions or keep a flexible backup plan.';
+            else if (maxRain >= 40) insight = 'There is a moderate rain risk in the travel window. Outdoor plans should stay flexible.';
+            else insight = 'The forecast looks broadly comfortable for sightseeing, with lower precipitation risk across the travel window.';
             html += '<div class="weather-insight"><span class="weather-insight-icon">💡</span><div><strong>Travel Weather Insight</strong><div>' + escapeHtml(insight) + '</div></div></div>';
+            html += '</div>';
         }
         return html + '</div>';
 

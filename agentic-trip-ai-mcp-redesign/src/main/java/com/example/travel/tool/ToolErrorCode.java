@@ -3,7 +3,7 @@ package com.example.travel.tool;
 public enum ToolErrorCode {
     NONE(false),
     RETRYABLE(true),
-    RATE_LIMITED(true),
+    RATE_LIMITED(false),
     TIMEOUT(true),
     UNAUTHORIZED(false),
     FORBIDDEN(false),
