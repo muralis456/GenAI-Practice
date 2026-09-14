@@ -13,6 +13,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.LocalDate;
+import java.math.BigDecimal;
 
 @Component
 public class TravelMcpTools {
@@ -27,19 +28,27 @@ public class TravelMcpTools {
         this.governance = governance;
     }
 
-    @McpTool(name = "search_hotels", description = "Search hotel options for a destination using live travel research.")
+    @McpTool(name = "search_hotels", description = "Search live hotel properties using SerpApi Google Hotels with structured prices, ratings, images, amenities and booking links.")
     public SearchHotelsResponse searchHotels(
             @McpToolParam(description = "Destination city or country", required = true) String destination,
-            @McpToolParam(description = "Travel style", required = false) String travelStyle,
-            @McpToolParam(description = "Prefer budget hotels", required = false) Boolean cheaper) {
+            @McpToolParam(description = "Travel style such as balanced, family, luxury, budget", required = false) String travelStyle,
+            @McpToolParam(description = "Prefer lower priced hotels", required = false) Boolean cheaper,
+            @McpToolParam(description = "Hotel check-in date yyyy-MM-dd", required = false) String checkInDate,
+            @McpToolParam(description = "Hotel check-out date yyyy-MM-dd", required = false) String checkOutDate,
+            @McpToolParam(description = "Number of adults", required = false) Integer adults,
+            @McpToolParam(description = "Number of children", required = false) Integer children,
+            @McpToolParam(description = "Maximum price per night in configured currency", required = false) BigDecimal maxPricePerNight) {
         governance.check("search_hotels");
         long started = System.nanoTime();
-        log.info("mcp.tool.request name=search_hotels destination={} travelStyle={} cheaper={}",
-            destination, travelStyle, cheaper);
-        log.info("mcp.tool.start name=search_hotels destination={}", destination);
+        LocalDate checkIn = parse(checkInDate, LocalDate.now().plusDays(1));
+        LocalDate checkOut = parse(checkOutDate, checkIn.plusDays(1));
+        int adultCount = adults == null ? 2 : Math.max(1, adults);
+        int childCount = children == null ? 0 : Math.max(0, children);
+        log.info("mcp.tool.request name=search_hotels destination={} travelStyle={} cheaper={} checkIn={} checkOut={} adults={} children={} maxPricePerNight={}",
+                destination, travelStyle, cheaper, checkIn, checkOut, adultCount, childCount, maxPricePerNight);
         SearchHotelsResponse response = services.searchHotels(destination, travelStyle == null ? "balanced" : travelStyle,
-                Boolean.TRUE.equals(cheaper));
-        log.info("mcp.tool.response name=search_hotels response={}", response);
+                Boolean.TRUE.equals(cheaper), checkIn, checkOut, adultCount, childCount, maxPricePerNight);
+        log.info("mcp.tool.response name=search_hotels success={} results={} message={}", response.success(), response.hotels().size(), response.message());
         log.info("mcp.tool.complete name=search_hotels success={} results={} durationMs={}", response.success(), response.hotels().size(), elapsedMs(started));
         return response;
     }

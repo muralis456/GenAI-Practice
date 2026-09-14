@@ -52,3 +52,20 @@ travel:
     circuit-breaker:
       failure-threshold: ${FLIGHT_CB_FAILURE_THRESHOLD:3}
       cooldown: ${FLIGHT_CB_COOLDOWN:60s}
+
+  serpapi:
+    enabled: ${SERPAPI_ENABLED:true}
+    api-url: ${SERPAPI_API_URL:https://serpapi.com/search}
+    api-key: ${SERPAPI_API_KEY:}
+    gl: ${SERPAPI_GL:in}
+    hl: ${SERPAPI_HL:en}
+    currency: ${SERPAPI_CURRENCY:INR}
+    max-results: ${SERPAPI_MAX_RESULTS:8}
+    connect-timeout: ${SERPAPI_CONNECT_TIMEOUT:5s}
+    read-timeout: ${SERPAPI_READ_TIMEOUT:15s}
+  hotels:
+    strategy: FALLBACK
+    max-results: ${HOTEL_MAX_RESULTS:8}
+    circuit-breaker:
+      failure-threshold: ${HOTEL_CB_FAILURE_THRESHOLD:3}
+      cooldown: ${HOTEL_CB_COOLDOWN:60s}

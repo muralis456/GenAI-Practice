@@ -14,6 +14,17 @@ public class HotelOption implements Serializable {
     private String rating;
     private String suitableFor;
     private String notes;
+    private String imageUrl;
+    private String bookingUrl;
+    private String amenities;
+    private String hotelClass;
+    private int reviews;
+    private String totalPrice;
+    private String currency;
+    private String deal;
+    private boolean freeCancellation;
+    private String propertyToken;
+    private String provider;
 
     public HotelOption() {
     }
@@ -72,6 +83,30 @@ public class HotelOption implements Serializable {
     public void setNotes(String notes) {
         this.notes = notes;
     }
+
+
+    public String getImageUrl() { return imageUrl; }
+    public void setImageUrl(String imageUrl) { this.imageUrl = imageUrl; }
+    public String getBookingUrl() { return bookingUrl; }
+    public void setBookingUrl(String bookingUrl) { this.bookingUrl = bookingUrl; }
+    public String getAmenities() { return amenities; }
+    public void setAmenities(String amenities) { this.amenities = amenities; }
+    public String getHotelClass() { return hotelClass; }
+    public void setHotelClass(String hotelClass) { this.hotelClass = hotelClass; }
+    public int getReviews() { return reviews; }
+    public void setReviews(int reviews) { this.reviews = reviews; }
+    public String getTotalPrice() { return totalPrice; }
+    public void setTotalPrice(String totalPrice) { this.totalPrice = totalPrice; }
+    public String getCurrency() { return currency; }
+    public void setCurrency(String currency) { this.currency = currency; }
+    public String getDeal() { return deal; }
+    public void setDeal(String deal) { this.deal = deal; }
+    public boolean isFreeCancellation() { return freeCancellation; }
+    public void setFreeCancellation(boolean freeCancellation) { this.freeCancellation = freeCancellation; }
+    public String getPropertyToken() { return propertyToken; }
+    public void setPropertyToken(String propertyToken) { this.propertyToken = propertyToken; }
+    public String getProvider() { return provider; }
+    public void setProvider(String provider) { this.provider = provider; }
 
     public String toDisplay() {
         StringBuilder sb = new StringBuilder();

@@ -23,13 +23,13 @@ public class HotelSearchTool {
             @ToolParam(description = "Destination city or country") String destination,
             @ToolParam(description = "Travel style such as balanced, family, luxury, budget", required = false) String travelStyle,
             @ToolParam(description = "Prefer cheaper/budget hotels when true", required = false) Boolean cheaper,
-            @ToolParam(description = "Optional maximum hotel budget in INR", required = false) Double hotelBudget) {
+            @ToolParam(description = "Optional maximum hotel price per night in INR", required = false) Double hotelBudget) {
         boolean budget = cheaper != null && cheaper;
         String style = travelStyle == null || travelStyle.isBlank() ? "balanced" : travelStyle;
         var mcpHotels = mcpHotelSearchClient.getIfAvailable();
         if (mcpHotels != null) {
             java.math.BigDecimal ceiling = hotelBudget == null ? null : java.math.BigDecimal.valueOf(hotelBudget);
-            return mcpHotels.search(destination, style, budget, ceiling).stream()
+            return mcpHotels.search(destination, style, budget, null, null, 2, 0, ceiling).stream()
                 .map(com.example.travel.model.HotelOption::toDisplay)
                 .collect(java.util.stream.Collectors.joining("\n"));
         }

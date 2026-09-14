@@ -39,6 +39,7 @@ public class TravelMcpServices {
     private final String currentWeatherUrl;
     private final String forecastWeatherUrl;
     private final String openWeatherApiKey;
+    private final HotelSearchOrchestrator hotelSearchOrchestrator;
 
     public TravelMcpServices(RestClient.Builder builder,
                              ObjectMapper objectMapper,
@@ -47,7 +48,8 @@ public class TravelMcpServices {
                              @Value("${travel.weather.geocode-url:https://api.openweathermap.org/geo/1.0/direct}") String geocodeUrl,
                              @Value("${travel.weather.current-url:https://api.openweathermap.org/data/2.5/weather}") String currentWeatherUrl,
                              @Value("${travel.weather.forecast-url:https://api.openweathermap.org/data/2.5/forecast}") String forecastWeatherUrl,
-                             @Value("${travel.weather.api-key:}") String openWeatherApiKey) {
+                             @Value("${travel.weather.api-key:}") String openWeatherApiKey,
+                             HotelSearchOrchestrator hotelSearchOrchestrator) {
         this.restClient = builder.build();
         this.objectMapper = objectMapper;
         this.tavilyUrl = tavilyUrl;
@@ -56,18 +58,27 @@ public class TravelMcpServices {
         this.currentWeatherUrl = currentWeatherUrl;
         this.forecastWeatherUrl = forecastWeatherUrl;
         this.openWeatherApiKey = openWeatherApiKey;
+        this.hotelSearchOrchestrator = hotelSearchOrchestrator;
+    }
+
+    public SearchHotelsResponse searchHotels(String destination, String travelStyle, boolean cheaper,
+                                             LocalDate checkIn, LocalDate checkOut, int adults, int children,
+                                             java.math.BigDecimal maxPricePerNight) {
+        HotelSearchRequest request = new HotelSearchRequest(
+                destination,
+                travelStyle == null || travelStyle.isBlank() ? "balanced" : travelStyle,
+                cheaper,
+                checkIn,
+                checkOut,
+                Math.max(1, adults),
+                Math.max(0, children),
+                maxPricePerNight);
+        return hotelSearchOrchestrator.search(request);
     }
 
     public SearchHotelsResponse searchHotels(String destination, String travelStyle, boolean cheaper) {
-        String query = (cheaper ? "Budget affordable hotels in " : "Best hotels in ") + destination
-                + " including location, price range, family suitability, and guest ratings. Style=" + travelStyle;
-        ResearchResult result = research(query);
-        List<HotelResult> hotels = new ArrayList<>();
-        for (ResearchHit hit : result.hits()) {
-            hotels.add(new HotelResult(hit.title(), destination, cheaper ? "budget" : "mid-range", "", "", hit.content()));
-        }
-        return result.success() ? SearchHotelsResponse.success(hotels, result.message())
-                : SearchHotelsResponse.failure(result.message());
+        LocalDate checkIn = LocalDate.now().plusDays(1);
+        return searchHotels(destination, travelStyle, cheaper, checkIn, checkIn.plusDays(1), 2, 0, null);
     }
 
     public WeatherResult weather(String destination, LocalDate start, LocalDate end) {
@@ -91,7 +102,7 @@ public class TravelMcpServices {
             JsonNode place = geo.get(0);
             double lat = place.path("lat").asDouble();
             double lon = place.path("lon").asDouble();
-            String resolvedLocation = place.path("name").asText(destination);
+            String resolvedLocation = place.path("name").asString(destination);
 
             String currentUri = UriComponentsBuilder.fromUriString(currentWeatherUrl)
                     .queryParam("lat", lat)
@@ -147,7 +158,7 @@ public class TravelMcpServices {
 
         Map<LocalDate, List<JsonNode>> grouped = new java.util.TreeMap<>();
         for (JsonNode item : list) {
-            String dtText = item.path("dt_txt").asText("");
+            String dtText = item.path("dt_txt").asString("");
             LocalDate date = parseForecastDate(dtText);
             if (date == null || date.isBefore(from) || date.isAfter(to)) {
                 continue;
@@ -189,8 +200,8 @@ public class TravelMcpServices {
             JsonNode weather = firstWeather(representative);
             days.add(new WeatherResult.DailyWeather(
                     date.toString(),
-                    weather.path("description").asText(weather.path("main").asText("Forecast")),
-                    weather.path("icon").asText(""),
+                    weather.path("description").asString(weather.path("main").asString("Forecast")),
+                    weather.path("icon").asString(""),
                     high,
                     low,
                     maxPop));
@@ -227,11 +238,11 @@ public class TravelMcpServices {
         }
         try {
             JsonNode root = objectMapper.readTree(responseBody);
-            String message = root.path("message").asText("");
+            String message = root.path("message").asString("");
             if (!message.isBlank()) {
                 return message;
             }
-            return root.path("error").asText("");
+            return root.path("error").asString("");
         } catch (Exception ignored) {
             return responseBody.trim();
         }
@@ -270,7 +281,7 @@ public class TravelMcpServices {
                 number(wind, "gust"), integer(wind, "deg"),
                 number(rain, "1h"), number(snow, "1h"), longValue(current, "dt"),
                 longValue(sys, "sunrise"), longValue(sys, "sunset"), timezone,
-                weather.path("main").asText(""), weather.path("description").asText(""), weather.path("icon").asText(""));
+                weather.path("main").asString(""), weather.path("description").asString(""), weather.path("icon").asString(""));
     }
 
     private boolean currentRain(WeatherResult.CurrentWeather current) {

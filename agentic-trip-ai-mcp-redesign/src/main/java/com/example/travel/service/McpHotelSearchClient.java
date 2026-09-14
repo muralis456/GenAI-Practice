@@ -24,18 +24,28 @@ public class McpHotelSearchClient {
     }
 
     public List<HotelOption> search(String destination, String travelStyle, boolean cheaper) {
-        return search(destination, travelStyle, cheaper, null);
+        return search(destination, travelStyle, cheaper, null, null, 2, 0, null);
     }
 
     public List<HotelOption> search(String destination, String travelStyle, boolean cheaper, java.math.BigDecimal hotelBudget) {
+        return search(destination, travelStyle, cheaper, null, null, 2, 0, hotelBudget);
+    }
+
+    public List<HotelOption> search(String destination, String travelStyle, boolean cheaper,
+                                    java.time.LocalDate checkIn, java.time.LocalDate checkOut,
+                                    int adults, int children, java.math.BigDecimal hotelBudget) {
         try {
-            String budgetText = hotelBudget == null ? "" : ", hotel budget ceiling INR=" + hotelBudget.toPlainString();
+            String budgetText = hotelBudget == null ? "" : ", maximum hotel price per night INR=" + hotelBudget.toPlainString();
             Map<String, Object> arguments = new java.util.LinkedHashMap<>();
             arguments.put("destination", destination == null ? "" : destination);
             arguments.put("travelStyle", travelStyle == null ? "balanced" : travelStyle);
             arguments.put("cheaper", cheaper);
+            if (checkIn != null) arguments.put("checkInDate", checkIn.toString());
+            if (checkOut != null) arguments.put("checkOutDate", checkOut.toString());
+            arguments.put("adults", Math.max(1, adults));
+            arguments.put("children", Math.max(0, children));
             if (hotelBudget != null) {
-                arguments.put("hotelBudget", hotelBudget);
+                arguments.put("maxPricePerNight", hotelBudget);
             }
             String userInput = "Find real, identifiable hotel properties for destination "
                     + (destination == null ? "" : destination)
@@ -57,6 +67,17 @@ public class McpHotelSearchClient {
                 hotel.setRating(node.path("rating").asString(""));
                 hotel.setSuitableFor(node.path("suitableFor").asString(""));
                 hotel.setNotes(node.path("notes").asString(""));
+                hotel.setImageUrl(node.path("imageUrl").asString(""));
+                hotel.setBookingUrl(node.path("bookingUrl").asString(""));
+                hotel.setAmenities(node.path("amenities").asString(""));
+                hotel.setHotelClass(node.path("hotelClass").asString(""));
+                hotel.setReviews(node.path("reviews").asInt(0));
+                hotel.setTotalPrice(node.path("totalPrice").asString(""));
+                hotel.setCurrency(node.path("currency").asString(""));
+                hotel.setDeal(node.path("deal").asString(""));
+                hotel.setFreeCancellation(node.path("freeCancellation").asBoolean(false));
+                hotel.setPropertyToken(node.path("propertyToken").asString(""));
+                hotel.setProvider(node.path("provider").asString(""));
                 hotels.add(hotel);
                 log.debug("mcp.hotel.raw-record destination={} name={} area={} priceRange={}",
                         destination, abbreviate(hotel.getName()), abbreviate(hotel.getArea()),

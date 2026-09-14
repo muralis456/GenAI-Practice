@@ -82,7 +82,10 @@ public class HotelAgentService {
         McpHotelSearchClient mcpClient = mcpHotelSearchClient.getIfAvailable();
         if (mcpClient != null && !TravelState.isBlank(destination)) {
             List<HotelOption> directHotels = mcpClient.search(
-                    destination, state.travelStyle(), cheaper, state.hotelBudget());
+                    destination, state.travelStyle(), cheaper,
+                    state.datesFlexible() ? null : state.departureDate(),
+                    state.datesFlexible() ? null : state.returnDate(),
+                    state.travelers(), 0, state.hotelBudget());
             List<HotelOption> providerHotels = directHotels;
             directHotels = providerHotels.stream()
                     .map(this::scrubPlaceholders)

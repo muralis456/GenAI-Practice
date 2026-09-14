@@ -1492,6 +1492,29 @@
         }
 
 
+        /* ===== V6 Dynamic stacked travel workspace ===== */
+        .plan-workspace{width:100%;max-width:1180px;margin:0 auto;padding:4px 0 28px}
+        .plan-header{position:relative;overflow:hidden;border:1px solid rgba(83,157,255,.22);border-radius:20px;padding:22px 24px;margin-bottom:12px;background:linear-gradient(135deg,rgba(19,45,79,.97),rgba(7,21,39,.98));box-shadow:0 18px 45px rgba(0,0,0,.18)}
+        .plan-header:after{content:"";position:absolute;inset:auto -10% -75% 45%;height:210px;background:radial-gradient(circle,rgba(65,142,255,.2),transparent 68%);pointer-events:none}
+        .plan-header-top{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;position:relative;z-index:1}
+        .plan-header h1{margin:5px 0 12px;font-size:clamp(1.65rem,3.4vw,2.65rem);line-height:1.05;letter-spacing:-.045em;color:#f2f7ff}
+        .plan-header-status{padding:7px 11px;border-radius:999px;background:rgba(42,199,120,.14);border:1px solid rgba(73,220,145,.28);color:#9af0bd;font-size:11px;font-weight:850;white-space:nowrap}
+        .plan-header-facts{display:flex;flex-wrap:wrap;gap:8px;position:relative;z-index:1}
+        .plan-header-facts span,.plan-requirements span{padding:7px 10px;border-radius:999px;background:rgba(255,255,255,.055);border:1px solid rgba(255,255,255,.075);color:#c7d8eb;font-size:11px;font-weight:700}
+        .plan-requirements{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px;position:relative;z-index:1}.plan-requirements span{color:#a8e9c3;background:rgba(42,199,120,.08);border-color:rgba(73,220,145,.18)}
+        .plan-section-nav{position:sticky;top:8px;z-index:12;display:flex;gap:6px;overflow:auto;padding:5px;margin:0 0 10px;border:1px solid rgba(255,255,255,.07);border-radius:13px;background:rgba(8,20,37,.9);backdrop-filter:blur(14px);scrollbar-width:none}.plan-section-nav::-webkit-scrollbar{display:none}
+        .plan-nav-btn{border:1px solid transparent;background:transparent;color:#9fb4cc;border-radius:9px;padding:9px 13px;font-size:11px;font-weight:800;white-space:nowrap;cursor:pointer}.plan-nav-btn:hover{background:rgba(255,255,255,.04);color:#eaf4ff}.plan-nav-btn.active{background:rgba(48,128,240,.18);border-color:rgba(82,157,255,.3);color:#eef6ff}
+        .plan-steps{position:relative}.plan-step{display:grid;grid-template-columns:48px minmax(0,1fr);gap:0;scroll-margin-top:70px}.plan-step-rail{position:relative;display:flex;justify-content:center}.plan-step-number{width:30px;height:30px;margin-top:14px;border-radius:50%;display:grid;place-items:center;background:#146ff1;border:3px solid #0a2340;box-shadow:0 0 0 1px rgba(88,161,255,.5),0 5px 18px rgba(20,111,241,.3);color:white;font-size:11px;font-weight:900;z-index:2}.plan-step-line{position:absolute;top:44px;bottom:-2px;width:2px;background:linear-gradient(180deg,rgba(61,143,255,.75),rgba(61,143,255,.12))}.plan-step:last-child .plan-step-line{display:none}
+        .plan-step-card{min-width:0;margin:8px 0 8px;border:1px solid rgba(255,255,255,.075);border-radius:16px;padding:15px;background:linear-gradient(180deg,rgba(14,33,57,.96),rgba(7,20,36,.97));box-shadow:0 12px 32px rgba(0,0,0,.13)}
+        .plan-step-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:12px}.plan-step-heading{display:flex;gap:10px;align-items:center;min-width:0}.plan-step-icon{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;background:rgba(65,139,241,.12);border:1px solid rgba(81,158,255,.18);font-size:17px;flex:0 0 auto}.plan-step-heading h3{margin:0;color:#edf5ff;font-size:16px;font-weight:850}.plan-step-heading p{margin:3px 0 0;color:#89a2bd;font-size:11px}.plan-check{display:inline-grid;place-items:center;width:17px;height:17px;border-radius:50%;margin-left:3px;background:rgba(45,202,123,.14);color:#77e8a6;font-size:10px;vertical-align:1px}
+        .plan-step-itinerary .plan-step-card{padding-bottom:17px}.plan-step-itinerary .itin-compact{grid-template-columns:repeat(auto-fit,minmax(190px,1fr))}
+        .plan-validation{margin:8px 0 12px;padding-left:48px}.plan-validation .validation-banner{margin:0}
+        .plan-final-action{margin:12px 0 0 48px;border:1px solid rgba(82,160,255,.2);border-radius:16px;padding:16px;background:linear-gradient(180deg,rgba(17,39,66,.97),rgba(8,22,39,.98));display:flex;align-items:center;justify-content:space-between;gap:18px}.plan-final-action h3{margin:7px 0 3px;font-size:16px}.plan-final-action p{margin:0;color:#8fa9c5;font-size:12px}.plan-final-action.confirmed{border-color:rgba(45,202,123,.2)}.final-actions-inline{display:flex;gap:8px;flex:0 0 auto}.final-actions-inline button{border:0;border-radius:10px;padding:11px 16px;color:#fff;font-weight:850;cursor:pointer}
+        .specialist-request{max-width:520px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.specialist-dynamic-header .plan-header-facts{margin-top:2px}
+        .plan-workspace .flight-rich-widget,.plan-workspace .weather-dashboard-card{width:100%}.plan-workspace .rich-flight-card{grid-template-columns:minmax(145px,.75fr) minmax(320px,1.7fr) minmax(130px,.6fr)}
+        @media(max-width:850px){.plan-step{grid-template-columns:38px minmax(0,1fr)}.plan-final-action{margin-left:38px;flex-direction:column;align-items:stretch}.final-actions-inline{display:grid;grid-template-columns:repeat(3,1fr)}.final-actions-inline button{padding:10px 6px}.plan-header{padding:18px}.plan-header-top{flex-direction:column;gap:8px}.plan-header-status{align-self:flex-start}}
+        @media(max-width:620px){.plan-step{grid-template-columns:28px minmax(0,1fr)}.plan-step-number{width:24px;height:24px;font-size:9px}.plan-step-line{top:39px}.plan-step-card{padding:12px}.plan-step-heading h3{font-size:14px}.plan-step-heading p{font-size:10px}.plan-validation,.plan-final-action{margin-left:28px;padding-left:0}.plan-final-action{padding:13px}.plan-workspace .plan-section-nav{top:2px}.plan-header-facts span,.plan-requirements span{font-size:10px;padding:6px 8px}.final-actions-inline{grid-template-columns:1fr}.plan-workspace .plan-step .rich-flight-card{grid-template-columns:1fr}.plan-workspace .flight-path{margin-top:8px}}
+
         /* ===== V5 Travel Workspace UI ===== */
         .travel-dashboard { display:grid; grid-template-columns:minmax(0,1fr) 310px; gap:16px; width:100%; }
         .travel-main { min-width:0; }
@@ -3362,33 +3385,60 @@
     };
 
     const buildHotelsSection = (hotels) => {
-        // Backend HotelAgentService is the single authoritative validation boundary.
-        // The browser MUST NOT re-validate hotel identity with its own lexical rules:
-        // provider hotel names can legitimately contain punctuation, brands,
-        // locations, languages, or long legal property names. A second UI filter
-        // previously rejected valid backend results and produced a false empty state.
         const usable = (Array.isArray(hotels) ? hotels : [])
             .filter(h => h && String(h.name || '').trim());
         if (!usable.length) return '<div class="specialist-empty">No verified hotel properties were found for this request.</div>';
+
         const visibleCount = 4;
         const cards = usable.map((h, index) => {
-            const meta = [h.area ? '📍 ' + h.area : '', h.priceRange ? '💰 ' + h.priceRange : '', h.rating ? '★ ' + h.rating : ''].filter(Boolean).join(' · ');
-            const fit = cleanHotelText(h.suitableFor);
+            const name = cleanHotelText(h.name);
+            const area = cleanHotelText(h.area);
+            const rating = cleanHotelText(h.rating);
+            const hotelClass = cleanHotelText(h.hotelClass);
+            const price = cleanHotelText(h.priceRange);
+            const total = cleanHotelText(h.totalPrice);
+            const deal = cleanHotelText(h.deal);
             const note = cleanHotelText(h.notes);
+            const amenities = String(h.amenities || '').split(',').map(x => cleanHotelText(x)).filter(Boolean).slice(0, 6);
+            const image = String(h.imageUrl || '').trim();
+            const booking = String(h.bookingUrl || '').trim();
+            const reviews = Number(h.reviews || 0);
             const extraClass = index >= visibleCount ? ' is-extra' : '';
-            return '<div class="hotel-card' + extraClass + '">'
-                + '<div class="hotel-card-main"><div class="item-title">' + escapeHtml(cleanHotelText(h.name)) + '</div>'
-                + (meta ? '<div class="item-meta">' + escapeHtml(meta) + '</div>' : '')
-                + (fit ? '<span class="hotel-fit">' + escapeHtml(fit) + '</span>' : '')
-                + (note ? '<div class="item-note">' + escapeHtml(note) + '</div>' : '')
-                + '</div></div>';
+            const badge = deal ? '<span class="hotel-rich-badge deal">' + escapeHtml(deal.length > 28 ? deal.slice(0,28) + '…' : deal) + '</span>' : (hotelClass ? '<span class="hotel-rich-badge">' + escapeHtml(hotelClass) + '</span>' : '');
+            const media = image
+                ? '<img src="' + escapeHtml(image) + '" alt="' + escapeHtml(name) + '" loading="lazy" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'grid\';"><div class="hotel-rich-media-fallback">🏨</div>'
+                : '<div class="hotel-rich-media-fallback">🏨</div>';
+            const ratingHtml = rating
+                ? '<div class="hotel-rich-rating"><span>★ ' + escapeHtml(rating) + '</span>' + (reviews > 0 ? '<span class="reviews">· ' + escapeHtml(reviews.toLocaleString()) + ' reviews</span>' : '') + (hotelClass ? '<span class="hotel-rich-class">' + escapeHtml(hotelClass) + '</span>' : '') + '</div>'
+                : (reviews > 0 ? '<div class="hotel-rich-rating"><span class="reviews">' + escapeHtml(reviews.toLocaleString()) + ' reviews</span></div>' : '');
+            const amenityHtml = amenities.length ? '<div class="hotel-rich-amenities">' + amenities.map(a => '<span class="hotel-amenity-chip">✓ ' + escapeHtml(a) + '</span>').join('') + '</div>' : '';
+            const dealHtml = deal ? '<div class="hotel-rich-deal">✦ ' + escapeHtml(deal) + '</div>' : '';
+            const bookHtml = booking ? '<a class="hotel-rich-book" href="' + escapeHtml(booking) + '" target="_blank" rel="noopener noreferrer">View deal ↗</a>' : '';
+            const cancelHtml = h.freeCancellation ? '<div class="hotel-rich-cancel">✓ Free cancellation</div>' : '';
+            return '<article class="hotel-rich-card' + extraClass + '">'
+                + '<div class="hotel-rich-media">' + media + badge + '</div>'
+                + '<div class="hotel-rich-main">'
+                + '<div class="hotel-rich-title-row"><div style="min-width:0"><div class="hotel-rich-name">' + escapeHtml(name) + '</div>'
+                + (area ? '<div class="hotel-rich-location">📍 ' + escapeHtml(area) + '</div>' : '') + '</div></div>'
+                + ratingHtml
+                + (note ? '<div class="hotel-rich-note">' + escapeHtml(note) + '</div>' : '')
+                + amenityHtml + dealHtml
+                + '</div>'
+                + '<div class="hotel-rich-price">'
+                + (price ? '<div class="hotel-rich-price-label">FROM / NIGHT</div><div class="hotel-rich-price-main">' + escapeHtml(price) + '</div>' : '<div class="hotel-rich-price-label">PRICE</div><div class="hotel-rich-price-main">Check rates</div>')
+                + (total ? '<div class="hotel-rich-price-total">Total stay ' + escapeHtml(total) + '</div>' : '')
+                + bookHtml + cancelHtml
+                + '</div></article>';
         }).join('');
-        const more = usable.length > visibleCount
-            ? '<button type="button" class="hotel-more-btn" data-hotels-more>＋ ' + (usable.length - visibleCount) + ' more hotel options</button>'
-            : '';
-        return '<div class="hotel-list">' + cards + '</div>' + more;
-    };
 
+        const extraCount = Math.max(0, usable.length - visibleCount);
+        const more = extraCount > 0
+            ? '<button type="button" class="hotel-rich-more" data-hotels-more>＋ ' + extraCount + ' more hotel option' + (extraCount === 1 ? '' : 's') + '</button>'
+            : '';
+        return '<div class="hotel-rich-widget">'
+            + '<div class="hotel-rich-summary"><div class="hotel-rich-summary-main"><div class="hotel-rich-summary-icon">🏨</div><div><div class="hotel-rich-summary-title">Live hotel options</div><div class="hotel-rich-summary-sub">Google Hotels results · prices, ratings, photos, amenities and booking links</div></div></div><span class="hotel-rich-count">' + usable.length + ' option' + (usable.length === 1 ? '' : 's') + '</span></div>'
+            + '<div class="hotel-rich-list">' + cards + '</div>' + more + '</div>';
+    };
     const buildItinerarySection = (itinerary) => {
         const days = itinerary && itinerary.days ? itinerary.days : [];
         if (!days.length) return '';
@@ -3707,87 +3757,51 @@
         const plan = data.plan || data || {};
         const trip = plan.trip || {};
         const type = String(data.requestType || trip.requestType || 'GENERAL').toUpperCase();
-        const location = String(
-            (plan.weather && plan.weather.location) || trip.destination || data.destination || ''
-        ).trim();
+        const location = String((plan.weather && plan.weather.location) || trip.destination || data.destination || '').trim();
         const weather = plan.weather || data.weather;
         const flights = Array.isArray(plan.flights) ? plan.flights : (Array.isArray(data.flights) ? data.flights : []);
         const hotels = Array.isArray(plan.hotels) ? plan.hotels : (Array.isArray(data.hotels) ? data.hotels : []);
         const budget = plan.budget;
         const exec = data.execution || {};
         const answer = String(exec.ragAnswer || data.ragAnswer || plan.tips || data.finalPlan || '').trim();
+        const hasWeather = !!(weather && (weather.summary || weather.location || (Array.isArray(weather.days) && weather.days.length) || weather.current));
+        const hasBudget = !!(budget && Array.isArray(budget.lineItems) && budget.lineItems.length);
+        const hasAnswer = !!answer;
 
-        let title = 'Travel information';
-        let subtitle = 'Answer based on your latest request';
-        let body = '';
-        let icon = '✦';
+        const meta = {
+            WEATHER: ['☀️', location ? 'Weather in ' + location : 'Weather details', 'Current conditions and forecast'],
+            FLIGHT_SEARCH: ['✈️', location ? 'Flight options for ' + location : 'Flight options', 'Available schedules and returned fare data'],
+            HOTEL_SEARCH: ['🏨', location ? 'Hotels in ' + location : 'Hotel options', 'Accommodation recommendations'],
+            BUDGET: ['💰', 'Travel budget', 'Estimated cost for your request'],
+            RESEARCH: ['🔎', location ? 'Things to do in ' + location : 'Travel research', 'Destination recommendations and current research'],
+            HISTORY: ['🕘', 'Recent saved trip', 'Retrieved from persistent trip history']
+        }[type] || ['✦', location ? 'Travel information for ' + location : 'Travel information', 'Knowledge-backed answer to your question'];
 
-        if (type === 'WEATHER') {
-            title = location ? 'Weather in ' + location : 'Weather details';
-            subtitle = 'Current or forecast conditions';
-            icon = '☀️';
-            body = buildWeatherSection(weather, { focused: true });
-        } else if (type === 'FLIGHT_SEARCH') {
-            title = location ? 'Flight options for ' + location : 'Flight options';
-            subtitle = 'Available flight results';
-            icon = '✈️';
-            body = buildFlightsSection(flights);
-        } else if (type === 'HOTEL_SEARCH') {
-            title = location ? 'Hotels in ' + location : 'Hotel options';
-            subtitle = 'Accommodation recommendations';
-            icon = '🏨';
-            body = buildHotelsSection(hotels);
-        } else if (type === 'BUDGET') {
-            title = 'Travel budget';
-            subtitle = 'Cost estimate for your request';
-            icon = '💰';
-            body = buildBudgetTable(budget);
-        } else if (type === 'RESEARCH') {
-            title = location ? 'Things to do in ' + location : 'Travel research';
-            subtitle = 'Destination recommendations and current research';
-            icon = '🔎';
-            body = answer ? '<div class="specialist-answer">' + formatKnowledgeText(answer) + '</div>' : '';
-        } else if (type === 'HISTORY') {
-            title = 'Recent saved trip';
-            subtitle = 'Retrieved from your persistent trip history';
-            icon = '🕘';
-            body = answer ? '<div class="specialist-answer">' + formatKnowledgeText(answer) + '</div>' : '';
-        } else if (type === 'MULTI_CAPABILITY' || type === 'MULTI_INTENT') {
-            title = location ? 'Travel information for ' + location : 'Travel information';
-            subtitle = 'Results for the capabilities requested in this message';
-            icon = '✦';
-            const parts = [];
-            if (weather && (weather.summary || weather.location || (Array.isArray(weather.days) && weather.days.length))) parts.push('<div class="specialist-subsection"><h3>☀️ Weather</h3>' + buildWeatherSection(weather) + '</div>');
-            if (flights.length) parts.push('<div class="specialist-subsection"><h3>✈️ Flights</h3>' + buildFlightsSection(flights) + '</div>');
-            if (hotels.length) parts.push('<div class="specialist-subsection"><h3>🏨 Hotels</h3>' + buildHotelsSection(hotels) + '</div>');
-            if (budget) parts.push('<div class="specialist-subsection"><h3>💰 Budget</h3>' + buildBudgetTable(budget) + '</div>');
-            // Knowledge is rendered as its own Travel Tips & Guidance card below.
-            // Keeping it separate prevents the RAG answer from being duplicated
-            // inside the live specialist result.
-            body = parts.join('') ;
-        } else {
-            title = location ? 'Travel information for ' + location : 'Travel information';
-            subtitle = 'Knowledge-backed answer to your question';
-            body = answer ? '<div class="specialist-answer">' + formatKnowledgeText(answer) + '</div>' : '';
-        }
+        const isMulti = type === 'MULTI_CAPABILITY' || type === 'MULTI_INTENT';
+        const widgets = [];
+        if (isMulti || type === 'WEATHER') { if (hasWeather) widgets.push({key:'weather', icon:'☀️', title:'Weather', subtitle:'Current conditions and forecast', body:buildWeatherSection(weather, {focused: !isMulti})}); }
+        if (isMulti || type === 'FLIGHT_SEARCH') { if (flights.length) widgets.push({key:'flights', icon:'✈️', title:'Flights', subtitle:'Available schedules and fare data', body:buildFlightsSection(flights)}); }
+        if (isMulti || type === 'HOTEL_SEARCH') { if (hotels.length) widgets.push({key:'hotels', icon:'🏨', title:'Hotels', subtitle:'Accommodation recommendations', body:buildHotelsSection(hotels)}); }
+        if (isMulti || type === 'BUDGET') { if (hasBudget) widgets.push({key:'budget', icon:'💰', title:'Budget', subtitle:'Estimated cost', body:buildBudgetTable(budget)}); }
+        if ((type === 'RESEARCH' || type === 'HISTORY' || (!isMulti && !widgets.length)) && hasAnswer) widgets.push({key:'answer', icon:meta[0], title:meta[1], subtitle:meta[2], body:'<div class="specialist-answer">' + formatKnowledgeText(answer) + '</div>'});
 
-        if (!body) {
-            body = '<div class="specialist-empty">No additional structured details were returned for this request.</div>';
-        }
+        const nav = widgets.length > 1 ? '<nav class="plan-section-nav">' + widgets.map((w,i) => '<button type="button" class="plan-nav-btn' + (i === 0 ? ' active' : '') + '" data-section-target="' + w.key + '">' + w.icon + ' ' + escapeHtml(w.title) + '</button>').join('') + '</nav>' : '';
+        let steps = '';
+        widgets.forEach((w, i) => {
+            steps += '<section id="section-' + w.key + '" class="plan-step">'
+                + '<div class="plan-step-rail"><span class="plan-step-number">' + (i + 1) + '</span><span class="plan-step-line"></span></div>'
+                + '<div class="plan-step-card"><div class="plan-step-head"><div class="plan-step-heading"><div class="plan-step-icon">' + w.icon + '</div><div><h3>' + escapeHtml(w.title) + ' <span class="plan-check">✓</span></h3><p>' + escapeHtml(w.subtitle) + '</p></div></div><span class="ready-badge">✓ Complete</span></div>'
+                + w.body + '</div></section>';
+        });
+        if (!steps) steps = '<div class="specialist-empty">No additional structured details were returned for this request.</div>';
 
-        return '<div class="specialist-dashboard">'
-            + '<section class="specialist-card specialist-hero">'
-            + '<div class="specialist-icon">' + icon + '</div>'
-            + '<div><div class="specialist-eyebrow">AgenticTripAI · ' + escapeHtml(type.replace(/_/g, ' ')) + '</div>'
-            + '<h2>' + escapeHtml(title) + '</h2><p>' + escapeHtml(subtitle) + '</p></div>'
-            + '</section>'
-            + '<section class="specialist-card specialist-content">'
-            + '<div class="specialist-card-head"><div><strong>' + escapeHtml(title) + '</strong><span>Requested information</span></div>'
-            + '<span class="complete-badge">✓ Complete</span></div>'
-            + body
-            + '</section>'
-            + (hasSpecialistKnowledge(data, plan) ? buildSpecialistKnowledgeCard(data, plan) : '')
+        let html = '<div class="plan-workspace specialist-dynamic-workspace">'
+            + '<header class="plan-header specialist-dynamic-header"><div class="plan-header-top"><div><div class="trip-eyebrow">AGENTICTRIPAI · ' + escapeHtml(type.replace(/_/g, ' ')) + '</div><h1>' + escapeHtml(meta[1]) + '</h1></div><div class="plan-header-status">✓ Complete</div></div>'
+            + '<div class="plan-header-facts"><span>✦ Requested information</span>' + (location ? '<span>📍 ' + escapeHtml(location) + '</span>' : '') + (userRequest ? '<span class="specialist-request">' + escapeHtml(String(userRequest).slice(0, 100)) + '</span>' : '') + '</div></header>'
+            + nav + '<div class="plan-steps">' + steps + '</div>'
+            + (hasSpecialistKnowledge(data, plan) ? '<div class="specialist-knowledge-inline">' + buildSpecialistKnowledgeCard(data, plan) + '</div>' : '')
             + '</div>';
+        return html;
     };
 
     const buildPlanCardHtml = (data, userRequest) => {
@@ -3801,87 +3815,99 @@
         const hasItineraryData = !!(plan.itinerary && Array.isArray(plan.itinerary.days) && plan.itinerary.days.length);
         const isTripPlan = data.tripPlanning === true || hasItineraryData;
         const requestType = String(data.requestType || trip.requestType || '').toUpperCase();
-        const hasFlights = Array.isArray(plan.flights) && plan.flights.length;
-        const hasReturnFlights = hasFlights && plan.flights.some(f => f && String(f.status || '').toLowerCase() !== 'unavailable' && String(f.direction || 'outbound').toLowerCase() === 'return');
+        const flights = Array.isArray(plan.flights) ? plan.flights.filter(Boolean) : [];
+        const hotels = Array.isArray(plan.hotels) ? plan.hotels.filter(Boolean) : [];
+        const hasFlights = flights.length > 0;
+        const hasReturnFlights = hasFlights && flights.some(f => String(f.status || '').toLowerCase() !== 'unavailable' && String(f.direction || 'outbound').toLowerCase() === 'return');
         const roundTripReturnMissing = hasFlights && trip.roundTrip !== false && !hasReturnFlights;
-        const hasHotels = Array.isArray(plan.hotels) && plan.hotels.length;
+        const hasHotels = hotels.length > 0;
         const hasItinerary = hasItineraryData;
         const hasBudget = !!(plan.budget && Array.isArray(plan.budget.lineItems) && plan.budget.lineItems.length);
-        const hasWeather = !!(plan.weather && (
-            (plan.weather.current && plan.weather.current.temperature != null)
-            || (Array.isArray(plan.weather.days) && plan.weather.days.some(d => d && (d.high != null || d.low != null || d.condition)))
-            || (typeof plan.weather.summary === 'string' && /no weather details found/i.test(plan.weather.summary))
-        ));
+        const hasWeather = !!(plan.weather && ((plan.weather.current && plan.weather.current.temperature != null) || (Array.isArray(plan.weather.days) && plan.weather.days.some(d => d && (d.high != null || d.low != null || d.condition))) || (typeof plan.weather.summary === 'string' && /no weather details found/i.test(plan.weather.summary))));
         const knowledge = plan.knowledge || {};
         const exec = data.execution || {};
         const hasKnowledge = !!(knowledge.available === true || knowledge.answer || exec.ragAnswer || data.ragAnswer);
         const quality = trip.qualityScore != null ? trip.qualityScore : (plan.validation && plan.validation.quality && plan.validation.quality.overall > 0 ? Math.round(plan.validation.quality.overall * 100) : null);
         const responseStatus = String(data.status || '').toUpperCase();
         const tripStatus = String(trip.status || '').toUpperCase();
-        const awaitingApproval = Boolean(
-            data.awaitingApproval === true
-            || trip.awaitingApproval === true
-            || responseStatus === 'PENDING_APPROVAL'
-            || tripStatus === 'PENDING_APPROVAL'
-        );
+        const awaitingApproval = Boolean(data.awaitingApproval === true || trip.awaitingApproval === true || responseStatus === 'PENDING_APPROVAL' || tripStatus === 'PENDING_APPROVAL');
         const complete = !awaitingApproval && (responseStatus === 'COMPLETE' || tripStatus === 'COMPLETE');
-        const flightDateUnconfirmed = hasFlights && plan.flights.some(f => f && /not independently confirmed/i.test(String(f.notes || '')));
+        const flightDateUnconfirmed = hasFlights && flights.some(f => /not independently confirmed/i.test(String(f.notes || '')));
         const origin = trip.origin || data.origin || '';
         const destination = trip.destination || data.destination || '';
         const route = origin && destination ? origin + ' → ' + destination : (destination || 'Travel plan');
         const nights = trip.nights || '';
         const travelers = data.travelers || trip.travelers || 1;
         const budgetLabel = trip.budgetLabel || data.budgetLabel || '';
-
-        let html = '<div class="travel-dashboard"><div class="travel-main">';
-        html += '<div class="trip-banner"><div class="trip-eyebrow">AI Travel Plan</div><div class="trip-route">' + escapeHtml(route) + '</div>';
-        html += '<div class="trip-facts">';
-        if (trip.datesFlexible === true || (!trip.departureDate && !trip.returnDate)) html += '<span class="trip-fact">📅 Dates flexible</span>';
-        else if (trip.departureDate || trip.returnDate) html += '<span class="trip-fact">📅 ' + escapeHtml(formatDateRange(trip.departureDate, trip.returnDate)) + '</span>';
-        if (nights) html += '<span class="trip-fact">🌙 ' + escapeHtml(String(nights)) + ' nights</span>';
-        html += '<span class="trip-fact">↔ ' + (trip.roundTrip === false ? 'One-way' : 'Round trip') + '</span>';
-        html += '<span class="trip-fact">👤 ' + escapeHtml(String(travelers)) + ' traveler' + (Number(travelers) === 1 ? '' : 's') + '</span>';
-        if (budgetLabel) html += '<span class="trip-fact">💰 ' + escapeHtml(budgetLabel) + '</span>';
-        if (quality != null) html += '<span class="trip-fact">✓ Plan confidence ' + escapeHtml(String(quality)) + '/100</span>';
-        html += '</div>';
         const requirements = Array.isArray(trip.requirements) ? trip.requirements : [];
-        if (requirements.length) html += '<div class="requirement-chips">' + requirements.map(r => '<span class="requirement-chip">✓ ' + escapeHtml(r) + '</span>').join('') + '</div>';
-        if (trip.qualityExplanation) html += '<div class="quality-explanation"><strong>' + escapeHtml(trip.qualityLabel || 'Plan confidence') + '</strong> · ' + escapeHtml(trip.qualityExplanation) + '</div>';
-        html += '</div>';
-        html += '<div class="workspace-tabs"><button type="button" class="workspace-tab active" data-section-target="overview">Overview</button>' + (hasFlights ? '<button type="button" class="workspace-tab" data-section-target="flights">✈ Flights</button>' : '') + (hasHotels ? '<button type="button" class="workspace-tab" data-section-target="hotels">🏨 Hotels</button>' : '') + (hasItinerary ? '<button type="button" class="workspace-tab" data-section-target="itinerary">🗓 Itinerary</button>' : '') + (hasWeather ? '<button type="button" class="workspace-tab" data-section-target="weather">☀ Weather</button>' : '') + (hasBudget ? '<button type="button" class="workspace-tab" data-section-target="budget">💰 Budget</button>' : '') + (hasKnowledge ? '<button type="button" class="workspace-tab" data-section-target="knowledge">🧠 Knowledge</button>' : '') + '</div>';
-        html += '<div class="workspace-grid">';
-        if (hasFlights) html += '<section id="section-flights" class="workspace-card"><div class="workspace-card-head"><div><div class="workspace-card-title">✈️ Flights</div><div class="workspace-card-sub">' + (flightDateUnconfirmed ? 'Live schedules — requested date not confirmed' : (roundTripReturnMissing ? 'Outbound options available · return flight not confirmed' : 'Outbound and return options')) + '</div></div><span class="ready-badge ' + ((flightDateUnconfirmed || roundTripReturnMissing) ? 'review-badge' : '') + '">' + ((flightDateUnconfirmed || roundTripReturnMissing) ? 'Review' : '✓ ' + (complete ? 'Complete' : 'Ready')) + '</span></div><div class="workspace-content">' + buildFlightsSection(plan.flights) + '</div></section>';
-        if (hasHotels) html += '<section id="section-hotels" class="workspace-card"><div class="workspace-card-head"><div><div class="workspace-card-title">🏨 Hotels</div><div class="workspace-card-sub">Accommodation recommendations</div></div><span class="ready-badge">✓ ' + (complete ? 'Complete' : 'Ready') + '</span></div><div class="workspace-content">' + buildHotelsSection(plan.hotels) + '</div></section>';
-        if (hasWeather) html += '<section id="section-weather" class="workspace-card"><div class="workspace-card-head"><div><div class="workspace-card-title">☀️ Weather</div><div class="workspace-card-sub">Travel-date forecast</div></div><span class="ready-badge">✓ ' + (complete ? 'Complete' : 'Ready') + '</span></div><div class="workspace-content">' + buildWeatherSection(plan.weather) + '</div></section>';
-        if (hasBudget) html += '<section id="section-budget" class="workspace-card"><div class="workspace-card-head"><div><div class="workspace-card-title">💰 Budget</div><div class="workspace-card-sub">Estimated trip cost</div></div><span class="ready-badge">✓ ' + (complete ? 'Complete' : 'Ready') + '</span></div><div class="workspace-content">' + buildBudgetTable(plan.budget) + '</div></section>';
-        if (hasItinerary) html += '<section id="section-itinerary" class="workspace-card full"><div class="workspace-card-head"><div><div class="workspace-card-title">🗓️ Day-wise Itinerary</div><div class="workspace-card-sub">Your planned activities by day</div></div><span class="ready-badge">✓ ' + (complete ? 'Complete' : 'Ready') + '</span></div><div class="workspace-content itin-compact">' + buildItinerarySection(plan.itinerary) + '</div></section>';
-        html += buildKnowledgeGuidanceSection(data, plan);
-        if (tips) html += '<section class="workspace-card full"><div class="workspace-card-head"><div><div class="workspace-card-title">💡 Travel Tips</div><div class="workspace-card-sub">Practical trip-specific suggestions</div></div></div><div class="workspace-content knowledge-answer">' + formatKnowledgeText(tips) + '</div></section>';
-        html += '</div>';
-        if (data.validationErrors?.length || data.semanticNotes?.length || data.ragJudge) html += '<section class="workspace-card full" style="margin-top:14px"><div class="workspace-card-title">✅ Validation</div><div class="workspace-content" style="margin-top:10px">' + buildPlanReview(data, userRequest) + '</div></section>';
-        html += '</div><aside class="travel-side">';
-        html += '<section class="trip-side-card"><div class="trip-side-title">📋 Trip Summary</div>';
-        html += '<div class="summary-row"><span>Route</span><strong>' + escapeHtml(route) + '</strong></div>';
-        if (trip.datesFlexible === true || (!trip.departureDate && !trip.returnDate)) html += '<div class="summary-row"><span>Dates</span><strong>Flexible</strong></div>'; else if (trip.departureDate || trip.returnDate) html += '<div class="summary-row"><span>Dates</span><strong>' + escapeHtml(formatDateRange(trip.departureDate, trip.returnDate)) + '</strong></div>'; 
-        html += '<div class="summary-row"><span>Travelers</span><strong>' + escapeHtml(String(travelers)) + '</strong></div>';
-        if (budgetLabel) html += '<div class="summary-row"><span>Budget</span><strong>' + escapeHtml(budgetLabel) + '</strong></div>';
-        if (quality != null) html += '<div class="summary-row"><span>Confidence</span><strong>' + escapeHtml(String(quality)) + '/100</strong></div>'; 
-        html += '</section>';
-        const componentStatus = responseStatus === 'REJECTED' ? 'Rejected' : complete ? 'Complete' : 'Ready';
-        const componentClass = responseStatus === 'REJECTED' ? ' rejected' : complete ? ' complete' : '';
-        html += '<section class="trip-side-card"><div class="trip-side-title">⚙ Plan Status</div><div class="status-list">';
-        if (hasFlights) html += '<div class="status-row"><span class="status-name"><i class="status-dot' + ((flightDateUnconfirmed || roundTripReturnMissing) ? ' rejected' : componentClass) + '"></i>Flights</span><span class="status-value' + ((flightDateUnconfirmed || roundTripReturnMissing) ? ' rejected' : componentClass) + '">' + ((flightDateUnconfirmed || roundTripReturnMissing) ? 'Review' : componentStatus) + '</span></div>';
-        if (hasHotels) html += '<div class="status-row"><span class="status-name"><i class="status-dot' + componentClass + '"></i>Hotels</span><span class="status-value' + componentClass + '">' + componentStatus + '</span></div>';
-        if (hasWeather) html += '<div class="status-row"><span class="status-name"><i class="status-dot' + componentClass + '"></i>Weather</span><span class="status-value' + componentClass + '">' + componentStatus + '</span></div>';
-        if (hasBudget) html += '<div class="status-row"><span class="status-name"><i class="status-dot' + componentClass + '"></i>Budget</span><span class="status-value' + componentClass + '">' + componentStatus + '</span></div>';
-        if (hasItinerary) html += '<div class="status-row"><span class="status-name"><i class="status-dot' + componentClass + '"></i>Itinerary</span><span class="status-value' + componentClass + '">' + componentStatus + '</span></div>';
-        html += '</div></section>';
-        if (awaitingApproval && data.threadId && data.tripPlanning !== false) {
-            html += '<section class="final-decision"><div class="decision-status pending"><i class="decision-dot"></i> Waiting for your decision</div><h3>Ready to finalize?</h3><p>Review the complete plan. Approve it, request a change, or reject it.</p><div class="final-actions"><button type="button" class="final-approve" data-plan-action="approve" data-thread-id="' + escapeHtml(data.threadId) + '">✓ Approve</button><button type="button" class="final-modify" data-plan-action="modify" data-thread-id="' + escapeHtml(data.threadId) + '">✎ Modify</button><button type="button" class="final-reject" data-plan-action="reject" data-thread-id="' + escapeHtml(data.threadId) + '">✕ Reject</button></div></section>';
-        } else if (complete) {
-            html += '<section class="final-decision"><div class="decision-status"><i class="decision-dot"></i> Plan confirmed</div><h3>✓ Trip plan confirmed</h3><p>This plan has already been finalized.</p></section>';
+        const imageUrl = trip.imageUrl || trip.heroImageUrl || data.destinationImageUrl || '';
+        const statusText = complete ? 'Plan Ready' : awaitingApproval ? 'Ready for review' : 'Planning in progress';
+
+        // Non-trip requests stay intentionally lightweight: only requested/returned widgets are shown.
+        if (!isTripPlan) {
+            return buildSpecialistResponseHtml(data, userRequest);
         }
-        html += '</aside></div>';
+
+        const section = (number, key, icon, title, subtitle, body, badge, extraClass) => {
+            if (!body) return '';
+            return '<section id="section-' + key + '" class="plan-step ' + (extraClass || '') + '">'
+                + '<div class="plan-step-rail"><span class="plan-step-number">' + number + '</span><span class="plan-step-line"></span></div>'
+                + '<div class="plan-step-card">'
+                + '<div class="plan-step-head"><div class="plan-step-heading"><div class="plan-step-icon">' + icon + '</div><div><h3>' + title + ' <span class="plan-check">✓</span></h3><p>' + subtitle + '</p></div></div>'
+                + (badge ? '<span class="ready-badge ' + (badge === 'Review' ? 'review-badge' : '') + '">' + badge + '</span>' : '')
+                + '</div>' + body + '</div></section>';
+        };
+
+        let html = '<div class="plan-workspace">';
+        html += '<header class="plan-header">'
+            + '<div class="plan-header-top"><div><div class="trip-eyebrow">AI TRAVEL PLAN</div><h1>' + escapeHtml(route) + '</h1></div><div class="plan-header-status">' + escapeHtml(statusText) + '</div></div>'
+            + '<div class="plan-header-facts">'
+            + '<span>📅 ' + escapeHtml(trip.datesFlexible === true || (!trip.departureDate && !trip.returnDate) ? 'Dates flexible' : formatDateRange(trip.departureDate, trip.returnDate)) + (nights ? ' · ' + escapeHtml(String(nights)) + ' nights' : '') + '</span>'
+            + '<span>👤 ' + escapeHtml(String(travelers)) + ' traveler' + (Number(travelers) === 1 ? '' : 's') + '</span>'
+            + '<span>↔ ' + (trip.roundTrip === false ? 'One-way' : 'Round trip') + '</span>'
+            + (budgetLabel ? '<span>💰 ' + escapeHtml(budgetLabel) + '</span>' : '')
+            + (quality != null ? '<span>✓ Confidence ' + escapeHtml(String(quality)) + '/100</span>' : '')
+            + '</div>'
+            + (requirements.length ? '<div class="plan-requirements">' + requirements.map(r => '<span>✓ ' + escapeHtml(r) + '</span>').join('') + '</div>' : '')
+            + '</header>';
+
+        const nav = [];
+        if (hasFlights) nav.push(['flights','✈ Flights']);
+        if (hasHotels) nav.push(['hotels','🏨 Hotels']);
+        if (hasItinerary) nav.push(['itinerary','🗓 Itinerary']);
+        if (hasWeather) nav.push(['weather','☀ Weather']);
+        if (hasBudget) nav.push(['budget','💰 Budget']);
+        if (hasKnowledge) nav.push(['knowledge','🧠 Tips']);
+        if (nav.length > 1) html += '<nav class="plan-section-nav">' + nav.map((x,i) => '<button type="button" class="plan-nav-btn' + (i === 0 ? ' active' : '') + '" data-section-target="' + x[0] + '">' + x[1] + '</button>').join('') + '</nav>';
+
+        html += '<div class="plan-steps">';
+        let step = 1;
+        if (hasFlights) {
+            const badge = (flightDateUnconfirmed || roundTripReturnMissing) ? 'Review' : '✓ Ready';
+            html += section(step++, 'flights', '✈️', 'Flights', flightDateUnconfirmed ? 'Live schedules · requested date not independently confirmed' : 'Best available flight options for your trip', buildFlightsSection(flights), badge);
+        }
+        if (hasHotels) html += section(step++, 'hotels', '🏨', 'Hotels', 'Top accommodation recommendations', buildHotelsSection(hotels), '✓ Ready');
+        if (hasItinerary) html += section(step++, 'itinerary', '🗓️', 'Day-wise Itinerary', 'A complete day-by-day plan', buildItinerarySection(plan.itinerary), '✓ Ready', 'plan-step-itinerary');
+        if (hasWeather) html += section(step++, 'weather', '☀️', 'Weather & Best Time', 'Travel-date forecast and planning guidance', buildWeatherSection(plan.weather), '✓ Ready');
+        if (hasBudget) html += section(step++, 'budget', '💰', 'Budget Breakdown', 'Estimated cost for your trip', buildBudgetTable(plan.budget), '✓ Ready');
+        if (hasKnowledge) {
+            const knowledgeBody = buildKnowledgeGuidanceSection(data, plan);
+            if (knowledgeBody) html += section(step++, 'knowledge', '🧠', 'Travel Knowledge & Tips', 'Useful destination guidance for your trip', knowledgeBody.replace(/^<section[^>]*>|<\/section>$/g, ''), '✓ Grounded');
+        }
+        if (tips && !hasKnowledge) html += section(step++, 'tips', '💡', 'Travel Tips', 'Practical trip-specific suggestions', '<div class="knowledge-answer">' + formatKnowledgeText(tips) + '</div>', '✓ Ready');
+        html += '</div>';
+
+        if (data.validationErrors?.length || data.semanticNotes?.length || data.ragJudge) {
+            html += '<div class="plan-validation">' + buildPlanReview(data, userRequest) + '</div>';
+        }
+
+        if (awaitingApproval && data.threadId && data.tripPlanning !== false) {
+            html += '<section class="plan-final-action"><div><span class="decision-status pending"><i class="decision-dot"></i> Waiting for your decision</span><h3>Ready to finalize?</h3><p>Review the plan, then approve it, request a change, or reject it.</p></div><div class="final-actions-inline"><button type="button" class="final-approve" data-plan-action="approve" data-thread-id="' + escapeHtml(data.threadId) + '">✓ Approve</button><button type="button" class="final-modify" data-plan-action="modify" data-thread-id="' + escapeHtml(data.threadId) + '">✎ Modify</button><button type="button" class="final-reject" data-plan-action="reject" data-thread-id="' + escapeHtml(data.threadId) + '">✕ Reject</button></div></section>';
+        } else if (complete) {
+            html += '<section class="plan-final-action confirmed"><div><span class="decision-status"><i class="decision-dot"></i> Plan confirmed</span><h3>✓ Trip plan confirmed</h3><p>This plan has already been finalized.</p></div></section>';
+        }
+
+        html += '</div>';
         return html;
     };
 
@@ -3959,7 +3985,7 @@
         }
         body.querySelectorAll('[data-section-target]').forEach(tab => {
             tab.addEventListener('click', () => {
-                body.querySelectorAll('.workspace-tab').forEach(t => t.classList.remove('active'));
+                body.querySelectorAll('.workspace-tab,.plan-nav-btn').forEach(t => t.classList.remove('active'));
                 tab.classList.add('active');
                 const target = tab.dataset.sectionTarget;
                 if (target !== 'overview') body.querySelector('#section-' + target)?.scrollIntoView({behavior:'smooth', block:'center'});
@@ -4253,11 +4279,11 @@
         const hotelMoreButton = event.target.closest('[data-hotels-more]');
         if (hotelMoreButton) {
             const list = hotelMoreButton.previousElementSibling;
-            if (!list || !list.classList.contains('hotel-list')) return;
+            if (!list || (!list.classList.contains('hotel-list') && !list.classList.contains('hotel-rich-list'))) return;
             const expanded = list.classList.toggle('expanded');
             hotelMoreButton.textContent = expanded
                 ? '− Show fewer hotel options'
-                : '＋ Show more hotel options';
+                : '＋ ' + list.querySelectorAll('.hotel-rich-card.is-extra,.hotel-card.is-extra').length + ' more hotel option' + (list.querySelectorAll('.hotel-rich-card.is-extra,.hotel-card.is-extra').length === 1 ? '' : 's');
             return;
         }
 
@@ -4356,3 +4382,14 @@
 </body>
 </html>
 
+<style>
+/* V7 — rich Google Hotels / SerpApi cards */
+.hotel-rich-widget{display:flex;flex-direction:column;gap:14px}
+.hotel-rich-summary{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px;border:1px solid rgba(255,255,255,.08);border-radius:14px;background:linear-gradient(135deg,rgba(72,126,206,.12),rgba(255,255,255,.025))}
+.hotel-rich-summary-main{display:flex;align-items:center;gap:11px;min-width:0}.hotel-rich-summary-icon{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;background:rgba(71,139,229,.16);font-size:17px}.hotel-rich-summary-title{font-size:14px;font-weight:800;color:#f5f8fc}.hotel-rich-summary-sub{font-size:10px;color:#91a0b5;margin-top:3px}.hotel-rich-count{white-space:nowrap;font-size:10px;font-weight:800;color:#9ec5f3;background:rgba(70,137,221,.12);border:1px solid rgba(70,137,221,.2);padding:6px 9px;border-radius:999px}
+.hotel-rich-list{display:flex;flex-direction:column;gap:12px}.hotel-rich-card{display:grid;grid-template-columns:190px minmax(0,1fr) 145px;gap:16px;overflow:hidden;border:1px solid rgba(255,255,255,.085);border-radius:16px;background:linear-gradient(145deg,rgba(255,255,255,.045),rgba(255,255,255,.018));box-shadow:0 8px 25px rgba(0,0,0,.14);transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease}.hotel-rich-card:hover{transform:translateY(-2px);border-color:rgba(105,164,229,.34);box-shadow:0 14px 34px rgba(0,0,0,.2)}
+.hotel-rich-media{position:relative;min-height:178px;background:linear-gradient(135deg,#172335,#263b56);overflow:hidden}.hotel-rich-media img{width:100%;height:100%;min-height:178px;display:block;object-fit:cover}.hotel-rich-media-fallback{position:absolute;inset:0;display:grid;place-items:center;font-size:38px;background:radial-gradient(circle at 35% 25%,rgba(104,166,235,.35),transparent 48%),linear-gradient(135deg,#172335,#263b56)}.hotel-rich-media img + .hotel-rich-media-fallback{display:none}.hotel-rich-badge{position:absolute;left:10px;top:10px;padding:5px 8px;border-radius:999px;background:rgba(18,26,39,.82);border:1px solid rgba(255,255,255,.16);backdrop-filter:blur(8px);font-size:9px;font-weight:800;color:#e8f2ff}.hotel-rich-badge.deal{background:rgba(24,135,91,.88);color:#dfffee;border-color:rgba(115,224,170,.3)}
+.hotel-rich-main{padding:16px 0;min-width:0}.hotel-rich-title-row{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}.hotel-rich-name{font-size:15px;line-height:1.25;font-weight:850;color:#f5f8fc}.hotel-rich-location{margin-top:5px;color:#9baabd;font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.hotel-rich-rating{display:inline-flex;align-items:center;gap:5px;margin-top:10px;padding:5px 7px;border-radius:7px;background:rgba(246,184,66,.09);border:1px solid rgba(246,184,66,.16);font-size:10px;color:#f4d27e;font-weight:800}.hotel-rich-rating .reviews{color:#8796aa;font-weight:600}.hotel-rich-class{margin-left:7px;color:#a9b7ca;font-weight:700}.hotel-rich-note{margin-top:9px;font-size:10px;line-height:1.5;color:#aab7c8}.hotel-rich-amenities{display:flex;flex-wrap:wrap;gap:5px;margin-top:11px}.hotel-amenity-chip{padding:5px 7px;border-radius:7px;background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.07);font-size:9px;color:#b9c6d6}.hotel-rich-deal{display:inline-block;margin-top:8px;font-size:9px;color:#86ddb1;font-weight:800}.hotel-rich-price{display:flex;flex-direction:column;justify-content:center;align-items:flex-end;padding:16px 16px 16px 0;text-align:right}.hotel-rich-price-label{font-size:9px;color:#8290a2}.hotel-rich-price-main{margin-top:3px;font-size:19px;font-weight:900;color:#f7fafc}.hotel-rich-price-total{margin-top:4px;font-size:9px;color:#8795a7}.hotel-rich-book{margin-top:12px;display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:9px 12px;border-radius:9px;background:#4f83d9;color:#fff;text-decoration:none;font-size:10px;font-weight:850;border:1px solid rgba(255,255,255,.08);box-shadow:0 5px 16px rgba(54,105,186,.22)}.hotel-rich-book:hover{background:#6094e5}.hotel-rich-cancel{margin-top:7px;font-size:9px;color:#8edeb4;font-weight:700}.hotel-rich-more{align-self:center;padding:9px 14px;border-radius:10px;border:1px solid rgba(105,164,229,.2);background:rgba(65,133,214,.07);color:#9fc5ee;font-size:10px;font-weight:800;cursor:pointer}.hotel-rich-card.is-extra{display:none}.hotel-rich-list.expanded .hotel-rich-card.is-extra{display:grid}
+@media(max-width:900px){.hotel-rich-card{grid-template-columns:150px minmax(0,1fr)}.hotel-rich-price{grid-column:2;align-items:flex-start;padding:0 16px 16px 0;flex-direction:row;gap:12px;flex-wrap:wrap}.hotel-rich-price-main{margin-top:0}.hotel-rich-book{margin-top:0}.hotel-rich-cancel{margin-top:4px}.hotel-rich-media{min-height:160px}.hotel-rich-media img{min-height:160px}}
+@media(max-width:620px){.hotel-rich-card{grid-template-columns:1fr}.hotel-rich-media{height:190px;min-height:190px}.hotel-rich-media img{min-height:190px}.hotel-rich-main{padding:14px}.hotel-rich-price{grid-column:auto;padding:0 14px 14px;align-items:flex-start}.hotel-rich-summary{align-items:flex-start}.hotel-rich-count{font-size:9px}}
+</style>
