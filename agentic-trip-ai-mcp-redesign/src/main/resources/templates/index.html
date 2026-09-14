@@ -4,6 +4,8 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>AgenticTripAI</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/favicon.svg" />
     <style>
         :root {
             --bg-1: #020b18;
@@ -969,6 +971,8 @@
         .itin-rich-day-title-wrap p { margin:5px 0 0; color:#94a9c4; font-size:12px; line-height:1.5; }
         .itin-day-cost { color:#9ed6b1; font-size:13px; font-weight:800; text-align:right; }
         .itin-day-cost small { display:block; margin-top:2px; color:#7187a4; font-size:9px; font-weight:600; text-transform:uppercase; letter-spacing:.08em; }
+        .itin-day-stats{display:flex;flex-wrap:wrap;gap:5px;margin-top:7px}.itin-day-stats span{padding:3px 7px;border-radius:999px;background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.055);color:#849bb7;font-size:9px;font-weight:700}
+        .itin-stop-index{display:inline-grid;place-items:center;width:20px;height:20px;margin-right:7px;border-radius:7px;background:rgba(74,143,241,.15);border:1px solid rgba(74,143,241,.22);color:#9fc7fa;font-size:9px;vertical-align:2px}
         .itin-rich-activities { padding:16px; display:grid; gap:12px; }
         .itin-rich-activity { display:flex; gap:14px; padding:13px; border:1px solid rgba(255,255,255,.055); border-radius:15px; background:rgba(7,17,32,.35); }
         .itin-rich-activity-media { width:145px; min-width:145px; height:112px; overflow:hidden; border-radius:12px; background:linear-gradient(135deg,#1d2d4a,#111d31); }
@@ -986,6 +990,71 @@
         .itin-book-btn { display:inline-flex; margin-top:10px; padding:7px 11px; border-radius:9px; background:#356fca; color:#fff; text-decoration:none; font-size:11px; font-weight:800; }
         .itin-book-btn:hover { background:#4482df; }
         .itin-rich-empty { padding:20px; color:#8095b0; font-size:12px; }
+
+        /* V53 — per-widget controls + expanded workspace mode */
+
+        /* V54 — click the numbered rail to fold a widget in/out */
+        .plan-step-number{appearance:none;-webkit-appearance:none;padding:0;font-family:inherit;cursor:pointer;transition:transform .16s ease,box-shadow .16s ease,background .16s ease}
+        .plan-step-number:hover{transform:scale(1.06);box-shadow:0 0 0 2px rgba(105,169,255,.18),0 5px 18px rgba(20,111,241,.35)}
+        .plan-step.widget-collapsed .plan-step-card{padding-bottom:10px}
+        .plan-step.widget-collapsed .plan-step-card > :not(.plan-step-head){display:none}
+        .plan-step.widget-collapsed .plan-step-head{margin-bottom:0}
+        .plan-step.widget-collapsed .plan-step-number{background:#0f4ea9;box-shadow:0 0 0 1px rgba(88,161,255,.35),0 4px 14px rgba(20,111,241,.22)}
+        .plan-step.widget-collapsed .plan-step-line{opacity:.35}
+
+        .widget-head-actions{display:flex;align-items:center;gap:8px;flex:0 0 auto}.widget-head-actions .ready-badge{white-space:nowrap}
+        .widget-controls{display:flex;align-items:center;gap:5px;flex:0 0 auto}
+        .widget-control{width:30px;height:30px;display:grid;place-items:center;border:1px solid rgba(255,255,255,.09);border-radius:9px;background:rgba(255,255,255,.035);color:#9eb4cd;font-size:13px;font-weight:800;cursor:pointer;transition:background .16s ease,border-color .16s ease,color .16s ease,transform .16s ease}
+        .widget-control:hover{background:rgba(72,139,238,.14);border-color:rgba(91,158,255,.3);color:#edf6ff;transform:translateY(-1px)}
+        .widget-control.close:hover{background:rgba(224,78,94,.12);border-color:rgba(224,78,94,.3);color:#ffb5bd}
+        .widget-control-label{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+        .plan-step.widget-closed{display:none}
+        .plan-step.widget-expanded{position:relative;z-index:80}
+        .plan-step.widget-expanded::before{content:"";position:fixed;inset:0;background:rgba(2,8,18,.78);backdrop-filter:blur(7px);z-index:80}
+        .plan-step.widget-expanded .plan-step-card{position:fixed;inset:18px 24px;z-index:81;margin:0;max-height:calc(100vh - 36px);overflow:auto;border-color:rgba(91,158,255,.28);box-shadow:0 30px 90px rgba(0,0,0,.55)}
+        .plan-step.widget-expanded .plan-step-line,.plan-step.widget-expanded .plan-step-number{opacity:.25}
+        .widget-restore-tray{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin:10px 0 4px 48px;padding:10px 12px;border:1px dashed rgba(105,164,229,.2);border-radius:13px;background:rgba(14,31,52,.6)}
+        .widget-restore-label{color:#8198b4;font-size:10px;font-weight:700;margin-right:2px}
+        .widget-restore-btn{border:1px solid rgba(89,150,231,.2);border-radius:9px;padding:7px 10px;background:rgba(61,128,215,.08);color:#a9cbf4;font-size:10px;font-weight:800;cursor:pointer}
+        .widget-restore-btn:hover{background:rgba(61,128,215,.17);color:#eef6ff}
+        .widget-close-empty{margin:10px 0 10px 48px;padding:12px 14px;border-radius:13px;border:1px dashed rgba(255,255,255,.1);color:#8fa4bd;font-size:11px}
+
+        /* Itinerary V53 — compact timeline, better scanability and less empty space */
+        .itin-rich-list{gap:14px}
+        .itin-overview{padding:15px 17px;align-items:center}
+        .itin-overview-text{font-size:12px}
+        .itin-rich-day{border-radius:17px}
+        .itin-rich-day-head{padding:14px 16px;gap:12px}
+        .itin-rich-day-number{width:50px;min-width:50px;height:50px;border-radius:13px;font-size:11px}
+        .itin-rich-day-title-wrap h3{font-size:16px}
+        .itin-rich-day-title-wrap p{font-size:11px;margin-top:4px}
+        .itin-rich-activities{position:relative;padding:12px 14px 14px 22px;gap:9px}
+        .itin-rich-activities:before{content:"";position:absolute;left:35px;top:19px;bottom:19px;width:2px;background:linear-gradient(180deg,rgba(74,143,241,.42),rgba(74,143,241,.08));border-radius:2px}
+        .itin-rich-activity{position:relative;display:grid;grid-template-columns:86px minmax(0,1fr);gap:12px;padding:10px 11px 10px 10px;border-radius:13px;background:rgba(7,17,32,.48)}
+        .itin-rich-activity:before{content:"";position:absolute;left:9px;top:28px;width:9px;height:9px;border-radius:50%;background:#4e91ec;box-shadow:0 0 0 4px rgba(78,145,236,.12);z-index:2}
+        .itin-rich-activity-media{width:86px;min-width:86px;height:82px;border-radius:10px;margin-left:2px}
+        .itin-rich-activity-media img{min-height:82px}
+        .itin-rich-activity-placeholder{font-size:25px}
+        .itin-rich-activity-body{padding-left:1px}
+        .itin-rich-activity-name{font-size:14px}
+        .itin-rich-type{margin-top:4px;font-size:9px}
+        .itin-rich-description{margin-top:6px;font-size:11px;line-height:1.45}
+        .itin-rich-meta{margin-top:7px;font-size:10px;gap:5px 11px}
+        .itin-rich-tags{margin-top:7px;gap:5px}
+        .itin-rich-tags span{padding:3px 7px;font-size:9px}
+        .itin-book-btn{margin-top:7px;padding:6px 9px;font-size:10px}
+        .itin-activity-cost{font-size:11px}
+        .itin-day-cost{font-size:11px}
+        @media(max-width:720px){
+            .widget-restore-tray,.widget-close-empty{margin-left:28px}
+            .plan-step.widget-expanded .plan-step-card{inset:8px;max-height:calc(100vh - 16px)}
+            .itin-rich-activities{padding-left:12px}
+            .itin-rich-activities:before{display:none}
+            .itin-rich-activity{grid-template-columns:72px minmax(0,1fr);gap:10px}
+            .itin-rich-activity-media{width:72px;min-width:72px;height:70px}
+            .itin-rich-activity-media img{min-height:70px}
+            .itin-rich-activity:before{display:none}
+        }
         @media (max-width:720px) { .itin-rich-activity { flex-direction:column; } .itin-rich-activity-media { width:100%; height:150px; } .itin-rich-day-head { align-items:flex-start; } .itin-day-cost { font-size:11px; } }
         .itin-list { display:grid; gap:10px; }
         .itin-item { display:grid; grid-template-columns:54px 1fr; gap:12px; }
@@ -1541,7 +1610,7 @@
         .plan-step-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:12px}.plan-step-heading{display:flex;gap:10px;align-items:center;min-width:0}.plan-step-icon{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;background:rgba(65,139,241,.12);border:1px solid rgba(81,158,255,.18);font-size:17px;flex:0 0 auto}.plan-step-heading h3{margin:0;color:#edf5ff;font-size:16px;font-weight:850}.plan-step-heading p{margin:3px 0 0;color:#89a2bd;font-size:11px}.plan-check{display:inline-grid;place-items:center;width:17px;height:17px;border-radius:50%;margin-left:3px;background:rgba(45,202,123,.14);color:#77e8a6;font-size:10px;vertical-align:1px}
         .plan-step-itinerary .plan-step-card{padding-bottom:17px}.plan-step-itinerary .itin-compact{grid-template-columns:repeat(auto-fit,minmax(190px,1fr))}
         .plan-validation{margin:8px 0 12px;padding-left:48px}.plan-validation .validation-banner{margin:0}
-        .plan-final-action{margin:12px 0 0 48px;border:1px solid rgba(82,160,255,.2);border-radius:16px;padding:16px;background:linear-gradient(180deg,rgba(17,39,66,.97),rgba(8,22,39,.98));display:flex;align-items:center;justify-content:space-between;gap:18px}.plan-final-action h3{margin:7px 0 3px;font-size:16px}.plan-final-action p{margin:0;color:#8fa9c5;font-size:12px}.plan-final-action.confirmed{border-color:rgba(45,202,123,.2)}.final-actions-inline{display:flex;gap:8px;flex:0 0 auto}.final-actions-inline button{border:0;border-radius:10px;padding:11px 16px;color:#fff;font-weight:850;cursor:pointer}
+        .plan-final-action{margin:12px 0 0 48px;border:1px solid rgba(82,160,255,.2);border-radius:16px;padding:16px;background:linear-gradient(180deg,rgba(17,39,66,.97),rgba(8,22,39,.98));display:flex;align-items:center;justify-content:space-between;gap:18px}.plan-final-action h3{margin:7px 0 3px;font-size:16px}.plan-final-action p{margin:0;color:#8fa9c5;font-size:12px}.plan-final-action.confirmed{border-color:rgba(45,202,123,.2)}.final-actions-inline{display:flex;gap:8px;flex:0 0 auto}.final-actions-inline button{border:0;border-radius:10px;padding:11px 16px;color:#fff;font-weight:850;cursor:pointer;transition:opacity .15s,transform .15s}.final-actions-inline button:disabled{cursor:wait;opacity:.65}.final-actions-inline button.is-busy{position:relative;pointer-events:none}.decision-progress{display:none;align-items:center;gap:8px;margin-top:10px;padding:8px 10px;border-radius:10px;background:rgba(76,157,255,.08);border:1px solid rgba(76,157,255,.16);color:#bcdcff;font-size:11px;font-weight:750}.decision-progress.visible{display:flex}.decision-progress.success{background:rgba(45,202,123,.08);border-color:rgba(45,202,123,.18);color:#a9efc7}.decision-progress.error{background:rgba(255,93,93,.08);border-color:rgba(255,93,93,.18);color:#ffc0c0}.decision-spinner{width:13px;height:13px;border:2px solid rgba(190,220,255,.28);border-top-color:#8bc2ff;border-radius:50%;animation:decisionSpin .75s linear infinite;flex:0 0 auto}.decision-progress.success .decision-spinner,.decision-progress.error .decision-spinner{display:none}@keyframes decisionSpin{to{transform:rotate(360deg)}}.decision-button-spinner{display:inline-block;width:12px;height:12px;border:2px solid rgba(255,255,255,.35);border-top-color:#fff;border-radius:50%;vertical-align:-2px;margin-right:7px;animation:decisionSpin .7s linear infinite}.decision-progress-icon{font-size:13px}.final-actions-inline button.final-approve{background:linear-gradient(135deg,#199c65,#25c77d)}.final-actions-inline button.final-modify{background:linear-gradient(135deg,#226fd2,#3b8ff5)}.final-actions-inline button.final-reject{background:linear-gradient(135deg,#a9404c,#d45b65)}
         .specialist-request{max-width:520px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.specialist-dynamic-header .plan-header-facts{margin-top:2px}
         .plan-workspace .flight-rich-widget,.plan-workspace .weather-dashboard-card{width:100%}.plan-workspace .rich-flight-card{grid-template-columns:minmax(145px,.75fr) minmax(320px,1.7fr) minmax(130px,.6fr)}
         @media(max-width:850px){.plan-step{grid-template-columns:38px minmax(0,1fr)}.plan-final-action{margin-left:38px;flex-direction:column;align-items:stretch}.final-actions-inline{display:grid;grid-template-columns:repeat(3,1fr)}.final-actions-inline button{padding:10px 6px}.plan-header{padding:18px}.plan-header-top{flex-direction:column;gap:8px}.plan-header-status{align-self:flex-start}}
@@ -1708,6 +1777,9 @@
         }
         .chat-history-item:hover { background:rgba(54,116,196,.10); border-color:rgba(94,151,224,.12); }
         .chat-history-item.active { background:rgba(42,116,231,.15); border-color:rgba(76,150,247,.20); }
+        .chat-history-item.active { box-shadow:inset 3px 0 0 #4f9cff, 0 0 0 1px rgba(79,156,255,.08); background:linear-gradient(90deg,rgba(42,116,231,.22),rgba(42,116,231,.10)); }
+        .chat-history-item.active > span:first-child { color:#ffffff; font-weight:800; }
+        .chat-history-item.active .meta { color:#9ec8f5; }
         .chat-history-item > span:first-child {
             display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
             font-size:12px; font-weight:650; color:#dce9f7;
@@ -2102,6 +2174,7 @@
             .city-grid { margin-bottom: 16px; }
         }
 
+.agent-clarification-banner{display:flex;align-items:center;gap:14px;margin:14px 0;padding:14px 18px;border:1px solid rgba(246,194,84,.35);border-radius:14px;background:rgba(246,194,84,.08);color:#e7edf8}.agent-clarification-banner strong{color:#f6c254;white-space:nowrap}.agent-clarification-banner span{color:#c8d2e5}
 </style>
 <style>
 /* V24 targeted modification mode: replace disruptive browser prompts with an
@@ -2374,6 +2447,10 @@
     let dbTrips = [];
     let pendingHistoryDelete = null;
     let modifyContext = null;
+    // Unified selection key for Recent Trips/Chats. DB rows use db:<id>; local
+    // conversations use chat:<id>. This is intentionally separate from
+    // currentChatId because the visible history can contain both kinds.
+    let currentHistoryKey = null;
 
     const showToast = (message) => {
         let toast = document.getElementById('uiToast');
@@ -2784,6 +2861,8 @@
 
     const openSavedTrip = async (id) => {
         try {
+            currentHistoryKey = 'db:' + String(id);
+            renderHistoryList();
             const trip = dbTrips.find(t => String(t.id) === String(id));
             const userId = userIdField.value.trim() || 'aaro_hi_user';
             showHomeView();
@@ -2896,7 +2975,16 @@
 
             const btn = document.createElement('button');
             btn.type = 'button';
-            btn.className = 'chat-history-item' + (entry.kind === 'chat' && entry.id === currentChatId ? ' active' : '');
+            const entryKey = entry.kind + ':' + String(entry.id);
+            const isSelected = entryKey === currentHistoryKey;
+            btn.className = 'chat-history-item' + (isSelected ? ' active' : '');
+            btn.dataset.historyKey = entryKey;
+            if (isSelected) {
+                btn.setAttribute('aria-current', 'page');
+                wrap.classList.add('selected');
+            } else {
+                btn.removeAttribute('aria-current');
+            }
             const title = document.createElement('span');
             title.textContent = entry.title;
             if (entry.kind === 'db') {
@@ -3002,8 +3090,9 @@
                 dbTrips = dbTrips.filter(trip => String(trip.id) !== String(entry.id));
             }
 
-            if (entry.kind === 'chat' && entry.id === currentChatId) {
+            if ((entry.kind === 'chat' && entry.id === currentChatId) || currentHistoryKey === entry.kind + ':' + String(entry.id)) {
                 currentChatId = null;
+                currentHistoryKey = null;
                 startedFreshChat = true;
                 clearThreadDom();
                 promptInput.value = '';
@@ -3047,6 +3136,8 @@
         if (!chat) return;
 
         currentChatId = chatId;
+        currentHistoryKey = 'chat:' + String(chatId);
+        renderHistoryList();
         startedFreshChat = String(chatId).startsWith('chat-');
         clearThreadDom();
 
@@ -3135,6 +3226,7 @@
         exitModifyMode(true);
         startedFreshChat = true;
         currentChatId = null;
+        currentHistoryKey = null;
         ensureCurrentChat('New trip');
         clearThreadDom();
         renderHistoryList();
@@ -3521,15 +3613,24 @@
         days.forEach(day => {
             const activities = Array.isArray(day.activities) ? day.activities.filter(a => a && text(a.name)) : [];
             const dayCost = money(day.estimatedCost, day.currency);
+            const foodCount = activities.filter(a => a.foodExperience === true).length;
+            const localCount = activities.filter(a => a.localExperience === true).length;
+            const familyCount = activities.filter(a => a.familyFriendly === true).length;
+            const stats = '<div class="itin-day-stats">'
+                + '<span>📍 ' + activities.length + ' stop' + (activities.length === 1 ? '' : 's') + '</span>'
+                + (foodCount ? '<span>🍜 ' + foodCount + ' food</span>' : '')
+                + (localCount ? '<span>🏘 ' + localCount + ' local</span>' : '')
+                + (familyCount ? '<span>👨‍👩‍👧 family</span>' : '')
+                + '</div>';
             html += '<article class="itin-rich-day"><div class="itin-rich-day-head">'
                 + '<div class="itin-rich-day-number">DAY ' + escapeHtml(String(day.day || '')) + '</div>'
                 + '<div class="itin-rich-day-title-wrap"><h3>' + escapeHtml(text(day.title) || 'Explore') + '</h3>'
-                + (text(day.summary) ? '<p>' + escapeHtml(day.summary) + '</p>' : '') + '</div>'
+                + (text(day.summary) ? '<p>' + escapeHtml(day.summary) + '</p>' : '') + stats + '</div>'
                 + (dayCost ? '<div class="itin-day-cost">' + escapeHtml(dayCost) + '<small>estimated</small></div>' : '')
                 + '</div>';
             if (activities.length) {
                 html += '<div class="itin-rich-activities">';
-                activities.forEach(a => {
+                activities.forEach((a, activityIndex) => {
                     const tags = activityTags(a);
                     const image = safeUrl(a.imageUrl || a.image || a.photoUrl);
                     const booking = safeUrl(a.bookingUrl || a.url || a.link);
@@ -3542,7 +3643,7 @@
                         + (image ? '<img src="' + escapeHtml(image) + '" alt="' + escapeHtml(a.name) + '" loading="lazy" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\';">' : '')
                         + '<div class="itin-rich-activity-placeholder"' + (image ? ' style="display:none"' : '') + '>' + activityIcon(a.type) + '</div>'
                         + '</div><div class="itin-rich-activity-body">'
-                        + '<div class="itin-rich-activity-top"><div><div class="itin-rich-activity-name">' + escapeHtml(a.name) + '</div>'
+                        + '<div class="itin-rich-activity-top"><div><div class="itin-rich-activity-name"><span class="itin-stop-index">' + (activityIndex + 1) + '</span>' + escapeHtml(a.name) + '</div>'
                         + (a.type ? '<span class="itin-rich-type">' + escapeHtml(a.type) + '</span>' : '') + '</div>'
                         + (cost ? '<div class="itin-activity-cost">' + escapeHtml(cost) + '</div>' : '') + '</div>'
                         + (description ? '<div class="itin-rich-description">' + escapeHtml(description) + '</div>' : '')
@@ -3862,6 +3963,13 @@
         return html + '</div>';
     };
 
+    const widgetControls = (key, title) =>
+        '<div class="widget-controls" aria-label="' + escapeHtml(title) + ' widget controls">'
+        + '<button type="button" class="widget-control widget-fold-control" data-widget-action="collapse" data-widget-key="' + escapeHtml(key) + '" title="Fold in ' + escapeHtml(title) + '" aria-label="Fold in ' + escapeHtml(title) + '" aria-expanded="true">⌃</button>'
+        + '<button type="button" class="widget-control" data-widget-action="expand" data-widget-key="' + escapeHtml(key) + '" title="Expand ' + escapeHtml(title) + '" aria-label="Expand ' + escapeHtml(title) + '">⛶</button>'
+        + '<button type="button" class="widget-control close" data-widget-action="close" data-widget-key="' + escapeHtml(key) + '" title="Hide ' + escapeHtml(title) + '" aria-label="Hide ' + escapeHtml(title) + '">×</button>'
+        + '</div>';
+
     const buildSpecialistResponseHtml = (data, userRequest) => {
         const plan = data.plan || data || {};
         const trip = plan.trip || {};
@@ -3876,6 +3984,8 @@
         const hasWeather = !!(weather && (weather.summary || weather.location || (Array.isArray(weather.days) && weather.days.length) || weather.current));
         const hasBudget = !!(budget && Array.isArray(budget.lineItems) && budget.lineItems.length);
         const hasAnswer = !!answer;
+        const clarification = String(data.clarificationRequired || data.plan?.clarificationRequired || '').trim();
+        const needsUserInput = String(data.status || '').toUpperCase() === 'NEEDS_USER_INPUT';
 
         const meta = {
             WEATHER: ['☀️', location ? 'Weather in ' + location : 'Weather details', 'Current conditions and forecast'],
@@ -3894,20 +4004,22 @@
         if (isMulti || type === 'BUDGET') { if (hasBudget) widgets.push({key:'budget', icon:'💰', title:'Budget', subtitle:'Estimated cost', body:buildBudgetTable(budget)}); }
         if ((type === 'RESEARCH' || type === 'HISTORY' || (!isMulti && !widgets.length)) && hasAnswer) widgets.push({key:'answer', icon:meta[0], title:meta[1], subtitle:meta[2], body:'<div class="specialist-answer">' + formatKnowledgeText(answer) + '</div>'});
 
-        const nav = widgets.length > 1 ? '<nav class="plan-section-nav">' + widgets.map((w,i) => '<button type="button" class="plan-nav-btn' + (i === 0 ? ' active' : '') + '" data-section-target="' + w.key + '">' + w.icon + ' ' + escapeHtml(w.title) + '</button>').join('') + '</nav>' : '';
+        const nav = widgets.length > 1 ? '<nav class="plan-section-nav">' + widgets.map((w,i) => '<button type="button" class="plan-nav-btn' + (i === 0 ? ' active' : '') + '" data-section-target="' + w.key + '" title="Open ' + escapeHtml(w.title) + '" aria-label="Open ' + escapeHtml(w.title) + '">' + w.icon + ' ' + escapeHtml(w.title) + '</button>').join('') + '</nav>' : '';
         let steps = '';
         widgets.forEach((w, i) => {
-            steps += '<section id="section-' + w.key + '" class="plan-step">'
-                + '<div class="plan-step-rail"><span class="plan-step-number">' + (i + 1) + '</span><span class="plan-step-line"></span></div>'
-                + '<div class="plan-step-card"><div class="plan-step-head"><div class="plan-step-heading"><div class="plan-step-icon">' + w.icon + '</div><div><h3>' + escapeHtml(w.title) + ' <span class="plan-check">✓</span></h3><p>' + escapeHtml(w.subtitle) + '</p></div></div><span class="ready-badge">✓ Complete</span></div>'
+            steps += '<section id="section-' + w.key + '" class="plan-step" data-widget-title="' + escapeHtml(w.title) + '">'
+                + '<div class="plan-step-rail"><span class="plan-step-number" title="Step ' + (i + 1) + '" aria-hidden="true">' + (i + 1) + '</span><span class="plan-step-line"></span></div>'
+                + '<div class="plan-step-card"><div class="plan-step-head"><div class="plan-step-heading"><div class="plan-step-icon">' + w.icon + '</div><div><h3>' + escapeHtml(w.title) + ' <span class="plan-check">✓</span></h3><p>' + escapeHtml(w.subtitle) + '</p></div></div><div class="widget-head-actions"><span class="ready-badge">✓ Complete</span>' + widgetControls(w.key, w.title) + '</div></div>'
                 + w.body + '</div></section>';
         });
         if (!steps) steps = '<div class="specialist-empty">No additional structured details were returned for this request.</div>';
 
         let html = '<div class="plan-workspace specialist-dynamic-workspace">'
-            + '<header class="plan-header specialist-dynamic-header"><div class="plan-header-top"><div><div class="trip-eyebrow">AGENTICTRIPAI · ' + escapeHtml(type.replace(/_/g, ' ')) + '</div><h1>' + escapeHtml(meta[1]) + '</h1></div><div class="plan-header-status">✓ Complete</div></div>'
+            + '<header class="plan-header specialist-dynamic-header"><div class="plan-header-top"><div><div class="trip-eyebrow">AGENTICTRIPAI · ' + escapeHtml(type.replace(/_/g, ' ')) + '</div><h1>' + escapeHtml(meta[1]) + '</h1></div><div class="plan-header-status">' + (needsUserInput ? 'Needs your input' : '✓ Complete') + '</div></div>'
             + '<div class="plan-header-facts"><span>✦ Requested information</span>' + (location ? '<span>📍 ' + escapeHtml(location) + '</span>' : '') + (userRequest ? '<span class="specialist-request">' + escapeHtml(String(userRequest).slice(0, 100)) + '</span>' : '') + '</div></header>'
+            + (needsUserInput && clarification ? '<div class="agent-clarification-banner"><strong>✦ Action needed</strong><span>' + escapeHtml(clarification) + '</span></div>' : '')
             + nav + '<div class="plan-steps">' + steps + '</div>'
+            + '<div class="widget-restore-tray" data-widget-restore-tray style="display:none"><span class="widget-restore-label">Closed widgets</span></div>'
             + (hasSpecialistKnowledge(data, plan) ? '<div class="specialist-knowledge-inline">' + buildSpecialistKnowledgeCard(data, plan) + '</div>' : '')
             + '</div>';
         return html;
@@ -3922,8 +4034,8 @@
         }
 
         const hasItineraryData = !!(plan.itinerary && Array.isArray(plan.itinerary.days) && plan.itinerary.days.length);
-        const isTripPlan = data.tripPlanning === true || hasItineraryData;
         const requestType = String(data.requestType || trip.requestType || '').toUpperCase();
+        const isTripPlan = data.tripPlanning === true || requestType === 'TRIP_PLANNING';
         const flights = Array.isArray(plan.flights) ? plan.flights.filter(Boolean) : [];
         const hotels = Array.isArray(plan.hotels) ? plan.hotels.filter(Boolean) : [];
         const hasFlights = flights.length > 0;
@@ -3959,12 +4071,14 @@
 
         const section = (number, key, icon, title, subtitle, body, badge, extraClass) => {
             if (!body) return '';
-            return '<section id="section-' + key + '" class="plan-step ' + (extraClass || '') + '">'
-                + '<div class="plan-step-rail"><span class="plan-step-number">' + number + '</span><span class="plan-step-line"></span></div>'
+            return '<section id="section-' + key + '" class="plan-step ' + (extraClass || '') + '" data-widget-title="' + escapeHtml(title) + '">'
+                + '<div class="plan-step-rail"><span class="plan-step-number" title="Step ' + number + '" aria-hidden="true">' + number + '</span><span class="plan-step-line"></span></div>'
                 + '<div class="plan-step-card">'
                 + '<div class="plan-step-head"><div class="plan-step-heading"><div class="plan-step-icon">' + icon + '</div><div><h3>' + title + ' <span class="plan-check">✓</span></h3><p>' + subtitle + '</p></div></div>'
+                + '<div class="widget-head-actions">'
                 + (badge ? '<span class="ready-badge ' + (badge === 'Review' ? 'review-badge' : '') + '">' + badge + '</span>' : '')
-                + '</div>' + body + '</div></section>';
+                + widgetControls(key, title)
+                + '</div></div>' + body + '</div></section>';
         };
 
         let html = '<div class="plan-workspace">';
@@ -3978,7 +4092,8 @@
             + (quality != null ? '<span>✓ Confidence ' + escapeHtml(String(quality)) + '/100</span>' : '')
             + '</div>'
             + (requirements.length ? '<div class="plan-requirements">' + requirements.map(r => '<span>✓ ' + escapeHtml(r) + '</span>').join('') + '</div>' : '')
-            + '</header>';
+            + '</header>'
+            + (responseStatus === 'NEEDS_USER_INPUT' && String(data.clarificationRequired || '').trim() ? '<div class="agent-clarification-banner"><strong>✦ Action needed</strong><span>' + escapeHtml(String(data.clarificationRequired)) + '</span></div>' : '');
 
         const nav = [];
         if (hasFlights) nav.push(['flights','✈ Flights']);
@@ -3987,7 +4102,7 @@
         if (hasWeather) nav.push(['weather','☀ Weather']);
         if (hasBudget) nav.push(['budget','💰 Budget']);
         if (hasKnowledge) nav.push(['knowledge','🧠 Tips']);
-        if (nav.length > 1) html += '<nav class="plan-section-nav">' + nav.map((x,i) => '<button type="button" class="plan-nav-btn' + (i === 0 ? ' active' : '') + '" data-section-target="' + x[0] + '">' + x[1] + '</button>').join('') + '</nav>';
+        if (nav.length > 1) html += '<nav class="plan-section-nav">' + nav.map((x,i) => '<button type="button" class="plan-nav-btn' + (i === 0 ? ' active' : '') + '" data-section-target="' + x[0] + '" title="Open ' + escapeHtml(x[1].replace(/^[^A-Za-z]+/, '')) + '" aria-label="Open ' + escapeHtml(x[1].replace(/^[^A-Za-z]+/, '')) + '">' + x[1] + '</button>').join('') + '</nav>';
 
         html += '<div class="plan-steps">';
         let step = 1;
@@ -4004,6 +4119,7 @@
             if (knowledgeBody) html += section(step++, 'knowledge', '🧠', 'Travel Knowledge & Tips', 'Useful destination guidance for your trip', knowledgeBody.replace(/^<section[^>]*>|<\/section>$/g, ''), '✓ Grounded');
         }
         if (tips && !hasKnowledge) html += section(step++, 'tips', '💡', 'Travel Tips', 'Practical trip-specific suggestions', '<div class="knowledge-answer">' + formatKnowledgeText(tips) + '</div>', '✓ Ready');
+        html += '<div class="widget-restore-tray" data-widget-restore-tray style="display:none"><span class="widget-restore-label">Closed widgets</span></div>';
         html += '</div>';
 
         if (data.validationErrors?.length || data.semanticNotes?.length || data.ragJudge) {
@@ -4056,6 +4172,33 @@
         }
     };
 
+    const updateWidgetFoldState = (section) => {
+        if (!section) return;
+        const title = section.dataset.widgetTitle || section.id.replace(/^section-/, '');
+        const collapsed = section.classList.contains('widget-collapsed');
+        const collapseControl = section.querySelector('[data-widget-action="collapse"]');
+        if (collapseControl) {
+            collapseControl.textContent = collapsed ? '⌄' : '⌃';
+            collapseControl.title = collapsed ? 'Fold out ' + title : 'Fold in ' + title;
+            collapseControl.setAttribute('aria-label', collapseControl.title);
+            collapseControl.setAttribute('aria-expanded', String(!collapsed));
+            collapseControl.dataset.foldState = collapsed ? 'collapsed' : 'expanded';
+        }
+        const expandControl = section.querySelector('[data-widget-action="expand"]');
+        if (expandControl) {
+            expandControl.textContent = section.classList.contains('widget-expanded') ? '↙' : '⛶';
+            expandControl.title = section.classList.contains('widget-expanded') ? 'Restore ' + title : 'Expand ' + title;
+            expandControl.setAttribute('aria-label', expandControl.title);
+        }
+        const workspace = section.closest('.plan-workspace');
+        const navButton = workspace?.querySelector('[data-section-target="' + CSS.escape(section.id.replace(/^section-/, '')) + '"]');
+        if (navButton) {
+            navButton.classList.toggle('is-folded', collapsed);
+            navButton.title = collapsed ? 'Folded — click to open ' + title : 'Open ' + title;
+            navButton.setAttribute('aria-expanded', String(!collapsed));
+        }
+    };
+
     const renderAssistantMessage = (data, persist, userRequestHint) => {
         markChatActive();
         const row = document.createElement('div');
@@ -4092,13 +4235,25 @@
             const text = data && (data.finalPlan || data.text) ? (data.finalPlan || data.text) : 'Plan response available.';
             body.innerHTML = '<div class="server-memory-card">' + formatKnowledgeText(text) + '</div>';
         }
+        body.querySelectorAll('.plan-step').forEach(section => updateWidgetFoldState(section));
         body.querySelectorAll('[data-section-target]').forEach(tab => {
             tab.addEventListener('click', () => {
                 body.querySelectorAll('.workspace-tab,.plan-nav-btn').forEach(t => t.classList.remove('active'));
                 tab.classList.add('active');
                 const target = tab.dataset.sectionTarget;
-                if (target !== 'overview') body.querySelector('#section-' + target)?.scrollIntoView({behavior:'smooth', block:'center'});
-                else body.querySelector('.trip-banner')?.scrollIntoView({behavior:'smooth', block:'start'});
+                if (target === 'overview') {
+                    body.querySelector('.trip-banner')?.scrollIntoView({behavior:'smooth', block:'start'});
+                    return;
+                }
+                const section = body.querySelector('#section-' + CSS.escape(target));
+                if (!section) return;
+                // The top widget tabs are also a quick way to unfold a widget.
+                // This makes the navigation useful even after every widget has been folded in.
+                if (section.classList.contains('widget-collapsed')) {
+                    section.classList.remove('widget-collapsed');
+                    updateWidgetFoldState(section);
+                }
+                section.scrollIntoView({behavior:'smooth', block:'center'});
             });
         });
         chatThread.appendChild(row);
@@ -4385,6 +4540,62 @@
     });
 
     chatThread.addEventListener('click', (event) => {
+        const widgetControl = event.target.closest('[data-widget-action]');
+        if (widgetControl) {
+            const section = widgetControl.closest('.plan-step');
+            if (!section) return;
+            const action = widgetControl.dataset.widgetAction;
+            const key = section.id.replace(/^section-/, '');
+            const title = section.dataset.widgetTitle || key;
+            if (action === 'collapse') {
+                const collapsed = section.classList.toggle('widget-collapsed');
+                if (collapsed) section.classList.remove('widget-expanded');
+                updateWidgetFoldState(section);
+                return;
+            }
+            if (action === 'expand') {
+                // Expanding a folded widget first unfolds it, then toggles the focused view.
+                section.classList.remove('widget-collapsed');
+                section.classList.toggle('widget-expanded');
+                updateWidgetFoldState(section);
+            } else if (action === 'close') {
+                section.classList.remove('widget-expanded');
+                section.classList.add('widget-closed');
+                const workspace = section.closest('.plan-workspace');
+                const tray = workspace?.querySelector('[data-widget-restore-tray]');
+                if (tray) {
+                    let restore = tray.querySelector('[data-restore-key="' + CSS.escape(key) + '"]');
+                    if (!restore) {
+                        restore = document.createElement('button');
+                        restore.type = 'button';
+                        restore.className = 'widget-restore-btn';
+                        restore.dataset.restoreKey = key;
+                        restore.textContent = title;
+                        tray.appendChild(restore);
+                    }
+                    tray.style.display = 'flex';
+                }
+                const navButton = workspace?.querySelector('[data-section-target="' + CSS.escape(key) + '"]');
+                if (navButton) navButton.style.display = 'none';
+            }
+            return;
+        }
+
+        const restoreTrayButton = event.target.closest('[data-restore-key]');
+        if (restoreTrayButton) {
+            const workspace = restoreTrayButton.closest('.plan-workspace');
+            const key = restoreTrayButton.dataset.restoreKey;
+            const section = workspace?.querySelector('#section-' + CSS.escape(key));
+            if (section) { section.classList.remove('widget-closed', 'widget-collapsed', 'widget-expanded'); updateWidgetFoldState(section); }
+            restoreTrayButton.remove();
+            if (!event.currentTarget.querySelector('[data-restore-key]')) {
+                workspace?.querySelector('[data-widget-restore-tray]')?.style.setProperty('display','none');
+            }
+            const navButton = workspace?.querySelector('[data-section-target="' + CSS.escape(key) + '"]');
+            if (navButton) navButton.style.display = '';
+            return;
+        }
+
         const hotelMoreButton = event.target.closest('[data-hotels-more]');
         if (hotelMoreButton) {
             const list = hotelMoreButton.previousElementSibling;
@@ -4488,6 +4699,39 @@
         renderHistoryList();
     })();
 </script>
+
+<style>
+/* V57.1 — step number is informational; fold is a dedicated visible control */
+.plan-step-number{cursor:default !important;transform:none !important}
+.plan-step-number:hover{transform:none !important;box-shadow:0 0 0 1px rgba(88,161,255,.5),0 5px 18px rgba(20,111,241,.3)}
+.widget-fold-control{display:grid !important;place-items:center !important;width:32px !important;height:32px !important;padding:0 !important}
+.widget-fold-control:focus-visible,.widget-control:focus-visible{outline:2px solid rgba(100,169,255,.7);outline-offset:2px}
+</style>
+<style>
+/* V60 — unmistakable Recent History selection. The selected row is a real
+   state, not just a hover treatment, and applies equally to DB trips and chats. */
+.chat-history-item-wrap.selected{
+    position:relative;
+    margin:4px 0;
+    border-radius:12px;
+    background:linear-gradient(90deg,rgba(54,133,247,.24),rgba(54,133,247,.10));
+    box-shadow:inset 3px 0 0 #5aa0ff,0 0 0 1px rgba(90,160,255,.24),0 6px 18px rgba(20,90,180,.12);
+}
+.chat-history-item-wrap.selected::before{
+    content:'';position:absolute;left:0;top:8px;bottom:8px;width:3px;border-radius:0 4px 4px 0;
+    background:#69adff;box-shadow:0 0 10px rgba(88,169,255,.55);pointer-events:none;
+}
+.chat-history-item-wrap.selected .chat-history-item,
+.chat-history-item-wrap.selected .chat-history-item:hover,
+.chat-history-item.active,
+.chat-history-item.active:hover{
+    background:transparent!important;border-color:transparent!important;box-shadow:none!important;
+}
+.chat-history-item-wrap.selected .chat-history-item > span:first-child{color:#fff!important;font-weight:850!important}
+.chat-history-item-wrap.selected .chat-history-item .meta{color:#a9d1fa!important}
+.chat-history-item-wrap.selected .db-status{color:#8be0ad!important}
+.chat-history-item-wrap.selected .chat-history-delete-btn{background:rgba(8,21,38,.42)}
+</style>
 </body>
 </html>
 
@@ -4501,4 +4745,20 @@
 .hotel-rich-main{padding:16px 0;min-width:0}.hotel-rich-title-row{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}.hotel-rich-name{font-size:15px;line-height:1.25;font-weight:850;color:#f5f8fc}.hotel-rich-location{margin-top:5px;color:#9baabd;font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.hotel-rich-rating{display:inline-flex;align-items:center;gap:5px;margin-top:10px;padding:5px 7px;border-radius:7px;background:rgba(246,184,66,.09);border:1px solid rgba(246,184,66,.16);font-size:10px;color:#f4d27e;font-weight:800}.hotel-rich-rating .reviews{color:#8796aa;font-weight:600}.hotel-rich-class{margin-left:7px;color:#a9b7ca;font-weight:700}.hotel-rich-note{margin-top:9px;font-size:10px;line-height:1.5;color:#aab7c8}.hotel-rich-amenities{display:flex;flex-wrap:wrap;gap:5px;margin-top:11px}.hotel-amenity-chip{padding:5px 7px;border-radius:7px;background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.07);font-size:9px;color:#b9c6d6}.hotel-rich-deal{display:inline-block;margin-top:8px;font-size:9px;color:#86ddb1;font-weight:800}.hotel-rich-price{display:flex;flex-direction:column;justify-content:center;align-items:flex-end;padding:16px 16px 16px 0;text-align:right}.hotel-rich-price-label{font-size:9px;color:#8290a2}.hotel-rich-price-main{margin-top:3px;font-size:19px;font-weight:900;color:#f7fafc}.hotel-rich-price-total{margin-top:4px;font-size:9px;color:#8795a7}.hotel-rich-book{margin-top:12px;display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:9px 12px;border-radius:9px;background:#4f83d9;color:#fff;text-decoration:none;font-size:10px;font-weight:850;border:1px solid rgba(255,255,255,.08);box-shadow:0 5px 16px rgba(54,105,186,.22)}.hotel-rich-book:hover{background:#6094e5}.hotel-rich-cancel{margin-top:7px;font-size:9px;color:#8edeb4;font-weight:700}.hotel-rich-more{align-self:center;padding:9px 14px;border-radius:10px;border:1px solid rgba(105,164,229,.2);background:rgba(65,133,214,.07);color:#9fc5ee;font-size:10px;font-weight:800;cursor:pointer}.hotel-rich-card.is-extra{display:none}.hotel-rich-list.expanded .hotel-rich-card.is-extra{display:grid}
 @media(max-width:900px){.hotel-rich-card{grid-template-columns:150px minmax(0,1fr)}.hotel-rich-price{grid-column:2;align-items:flex-start;padding:0 16px 16px 0;flex-direction:row;gap:12px;flex-wrap:wrap}.hotel-rich-price-main{margin-top:0}.hotel-rich-book{margin-top:0}.hotel-rich-cancel{margin-top:4px}.hotel-rich-media{min-height:160px}.hotel-rich-media img{min-height:160px}}
 @media(max-width:620px){.hotel-rich-card{grid-template-columns:1fr}.hotel-rich-media{height:190px;min-height:190px}.hotel-rich-media img{min-height:190px}.hotel-rich-main{padding:14px}.hotel-rich-price{grid-column:auto;padding:0 14px 14px;align-items:flex-start}.hotel-rich-summary{align-items:flex-start}.hotel-rich-count{font-size:9px}}
+</style>
+<style>
+/* V57 — visible fold control: the step number is only a step indicator */
+.plan-step-number{position:relative;cursor:default;user-select:none}
+.plan-step.widget-collapsed .plan-step-number{background:#0f4ea9;box-shadow:0 0 0 1px rgba(88,161,255,.35),0 4px 14px rgba(20,111,241,.22)}
+.widget-fold-control{font-size:17px;line-height:1;font-weight:900;min-width:32px}
+.widget-fold-control:hover{background:rgba(72,139,238,.16);border-color:rgba(91,158,255,.36);color:#edf6ff}
+.plan-nav-btn{position:relative}
+.plan-nav-btn:hover{box-shadow:0 0 0 1px rgba(88,157,255,.12) inset}
+.plan-nav-btn[data-section-target]{transition:background .16s ease,border-color .16s ease,color .16s ease,box-shadow .16s ease}
+</style>
+<style>
+/* V56 navigation state — folded widgets are visibly marked and remain one-click accessible */
+.plan-nav-btn.is-folded{color:#9fc8ff;background:rgba(55,126,232,.07);border-color:rgba(82,157,255,.16)}
+.plan-nav-btn.is-folded::after{content:'↗';display:inline-block;margin-left:6px;font-size:10px;opacity:.8}
+.plan-nav-btn.is-folded:hover{background:rgba(55,126,232,.14);color:#edf6ff}
 </style>

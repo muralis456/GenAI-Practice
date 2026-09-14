@@ -61,7 +61,7 @@ travel:
       enabled: ${TRAVEL_MCP_CLIENT_ENABLED:true}
       max-attempts: ${TRAVEL_MCP_CLIENT_MAX_ATTEMPTS:2}
   itinerary:
-    provider: ${TRAVEL_ITINERARY_PROVIDER:jettova}
+    provider: ${TRAVEL_ITINERARY_PROVIDER:fast}
   rag:
     enabled: ${TRAVEL_RAG_ENABLED:true}
     top-k: ${TRAVEL_RAG_TOP_K:5}
@@ -76,6 +76,8 @@ travel:
     fast-path:
       enabled: ${TRAVEL_RAG_FAST_PATH_ENABLED:true}
     seed-on-empty: ${TRAVEL_RAG_SEED_ON_EMPTY:true}
+  agent:
+    max-decision-steps: ${TRAVEL_AGENT_MAX_DECISION_STEPS:10}
   graph:
     max-retries: 5
     max-llm-calls: 20
@@ -95,7 +97,7 @@ travel:
     max-tokens:
       extraction: ${TRAVEL_MODEL_MAX_TOKENS_EXTRACTION:384}
       planner: ${TRAVEL_MODEL_MAX_TOKENS_PLANNER:512}
-      itinerary: ${TRAVEL_MODEL_MAX_TOKENS_ITINERARY:1400}
+      itinerary: ${TRAVEL_MODEL_MAX_TOKENS_ITINERARY:800}
       final: ${TRAVEL_MODEL_MAX_TOKENS_FINAL:700}
   tavily:
     api-url: https://api.tavily.com/search

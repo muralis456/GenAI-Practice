@@ -160,6 +160,7 @@
 
     const storageKey = () => 'agentic-trip-ai-chats:' + (userIdField.value.trim() || 'aaro_hi_user');
     let currentChatId = null;
+    let currentHistoryKey = null;
     let startedFreshChat = false;
 
     const syncUserIdField = () => {
@@ -435,6 +436,8 @@
 
     const openSavedTrip = async (id) => {
         try {
+            currentHistoryKey = 'db:' + String(id);
+            renderHistoryList();
             const trip = dbTrips.find(t => String(t.id) === String(id));
             const userId = userIdField.value.trim() || 'aaro_hi_user';
             showHomeView();
@@ -547,7 +550,10 @@
 
             const btn = document.createElement('button');
             btn.type = 'button';
-            btn.className = 'chat-history-item' + (entry.kind === 'chat' && entry.id === currentChatId ? ' active' : '');
+            const entryKey = entry.kind + ':' + String(entry.id);
+            btn.className = 'chat-history-item' + (entryKey === currentHistoryKey ? ' active' : '');
+            if (entryKey === currentHistoryKey) btn.setAttribute('aria-current', 'page');
+            else btn.removeAttribute('aria-current');
             const title = document.createElement('span');
             title.textContent = entry.title;
             if (entry.kind === 'db') {
@@ -653,8 +659,9 @@
                 dbTrips = dbTrips.filter(trip => String(trip.id) !== String(entry.id));
             }
 
-            if (entry.kind === 'chat' && entry.id === currentChatId) {
+            if ((entry.kind === 'chat' && entry.id === currentChatId) || currentHistoryKey === entry.kind + ':' + String(entry.id)) {
                 currentChatId = null;
+                currentHistoryKey = null;
                 startedFreshChat = true;
                 clearThreadDom();
                 promptInput.value = '';
@@ -698,6 +705,8 @@
         if (!chat) return;
 
         currentChatId = chatId;
+        currentHistoryKey = 'chat:' + String(chatId);
+        renderHistoryList();
         startedFreshChat = String(chatId).startsWith('chat-');
         clearThreadDom();
 
@@ -786,6 +795,7 @@
         exitModifyMode(true);
         startedFreshChat = true;
         currentChatId = null;
+        currentHistoryKey = null;
         ensureCurrentChat('New trip');
         clearThreadDom();
         renderHistoryList();
@@ -1497,9 +1507,11 @@
         const budget = plan.budget;
         const exec = data.execution || {};
         const answer = String(exec.ragAnswer || data.ragAnswer || plan.tips || data.finalPlan || '').trim();
-        const hasWeather = !!(weather && (weather.summary || weather.location || (Array.isArray(weather.days) && weather.days.length) || weather.current));
+        const hasWeather = !!(weather && ((weather.current && weather.current.temperature != null) || (Array.isArray(weather.days) && weather.days.some(d => d && (d.high != null || d.low != null || d.condition)))));
         const hasBudget = !!(budget && Array.isArray(budget.lineItems) && budget.lineItems.length);
         const hasAnswer = !!answer;
+        const clarification = String(data.clarificationRequired || data.plan?.clarificationRequired || '').trim();
+        const needsUserInput = String(data.status || '').toUpperCase() === 'NEEDS_USER_INPUT';
 
         const meta = {
             WEATHER: ['☀️', location ? 'Weather in ' + location : 'Weather details', 'Current conditions and forecast'],
@@ -1512,13 +1524,13 @@
 
         const isMulti = type === 'MULTI_CAPABILITY' || type === 'MULTI_INTENT';
         const widgets = [];
-        if (isMulti || type === 'WEATHER') { if (hasWeather) widgets.push({key:'weather', icon:'☀️', title:'Weather', subtitle:'Current conditions and forecast', body:buildWeatherSection(weather, {focused: !isMulti})}); }
-        if (isMulti || type === 'FLIGHT_SEARCH') { if (flights.length) widgets.push({key:'flights', icon:'✈️', title:'Flights', subtitle:'Available schedules and fare data', body:buildFlightsSection(flights)}); }
-        if (isMulti || type === 'HOTEL_SEARCH') { if (hotels.length) widgets.push({key:'hotels', icon:'🏨', title:'Hotels', subtitle:'Accommodation recommendations', body:buildHotelsSection(hotels)}); }
-        if (isMulti || type === 'BUDGET') { if (hasBudget) widgets.push({key:'budget', icon:'💰', title:'Budget', subtitle:'Estimated cost', body:buildBudgetTable(budget)}); }
+        if (hasWeather && (type === 'WEATHER' || isMulti)) { widgets.push({key:'weather', icon:'☀️', title:'Weather', subtitle:'Current conditions and forecast', body:buildWeatherSection(weather, {focused: !isMulti})}); }
+        if (flights.length && (type === 'FLIGHT_SEARCH' || isMulti)) { widgets.push({key:'flights', icon:'✈️', title:'Flights', subtitle:'Available schedules and fare data', body:buildFlightsSection(flights)}); }
+        if (hotels.length && (type === 'HOTEL_SEARCH' || isMulti)) { widgets.push({key:'hotels', icon:'🏨', title:'Hotels', subtitle:'Accommodation recommendations', body:buildHotelsSection(hotels)}); }
+        if (hasBudget && (type === 'BUDGET' || isMulti)) { widgets.push({key:'budget', icon:'💰', title:'Budget', subtitle:'Estimated cost', body:buildBudgetTable(budget)}); }
         if ((type === 'RESEARCH' || type === 'HISTORY' || (!isMulti && !widgets.length)) && hasAnswer) widgets.push({key:'answer', icon:meta[0], title:meta[1], subtitle:meta[2], body:'<div class="specialist-answer">' + formatKnowledgeText(answer) + '</div>'});
 
-        const nav = widgets.length > 1 ? '<nav class="plan-section-nav">' + widgets.map((w,i) => '<button type="button" class="plan-nav-btn' + (i === 0 ? ' active' : '') + '" data-section-target="' + w.key + '">' + w.icon + ' ' + escapeHtml(w.title) + '</button>').join('') + '</nav>' : '';
+        const nav = widgets.length > 1 ? '<nav class="plan-section-nav">' + widgets.map((w,i) => '<button type="button" class="plan-nav-btn' + (i === 0 ? ' active' : '') + '" data-section-target="' + w.key + '" title="Open ' + escapeHtml(w.title) + '" aria-label="Open ' + escapeHtml(w.title) + '">' + w.icon + ' ' + escapeHtml(w.title) + '</button>').join('') + '</nav>' : '';
         let steps = '';
         widgets.forEach((w, i) => {
             steps += '<section id="section-' + w.key + '" class="plan-step">'
@@ -1529,8 +1541,9 @@
         if (!steps) steps = '<div class="specialist-empty">No additional structured details were returned for this request.</div>';
 
         let html = '<div class="plan-workspace specialist-dynamic-workspace">'
-            + '<header class="plan-header specialist-dynamic-header"><div class="plan-header-top"><div><div class="trip-eyebrow">AGENTICTRIPAI · ' + escapeHtml(type.replace(/_/g, ' ')) + '</div><h1>' + escapeHtml(meta[1]) + '</h1></div><div class="plan-header-status">✓ Complete</div></div>'
+            + '<header class="plan-header specialist-dynamic-header"><div class="plan-header-top"><div><div class="trip-eyebrow">AGENTICTRIPAI · ' + escapeHtml(type.replace(/_/g, ' ')) + '</div><h1>' + escapeHtml(meta[1]) + '</h1></div><div class="plan-header-status">' + (needsUserInput ? 'Needs your input' : '✓ Complete') + '</div></div>'
             + '<div class="plan-header-facts"><span>✦ Requested information</span>' + (location ? '<span>📍 ' + escapeHtml(location) + '</span>' : '') + (userRequest ? '<span class="specialist-request">' + escapeHtml(String(userRequest).slice(0, 100)) + '</span>' : '') + '</div></header>'
+            + (needsUserInput && clarification ? '<div class="agent-clarification-banner"><strong>✦ Action needed</strong><span>' + escapeHtml(clarification) + '</span></div>' : '')
             + nav + '<div class="plan-steps">' + steps + '</div>'
             + (hasSpecialistKnowledge(data, plan) ? '<div class="specialist-knowledge-inline">' + buildSpecialistKnowledgeCard(data, plan) + '</div>' : '')
             + '</div>';
@@ -1546,8 +1559,8 @@
         }
 
         const hasItineraryData = !!(plan.itinerary && Array.isArray(plan.itinerary.days) && plan.itinerary.days.length);
-        const isTripPlan = data.tripPlanning === true || hasItineraryData;
         const requestType = String(data.requestType || trip.requestType || '').toUpperCase();
+        const isTripPlan = data.tripPlanning === true || requestType === 'TRIP_PLANNING';
         const flights = Array.isArray(plan.flights) ? plan.flights.filter(Boolean) : [];
         const hotels = Array.isArray(plan.hotels) ? plan.hotels.filter(Boolean) : [];
         const hasFlights = flights.length > 0;
@@ -1556,7 +1569,7 @@
         const hasHotels = hotels.length > 0;
         const hasItinerary = hasItineraryData;
         const hasBudget = !!(plan.budget && Array.isArray(plan.budget.lineItems) && plan.budget.lineItems.length);
-        const hasWeather = !!(plan.weather && ((plan.weather.current && plan.weather.current.temperature != null) || (Array.isArray(plan.weather.days) && plan.weather.days.some(d => d && (d.high != null || d.low != null || d.condition))) || (typeof plan.weather.summary === 'string' && /no weather details found/i.test(plan.weather.summary))));
+        const hasWeather = !!(plan.weather && ((plan.weather.current && plan.weather.current.temperature != null) || (Array.isArray(plan.weather.days) && plan.weather.days.some(d => d && (d.high != null || d.low != null || d.condition)))));
         const knowledge = plan.knowledge || {};
         const exec = data.execution || {};
         const hasKnowledge = !!(knowledge.available === true || knowledge.answer || exec.ragAnswer || data.ragAnswer);
@@ -1602,7 +1615,8 @@
             + (quality != null ? '<span>✓ Confidence ' + escapeHtml(String(quality)) + '/100</span>' : '')
             + '</div>'
             + (requirements.length ? '<div class="plan-requirements">' + requirements.map(r => '<span>✓ ' + escapeHtml(r) + '</span>').join('') + '</div>' : '')
-            + '</header>';
+            + '</header>'
+            + (String(data.status || '').toUpperCase() === 'NEEDS_USER_INPUT' && String(data.clarificationRequired || '').trim() ? '<div class="agent-clarification-banner"><strong>✦ Action needed</strong><span>' + escapeHtml(String(data.clarificationRequired)) + '</span></div>' : '');
 
         const nav = [];
         if (hasFlights) nav.push(['flights','✈ Flights']);
@@ -1611,7 +1625,7 @@
         if (hasWeather) nav.push(['weather','☀ Weather']);
         if (hasBudget) nav.push(['budget','💰 Budget']);
         if (hasKnowledge) nav.push(['knowledge','🧠 Tips']);
-        if (nav.length > 1) html += '<nav class="plan-section-nav">' + nav.map((x,i) => '<button type="button" class="plan-nav-btn' + (i === 0 ? ' active' : '') + '" data-section-target="' + x[0] + '">' + x[1] + '</button>').join('') + '</nav>';
+        if (nav.length > 1) html += '<nav class="plan-section-nav">' + nav.map((x,i) => '<button type="button" class="plan-nav-btn' + (i === 0 ? ' active' : '') + '" data-section-target="' + x[0] + '" title="Open ' + escapeHtml(x[1].replace(/^[^A-Za-z]+/, '')) + '" aria-label="Open ' + escapeHtml(x[1].replace(/^[^A-Za-z]+/, '')) + '">' + x[1] + '</button>').join('') + '</nav>';
 
         html += '<div class="plan-steps">';
         let step = 1;
@@ -1635,7 +1649,7 @@
         }
 
         if (awaitingApproval && data.threadId && data.tripPlanning !== false) {
-            html += '<section class="plan-final-action"><div><span class="decision-status pending"><i class="decision-dot"></i> Waiting for your decision</span><h3>Ready to finalize?</h3><p>Review the plan, then approve it, request a change, or reject it.</p></div><div class="final-actions-inline"><button type="button" class="final-approve" data-plan-action="approve" data-thread-id="' + escapeHtml(data.threadId) + '">✓ Approve</button><button type="button" class="final-modify" data-plan-action="modify" data-thread-id="' + escapeHtml(data.threadId) + '">✎ Modify</button><button type="button" class="final-reject" data-plan-action="reject" data-thread-id="' + escapeHtml(data.threadId) + '">✕ Reject</button></div></section>';
+            html += '<section class="plan-final-action" data-decision-panel><div><span class="decision-status pending"><i class="decision-dot"></i> Waiting for your decision</span><h3>Ready to finalize?</h3><p>Review the plan, then approve it, request a change, or reject it.</p><div class="decision-progress" data-decision-progress><span class="decision-spinner"></span><span data-decision-message>Working…</span></div></div><div class="final-actions-inline"><button type="button" class="final-approve" data-plan-action="approve" data-thread-id="' + escapeHtml(data.threadId) + '">✓ Approve</button><button type="button" class="final-modify" data-plan-action="modify" data-thread-id="' + escapeHtml(data.threadId) + '">✎ Modify</button><button type="button" class="final-reject" data-plan-action="reject" data-thread-id="' + escapeHtml(data.threadId) + '">✕ Reject</button></div></section>';
         } else if (complete) {
             html += '<section class="plan-final-action confirmed"><div><span class="decision-status"><i class="decision-dot"></i> Plan confirmed</span><h3>✓ Trip plan confirmed</h3><p>This plan has already been finalized.</p></div></section>';
         }
@@ -1721,8 +1735,19 @@
                 body.querySelectorAll('.workspace-tab,.plan-nav-btn').forEach(t => t.classList.remove('active'));
                 tab.classList.add('active');
                 const target = tab.dataset.sectionTarget;
-                if (target !== 'overview') body.querySelector('#section-' + target)?.scrollIntoView({behavior:'smooth', block:'center'});
-                else body.querySelector('.trip-banner')?.scrollIntoView({behavior:'smooth', block:'start'});
+                if (target === 'overview') {
+                    body.querySelector('.trip-banner')?.scrollIntoView({behavior:'smooth', block:'start'});
+                    return;
+                }
+                const section = body.querySelector('#section-' + CSS.escape(target));
+                if (!section) return;
+                // The top widget tabs are also a quick way to unfold a widget.
+                // This makes the navigation useful even after every widget has been folded in.
+                if (section.classList.contains('widget-collapsed')) {
+                    section.classList.remove('widget-collapsed');
+                    updateWidgetFoldState(section);
+                }
+                section.scrollIntoView({behavior:'smooth', block:'center'});
             });
         });
         chatThread.appendChild(row);
@@ -1983,6 +2008,36 @@
         }
     });
 
+    const setDecisionProgress = (sourceRow, message, state = 'working') => {
+        const panel = sourceRow?.querySelector('[data-decision-panel]');
+        if (!panel) return;
+        const progress = panel.querySelector('[data-decision-progress]');
+        const messageNode = panel.querySelector('[data-decision-message]');
+        if (!progress) return;
+        progress.classList.add('visible');
+        progress.classList.toggle('success', state === 'success');
+        progress.classList.toggle('error', state === 'error');
+        if (messageNode) {
+            messageNode.textContent = message;
+            const spinner = progress.querySelector('.decision-spinner');
+            if (spinner) spinner.style.display = state === 'working' ? '' : 'none';
+        }
+    };
+
+    const setDecisionButtonBusy = (button, busy, label) => {
+        if (!button) return;
+        if (busy) {
+            button.dataset.originalLabel = button.innerHTML;
+            button.classList.add('is-busy');
+            button.disabled = true;
+            button.innerHTML = '<span class="decision-button-spinner"></span>' + label;
+        } else {
+            button.classList.remove('is-busy');
+            button.disabled = false;
+            if (button.dataset.originalLabel) button.innerHTML = button.dataset.originalLabel;
+        }
+    };
+
     // Decision actions are delegated from the chat thread so they keep working
     // after assistant cards are replaced/re-rendered. The button carries the
     // thread id explicitly, avoiding any dependency on a stale closure.
@@ -2000,6 +2055,7 @@
             return;
         }
         if (action === 'modify') {
+            setDecisionProgress(row, 'Modify mode is ready — describe the change below.', 'working');
             enterModifyMode(threadId, row);
             return;
         }
@@ -2039,6 +2095,11 @@
         }
         loadingState.classList.add('visible');
         submitButton.disabled = true;
+        const action = url.includes('approve') ? 'approve' : url.includes('reject') ? 'reject' : 'modify';
+        const actionButton = sourceRow?.querySelector('[data-plan-action="' + action + '"]');
+        const busyLabel = action === 'approve' ? 'Approving…' : action === 'reject' ? 'Rejecting…' : 'Updating…';
+        setDecisionProgress(sourceRow, busyLabel + ' please wait…', 'working');
+        setDecisionButtonBusy(actionButton, true, busyLabel);
         if (sourceRow) {
             sourceRow.querySelectorAll('[data-plan-action]').forEach(btn => {
                 btn.disabled = true;
@@ -2058,6 +2119,7 @@
             if (!res.ok) {
                 throw new Error(payload.error || safeUiErrorMessage());
             }
+            setDecisionProgress(sourceRow, action === 'approve' ? 'Plan approved successfully.' : action === 'reject' ? 'Plan rejected successfully.' : 'Plan updated successfully.', 'success');
             if (notes) {
                 appendUserMessage(notes);
             } else if (url.includes('reject')) {
@@ -2075,7 +2137,10 @@
                     btn.classList.remove('action-unavailable');
                 });
             }
-            showToast(error && error.message ? error.message : safeUiErrorMessage());
+            const errorMessage = error && error.message ? error.message : safeUiErrorMessage();
+            setDecisionProgress(sourceRow, 'Action failed: ' + errorMessage, 'error');
+            showToast(errorMessage);
+            setDecisionButtonBusy(actionButton, false);
             return false;
         } finally {
             submitButton.disabled = false;
