@@ -175,8 +175,17 @@ public class McpToolClient {
                         log.info("mcp.client.response tool={} success=true errorCode={} message={}",
                                 toolName, errorCode, message);
                     } else {
-                        log.error("mcp.client.error phase=server-response tool={} attempt={} success=false errorCode={} message={}",
-                                toolName, attempt, errorCode, message);
+                        boolean responseRetryable = isRetryableProviderResponse(errorCode, message);
+                        log.error("mcp.client.error phase=server-response tool={} attempt={} success=false retryable={} errorCode={} message={}",
+                                toolName, attempt, responseRetryable, errorCode, message);
+                        // A provider-declared failure is already a complete MCP response.
+                        // Never turn a known non-retryable provider failure (429/401/403/4xx)
+                        // into another invocation. This is especially important for
+                        // quota/rate-limit errors, where another call only consumes more quota.
+                        if (!responseRetryable) {
+                            log.warn("mcp.client.no-retry tool={} reason=provider-non-retryable errorCode={} message={}",
+                                    toolName, errorCode, message);
+                        }
                     }
                 }
                 log.info("mcp.client.complete tool={} attempt={} durationMs={}", toolName, attempt, elapsedMs(started));
@@ -214,13 +223,63 @@ public class McpToolClient {
         // A malformed JSON-RPC frame is a protocol/payload failure, not a transient
         // tool failure. Retrying the same malformed response only adds latency and
         // duplicates noisy stack traces; the domain client can move to its fallback.
-        String message = safeExceptionMessage(exception).toLowerCase(java.util.Locale.ROOT);
+        String message = exceptionChainMessage(exception).toLowerCase(java.util.Locale.ROOT);
         if (message.contains("error parsing json-rpc message")
                 || message.contains("unexpected end-of-input")
                 || message.contains("failed to read value")) {
             return false;
         }
+
+        // Provider 4xx/quota failures are deterministic. In particular, a 429 must
+        // never be retried by the generic MCP transport loop. The previous version
+        // could miss 429 when Spring/MCP wrapped the provider response in another
+        // exception type.
+        if (isNonRetryableProviderError(message)) {
+            return false;
+        }
+
         return !(exception instanceof IllegalArgumentException || exception instanceof IllegalStateException);
+    }
+
+    private boolean isRetryableProviderResponse(String errorCode, String message) {
+        String code = errorCode == null ? "" : errorCode.toUpperCase(java.util.Locale.ROOT);
+        String text = message == null ? "" : message.toLowerCase(java.util.Locale.ROOT);
+        return !isNonRetryableProviderError(code + " " + text);
+    }
+
+    private boolean isNonRetryableProviderError(String text) {
+        String value = text == null ? "" : text.toLowerCase(java.util.Locale.ROOT);
+        return value.contains("provider_http_429")
+                || value.contains("http 429")
+                || value.contains("too many requests")
+                || value.contains("rate limit")
+                || value.contains("rate_limit")
+                || value.contains("quota reached")
+                || value.contains("quota exceeded")
+                || value.contains("provider_http_401")
+                || value.contains("http 401")
+                || value.contains("provider_http_403")
+                || value.contains("http 403")
+                || value.contains("provider_http_400")
+                || value.contains("http 400")
+                || value.contains("provider_http_422")
+                || value.contains("http 422")
+                || value.contains("provider_http_404")
+                || value.contains("http 404");
+    }
+
+    private String exceptionChainMessage(Throwable exception) {
+        StringBuilder value = new StringBuilder();
+        Throwable current = exception;
+        int depth = 0;
+        while (current != null && depth++ < 8) {
+            if (current.getMessage() != null) {
+                value.append(' ').append(current.getMessage());
+            }
+            value.append(' ').append(current.getClass().getName());
+            current = current.getCause();
+        }
+        return value.toString();
     }
 
     private JsonNode responseTree(String response) throws Exception {

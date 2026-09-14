@@ -15,10 +15,15 @@ public final class NodeFailureSupport {
         failure.setLastFailedNode(node);
         String errorMessage = ex.getMessage() == null ? ex.getClass().getSimpleName() : ex.getMessage();
         failure.setLastError(errorMessage);
-        if (!retryable && errorMessage.toLowerCase(java.util.Locale.ROOT).contains("rate limit")) {
+        String normalizedError = errorMessage.toLowerCase(java.util.Locale.ROOT);
+        if (!retryable && (normalizedError.contains("rate limit")
+                || normalizedError.contains("quota")
+                || normalizedError.contains("http 429")
+                || normalizedError.contains("provider_http_429"))) {
             failure.setFailureType("RATE_LIMITED");
+        } else {
+            failure.setFailureType(ex.getClass().getSimpleName());
         }
-        failure.setFailureType(ex.getClass().getSimpleName());
         failure.setRetryable(retryable);
         failure.setNodeRetryCount(previousRetries + 1);
         Map<String, Object> updates = new LinkedHashMap<>();
