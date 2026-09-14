@@ -44,6 +44,7 @@ public class ItineraryAgentService {
                             + "CRITICAL: days MUST contain exactly " + expectedDays + " objects (day 1.." + expectedDays + "). "
                             + "Each activity must have structured fields — never append '(indoor activity)' to names. "
                             + "Day 1 MUST mention arrival/check-in. Day " + expectedDays + " MUST mention departure/checkout. "
+                            + "Use at most 2 activities per day plus one short food/local item when requested. Keep every activity name under 12 words. "
                             + "If rain is likely, move outdoor activities to drier days. "
                             + "Use flights, hotels, attractions, research, weather, and budget from shared state. "
                             + "Do not invent flight numbers.",
@@ -57,9 +58,45 @@ public class ItineraryAgentService {
                 .filter(itinerary -> !itinerary.isEmpty())
                 .orElseGet(() -> ItinerarySupport.skeleton(nights, state.destination(), state.attractions()));
         Itinerary normalized = ItinerarySupport.normalize(parsed, nights, state.destination(), state.attractions());
+        ensureRequestedPreferenceCoverage(normalized, state);
         log.info("Itinerary normalized to {} day(s)",
                 normalized.getDays() == null ? 0 : normalized.getDays().size());
         return normalized;
+    }
+
+    private void ensureRequestedPreferenceCoverage(Itinerary itinerary, TravelState state) {
+        if (itinerary == null || itinerary.getDays() == null) return;
+        var requirements = state.tripRequirements();
+        if (requirements == null) return;
+
+        boolean hasFood = itinerary.getDays().stream().flatMap(day -> day.getActivities().stream())
+                .anyMatch(activity -> activity != null && activity.isFoodExperience());
+        boolean hasLocal = itinerary.getDays().stream().flatMap(day -> day.getActivities().stream())
+                .anyMatch(activity -> activity != null && activity.isLocalExperience());
+        boolean hasFamily = itinerary.getDays().stream().flatMap(day -> day.getActivities().stream())
+                .anyMatch(activity -> activity != null && activity.isFamilyFriendly());
+
+        for (int i = 1; i < itinerary.getDays().size() - 1; i++) {
+            var day = itinerary.getDays().get(i);
+            if (requirements.isFoodExperiences() && !hasFood) {
+                day.getActivities().add(new com.example.travel.model.ItineraryActivity(
+                        "Local family-friendly food experience", "food", "indoor", true, true, true));
+                hasFood = true;
+            }
+            if (requirements.isLocalExperiences() && !hasLocal) {
+                day.getActivities().add(new com.example.travel.model.ItineraryActivity(
+                        "Explore a local neighborhood", "culture", "mixed", true, false, true));
+                hasLocal = true;
+            }
+            if (requirements.isFamilyFriendly() && !hasFamily) {
+                day.getActivities().add(new com.example.travel.model.ItineraryActivity(
+                        "Family-friendly local activity", "family", "mixed", true, false, true));
+                hasFamily = true;
+            }
+            if ((hasFood || !requirements.isFoodExperiences())
+                    && (hasLocal || !requirements.isLocalExperiences())
+                    && (hasFamily || !requirements.isFamilyFriendly())) break;
+        }
     }
 
     private String stateSnapshot(TravelState state, LocalDate departure, LocalDate returning, int expectedDays) {

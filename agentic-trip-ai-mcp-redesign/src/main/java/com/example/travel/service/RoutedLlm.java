@@ -7,6 +7,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.ollama.api.OllamaChatOptions;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.util.Arrays;
@@ -20,13 +21,25 @@ public class RoutedLlm {
     private final ChatClient chatClient;
     private final TravelModelsProperties models;
     private final AgentExecutionBudget executionBudget;
+    private final int extractionMaxTokens;
+    private final int plannerMaxTokens;
+    private final int itineraryMaxTokens;
+    private final int finalMaxTokens;
 
     public RoutedLlm(ChatClient chatClient,
                      TravelModelsProperties models,
-                     AgentExecutionBudget executionBudget) {
+                     AgentExecutionBudget executionBudget,
+                     @Value("${travel.models.max-tokens.extraction:384}") int extractionMaxTokens,
+                     @Value("${travel.models.max-tokens.planner:512}") int plannerMaxTokens,
+                     @Value("${travel.models.max-tokens.itinerary:900}") int itineraryMaxTokens,
+                     @Value("${travel.models.max-tokens.final:700}") int finalMaxTokens) {
         this.chatClient = chatClient;
         this.models = models;
         this.executionBudget = executionBudget;
+        this.extractionMaxTokens = Math.max(128, extractionMaxTokens);
+        this.plannerMaxTokens = Math.max(128, plannerMaxTokens);
+        this.itineraryMaxTokens = Math.max(256, itineraryMaxTokens);
+        this.finalMaxTokens = Math.max(256, finalMaxTokens);
     }
 
     public String complete(AgentRole role, String system, String user) {
@@ -53,7 +66,8 @@ public class RoutedLlm {
         var prompt = chatClient.prompt()
             .options(OllamaChatOptions.builder()
                 .model(model)
-                .temperature(models.temperature(role)))
+                .temperature(models.temperature(role))
+                .numPredict(maxTokens(role)))
             .system(system)
             .user(user);
         if (tools != null && tools.length > 0) {
@@ -77,6 +91,15 @@ public class RoutedLlm {
                 System.currentTimeMillis() - started, inputTokens, outputTokens);
         LlmCallContext.record(result);
         return result;
+    }
+
+    private int maxTokens(AgentRole role) {
+        return switch (role) {
+            case PLANNER -> plannerMaxTokens;
+            case ITINERARY -> itineraryMaxTokens;
+            case FINAL -> finalMaxTokens;
+            case EXTRACT -> extractionMaxTokens;
+        };
     }
 
     private static int safeTokens(Integer value) {

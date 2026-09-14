@@ -50,6 +50,15 @@ public class SemanticValidatorService {
         TripRequirements requirements = state.tripRequirements();
         result.getIssues().addAll(requirementEvaluator.evaluateIssues(state, requirements));
 
+        // Deterministic requirement scoring is authoritative for structured
+        // preferences. If it passes, do not spend another local-LLM call merely
+        // to confirm the same facts. The previous validator call added ~6s and
+        // could incorrectly trigger a full itinerary replan.
+        if (result.getIssues().isEmpty()) {
+            GraphExecutionLogger.semanticValidation(state, "PASS", result.getScore(), result.getIssues());
+            return result;
+        }
+
         try {
             String content = routedLlm.complete(AgentRole.EXTRACT,
                     "You are a semantic travel validator. Return JSON only: "

@@ -11,6 +11,8 @@ import com.example.travel.service.PlanQualityScorer;
 import com.example.travel.rag.eval.RagLlmJudgeService;
 import org.bsc.langgraph4j.action.NodeAction;
 import org.springframework.stereotype.Component;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -19,6 +21,8 @@ import java.util.Map;
 
 @Component
 public class ValidatorNode implements NodeAction<TravelState> {
+
+    private static final Logger log = LoggerFactory.getLogger(ValidatorNode.class);
 
     private final ValidatorAgentService validatorAgentService;
     private final SemanticValidatorService semanticValidatorService;
@@ -65,6 +69,11 @@ public class ValidatorNode implements NodeAction<TravelState> {
             detail += " | semantic: " + String.join("; ", semanticNotes);
         }
         boolean pass = errors.isEmpty() && !semantic.failed() && quality.passes();
+        if (!pass) {
+            log.warn("Validator rejected plan: errors={} semanticIssues={} semanticScore={} quality={} retry={}/{}",
+                    errors, semanticNotes, semantic.getScore(), quality.getOverall(),
+                    state.retryCount(), state.maxRetries());
+        }
         GraphExecutionLogger.validation(state, quality.getOverall(), pass, errors, semanticNotes);
         updates.putAll(TravelState.trace(TravelGraphNodes.VALIDATOR, pass ? "ok" : "warn", detail));
         return updates;

@@ -39,7 +39,7 @@ public class SupervisorAgentService {
     }
 
     public Map<String, Object> review(TravelState state) {
-        SupervisorAssessment assessment = llmAssess(state);
+        SupervisorAssessment assessment = deterministicAssessment(state);
         String decision = decide(state, assessment);
 
         AgentDecision recorded = new AgentDecision("supervisor", decision,
@@ -60,6 +60,28 @@ public class SupervisorAgentService {
         }
         GraphExecutionLogger.supervisorDecision(state, decision, assessment.getQualityHint(), recorded.getReason());
         return updates;
+    }
+
+    private SupervisorAssessment deterministicAssessment(TravelState state) {
+        SupervisorAssessment assessment = new SupervisorAssessment();
+        assessment.setDecision(TravelGraphNodes.ROUTE_PROCEED);
+        assessment.setQualityHint(0.90);
+        assessment.setConfidence(1.0);
+        assessment.setReason("Deterministic specialist checks passed");
+
+        // If the current pass has an explicit failure, keep the existing LLM
+        // assessment path for unusual recovery decisions. Normal successful
+        // specialist fan-out should never pay for another local-LLM call.
+        if (NodeFailureRouting.hasRetryableFailure(state)) {
+            return llmAssess(state);
+        }
+        if (state.runFlights() && flightsUnusable(state)) return llmAssess(state);
+        if (state.runHotels() && state.hotels().isEmpty() && !state.hotelFallbackExhausted()) return llmAssess(state);
+        if (state.runResearch() && state.research().isEmpty() && state.attractions().isEmpty()) return llmAssess(state);
+        if (state.runWeather() && (state.weather() == null
+                || (TravelState.isBlank(state.weather().getSummary())
+                && (state.weather().getDays() == null || state.weather().getDays().isEmpty())))) return llmAssess(state);
+        return assessment;
     }
 
     public String decide(TravelState state) {

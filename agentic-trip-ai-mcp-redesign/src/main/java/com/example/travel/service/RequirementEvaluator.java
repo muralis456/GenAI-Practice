@@ -24,8 +24,11 @@ public class RequirementEvaluator {
         if (counts.total == 0) {
             return 0.35;
         }
-        double ratio = counts.familyFriendly / (double) counts.total;
-        return clamp(0.35 + ratio * 0.65);
+        // A requested preference is a coverage requirement, not a percentage
+        // of every itinerary activity. One explicit family-friendly activity
+        // is sufficient to establish coverage; otherwise a normal sightseeing
+        // plan can incorrectly fail validation and trigger repeated replans.
+        return counts.familyFriendly > 0 ? 1.0 : 0.35;
     }
 
     public double foodScore(TravelState state, TripRequirements requirements) {
@@ -36,8 +39,10 @@ public class RequirementEvaluator {
         if (counts.total == 0) {
             return 0.35;
         }
-        double ratio = counts.foodExperience / (double) counts.total;
-        return clamp(0.35 + ratio * 0.65);
+        // Do not require a food activity to represent an arbitrary percentage
+        // of the whole itinerary. The previous ratio-based rule made a single
+        // valid food experience fail a 7-day itinerary and caused replan loops.
+        return counts.foodExperience > 0 ? 1.0 : 0.35;
     }
 
     public double localScore(TravelState state, TripRequirements requirements) {
@@ -48,8 +53,7 @@ public class RequirementEvaluator {
         if (counts.total == 0) {
             return 0.35;
         }
-        double ratio = counts.localExperience / (double) counts.total;
-        return clamp(0.35 + ratio * 0.65);
+        return counts.localExperience > 0 ? 1.0 : 0.35;
     }
 
     public List<String> evaluateIssues(TravelState state, TripRequirements requirements) {

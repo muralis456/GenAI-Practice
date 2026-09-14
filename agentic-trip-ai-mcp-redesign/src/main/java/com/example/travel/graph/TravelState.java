@@ -760,10 +760,22 @@ public class TravelState extends AgentState {
     public boolean shouldReplan() {
         boolean deterministicFailure = !validationErrors().isEmpty();
         boolean semanticFailure = !semanticNotes().isEmpty() || semanticValidation().failed();
+        boolean semanticRepairAlreadyAttempted = semanticFailure
+                && retryCount() > 0
+                && replanNotes().contains("semanticRepairAttempt=true");
         boolean qualityFailure = planQuality() != null && planQuality().getOverall() > 0
                 && planQuality().getOverall() < PlanQualityScore.PASS_THRESHOLD;
         boolean ragGroundingFailure = ragEnabled() && ragSufficient() && !ragJudgePass();
-        return (deterministicFailure || semanticFailure || qualityFailure || ragGroundingFailure) && retryCount() < maxRetries();
+
+        // Semantic itinerary issues get one targeted repair pass only. If the
+        // repaired itinerary still has the same preference warning, accept it
+        // as a quality caveat instead of regenerating the itinerary again.
+        if (semanticRepairAlreadyAttempted && !deterministicFailure
+                && !qualityFailure && !ragGroundingFailure) {
+            return false;
+        }
+        return (deterministicFailure || semanticFailure || qualityFailure || ragGroundingFailure)
+                && retryCount() < maxRetries();
     }
 
     public boolean shouldReplanForBudget() {

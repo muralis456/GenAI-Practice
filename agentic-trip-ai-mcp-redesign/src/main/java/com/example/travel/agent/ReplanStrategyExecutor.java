@@ -220,6 +220,7 @@ public class ReplanStrategyExecutor {
         // entire original trip again.
         TravelState.projectRunSelection(updates, state);
 
+        boolean semanticRepair = !state.semanticNotes().isEmpty();
         String notes = "Replan priority="
                 + strategy.getPriority()
                 + " actions="
@@ -234,7 +235,8 @@ public class ReplanStrategyExecutor {
                                         + String.join(
                                                 "; ",
                                                 state.semanticNotes())
-                                : strategy.getReason());
+                                : strategy.getReason())
+                + (semanticRepair ? " semanticRepairAttempt=true" : "");
 
         AgentDecision decision = new AgentDecision(
                 "replanner",

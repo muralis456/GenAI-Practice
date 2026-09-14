@@ -51,6 +51,7 @@ public class AgenticRagService {
     private final boolean hybridEnabled;
     private final boolean rerankEnabled;
     private final boolean compressionEnabled;
+    private final boolean fastPathEnabled;
 
     public AgenticRagService(
             VectorStore vectorStore,
@@ -63,7 +64,8 @@ public class AgenticRagService {
             @Value("${travel.rag.max-iterations:2}") int maxIterations,
             @Value("${travel.rag.hybrid.enabled:true}") boolean hybridEnabled,
             @Value("${travel.rag.rerank.enabled:true}") boolean rerankEnabled,
-            @Value("${travel.rag.compression.enabled:true}") boolean compressionEnabled) {
+            @Value("${travel.rag.compression.enabled:true}") boolean compressionEnabled,
+            @Value("${travel.rag.fast-path.enabled:true}") boolean fastPathEnabled) {
         this.vectorStore = vectorStore;
         this.jdbcTemplate = jdbcTemplate;
         this.routedLlm = routedLlm;
@@ -75,6 +77,7 @@ public class AgenticRagService {
         this.hybridEnabled = hybridEnabled;
         this.rerankEnabled = rerankEnabled;
         this.compressionEnabled = compressionEnabled;
+        this.fastPathEnabled = fastPathEnabled;
     }
 
     public RagResult run(TravelState state) {
@@ -86,6 +89,16 @@ public class AgenticRagService {
         if (!decision.retrieve() || decision.query().isBlank()) {
             log.info("Agentic RAG decision=skip reason={} destination={}", decision.reason(), state.destination());
             return RagResult.skipped("llm_decided_no_retrieval");
+        }
+
+        // Explicit knowledge capability is already decided by the Intent Agent.
+        // Do not spend three additional local-LLM calls on reranking, compression
+        // and sufficiency judging for a normal destination-guidance lookup.
+        // Retrieval itself is deterministic and the final knowledge card can be
+        // generated once downstream. This removes the 90s+ RAG bottleneck seen
+        // with llama3.2:3b.
+        if (fastPathEnabled && state.needsKnowledge()) {
+            return runKnowledgeFastPath(state, decision);
         }
 
         List<Document> evidence = List.of();
@@ -153,6 +166,37 @@ public class AgenticRagService {
                 candidateCount, rerankedCount, compressedContext.length(),
                 evidenceScore(activeQuery, compressedContext, sources),
                 decision.destination(), decision.country(), decision.topics());
+    }
+
+    private RagResult runKnowledgeFastPath(TravelState state, Decision decision) {
+        String query = decision.query().trim();
+        List<Document> evidence = fastRetrieve(state, decision, query);
+        Set<String> sources = new LinkedHashSet<>(sourceNames(evidence));
+        String context = formatEvidence(evidence);
+        boolean sufficient = !evidence.isEmpty() && !context.isBlank();
+        log.info("Agentic RAG fast-path query='{}' candidates={} sources={} contextChars={}",
+                query, evidence.size(), sources.size(), context.length());
+        return new RagResult(true,
+                sufficient ? "hybrid_fast_sufficient" : "hybrid_fast_best_effort",
+                query, context, new ArrayList<>(sources), 1, sufficient,
+                hybridEnabled ? "hybrid_vector_fts_fast" : "vector_fast",
+                evidence.size(), evidence.size(), context.length(),
+                evidenceScore(query, context, sources), decision.destination(),
+                decision.country(), decision.topics());
+    }
+
+    private List<Document> fastRetrieve(TravelState state, Decision decision, String query) {
+        List<Document> vector = vectorSearch(state, decision, query);
+        Map<String, RankedDocument> merged = new LinkedHashMap<>();
+        addRanked(merged, vector, 1);
+        if (hybridEnabled) {
+            addRanked(merged, keywordSearch(state, decision, query, MAX_CANDIDATES), 2);
+        }
+        return merged.values().stream()
+                .sorted(Comparator.comparingDouble(RankedDocument::rrfScore).reversed())
+                .limit(topK)
+                .map(RankedDocument::document)
+                .toList();
     }
 
     private Decision decideRetrieval(TravelState state) {

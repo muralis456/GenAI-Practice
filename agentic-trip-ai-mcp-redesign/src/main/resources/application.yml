@@ -71,6 +71,8 @@ travel:
       enabled: ${TRAVEL_RAG_RERANK_ENABLED:true}
     compression:
       enabled: ${TRAVEL_RAG_COMPRESSION_ENABLED:true}
+    fast-path:
+      enabled: ${TRAVEL_RAG_FAST_PATH_ENABLED:true}
     seed-on-empty: ${TRAVEL_RAG_SEED_ON_EMPTY:true}
   graph:
     max-retries: 5
@@ -88,6 +90,11 @@ travel:
     fast: ${TRAVEL_MODEL_FAST:llama3.2:3b}
     balanced: ${TRAVEL_MODEL_BALANCED:llama3.2:3b}
     reasoning: ${TRAVEL_MODEL_REASONING:llama3.2:3b}
+    max-tokens:
+      extraction: ${TRAVEL_MODEL_MAX_TOKENS_EXTRACTION:384}
+      planner: ${TRAVEL_MODEL_MAX_TOKENS_PLANNER:512}
+      itinerary: ${TRAVEL_MODEL_MAX_TOKENS_ITINERARY:900}
+      final: ${TRAVEL_MODEL_MAX_TOKENS_FINAL:700}
   tavily:
     api-url: https://api.tavily.com/search
     api-key: ${TAVILY_API_KEY:}
