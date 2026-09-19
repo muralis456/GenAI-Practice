@@ -2605,7 +2605,7 @@
             setValue(settingsEmail, identity.email);
             setValue(settingsUsername, identity.username);
             setValue(settingsRole, identity.role);
-            if (signedInUser) signedInUser.textContent = identity.username || identity.userId || '';
+            if (signedInUser) signedInUser.textContent = [identity.firstName, identity.lastName].filter(Boolean).join(' ') || identity.username || identity.userId || '';
         } catch (error) {
             showToast(error.message || 'Unable to load account details.');
         }
@@ -5057,7 +5057,7 @@
                 return;
             }
             userIdField.value = currentUserId;
-            if (signedInUser) signedInUser.textContent = currentUserId;
+            if (signedInUser) signedInUser.textContent = [identity.firstName, identity.lastName].filter(Boolean).join(' ') || currentUserId;
             syncUserIdField();
             await loadDbTrips(false);
             await loadServerHistoryIntoStore();

@@ -39,7 +39,6 @@ public class TripHistory {
     @Column(nullable = false)
     private Instant updatedAt;
 
-    @Lob
     @Column(nullable = false, columnDefinition = "TEXT")
     private String planJson;
 

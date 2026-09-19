@@ -19,7 +19,6 @@ public class GraphProgressEvent {
     @Column(nullable = false, length = 40)
     private String eventType;
 
-    @Lob
     @Column(nullable = false, columnDefinition = "TEXT")
     private String payload;
 

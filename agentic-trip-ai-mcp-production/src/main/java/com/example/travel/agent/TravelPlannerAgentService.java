@@ -934,17 +934,14 @@ public class TravelPlannerAgentService {
             throw new ResourceNotFoundException("Travel plan not found");
         }
 
-        TravelState state = requireCheckpointState(key);
-
-        String owner = TravelState.firstNonBlank(
-                state.userId(),
-                requester);
-
-        if (!owner.equals(requester)) {
-
-            throw new ResourceNotFoundException("Travel plan not found");
-        }
-
+        /*
+         * SSE can connect immediately after /plan/start returns, while the
+         * asynchronous LangGraph execution is still creating its first
+         * checkpoint. Ownership must therefore be checked from the
+         * server-generated thread id, not from graph state. Checkpoint-backed
+         * authorization remains enforced by operations that actually read or
+         * mutate graph state (approve/modify/reject/restore/history).
+         */
         return key;
     }
 
