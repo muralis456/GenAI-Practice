@@ -42,6 +42,16 @@
       "projectName": "agentic-trip-ai-mcp-redesign",
       "args": "",
       "envFile": "${workspaceFolder}/.env"
+    },
+    {
+      "type": "java",
+      "name": "Spring Boot-AgenticTripAiApplication<agentic-trip-ai-mcp-production>",
+      "request": "launch",
+      "cwd": "${workspaceFolder}",
+      "mainClass": "com.example.travel.AgenticTripAiApplication",
+      "projectName": "agentic-trip-ai-mcp-production",
+      "args": "",
+      "envFile": "${workspaceFolder}/.env"
     }
   ]
 }
