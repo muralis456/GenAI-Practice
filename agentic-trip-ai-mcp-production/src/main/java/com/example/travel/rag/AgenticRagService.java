@@ -13,6 +13,7 @@ import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
+import tools.jackson.databind.JsonNode;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -200,46 +201,236 @@ public class AgenticRagService {
     }
 
     private Decision decideRetrieval(TravelState state) {
-        // The semantic Intent Agent owns the knowledge capability. If it decided
-        // that the user wants durable travel guidance in addition to another
-        // capability, retrieval is mandatory. No specialist gets a hard-coded
-        // knowledge exception here.
+        /*
+         * The Intent Agent is the source of truth for whether knowledge is needed.
+         * For explicit knowledge requests we must preserve the user's actual
+         * question. The old implementation replaced it with a generic "travel
+         * tips" query, which caused focused questions (for example, precautions
+         * for Bangalore) to retrieve unrelated generic travel guidance.
+         */
         if (state != null && state.needsKnowledge()) {
+            String userRequest = TravelState.firstNonBlank(
+                    state.userRequest(),
+                    state.destination(),
+                    "travel knowledge");
+
             String destination = TravelState.firstNonBlank(
                     state.destination(),
-                    TripSlotHeuristics.extractDestinationHint(state.userRequest()));
-            String query = destination.isBlank()
-                    ? state.userRequest()
-                    : "travel tips and practical guidance for " + destination
-                            + " including packing, weather planning, local transport, safety and useful travel advice";
-            return new Decision(true, query, "explicitKnowledgeCapability",
-                    destination, "", List.of("travel tips", "packing", "weather planning", "local transport", "safety"));
+                    TripSlotHeuristics.extractDestinationHint(userRequest));
+
+            final List<String> inferredTopics = inferKnowledgeTopics(userRequest);
+            String country = inferCountry(destination);
+
+            // Keep the original question as the primary semantic query.
+            // Topic terms are used only as secondary retrieval expansions.
+            return new Decision(
+                    true,
+                    userRequest.trim(),
+                    "explicitKnowledgeCapability",
+                    destination,
+                    country,
+                    inferredTopics);
         }
 
         String raw = routedLlm.complete(AgentRole.EXTRACT,
                 """
                 You are the Knowledge Router for a travel-planning agent.
                 Decide whether INTERNAL KNOWLEDGE retrieval is needed.
-                Use retrieval for durable knowledge such as destination guidance, travel rules,
-                packing, culture, safety, planning policies and document-backed facts.
-                For a real TRIP_PLANNING request, prefer retrieval of concise, useful common
-                destination guidance when a destination is known (for example packing, culture,
-                safety, local transport, seasonality, etiquette, or practical planning advice).
-                Do NOT retrieve live flight availability, hotel prices, live weather, currency rates,
-                or airport resolution; those are handled by MCP/tools.
-                Return JSON only: {"retrieve":true|false,"query":"concise semantic query","reason":"short reason","destination":"city or destination","country":"country","topics":["culture","food"]}
+
+                Use retrieval for durable knowledge such as:
+                - destination guidance
+                - travel rules and practical policies
+                - packing
+                - culture and etiquette
+                - safety and precautions
+                - local transport guidance
+                - food and hygiene
+                - durable planning advice
+                - document-backed travel facts
+
+                Do NOT retrieve live flight availability, hotel prices,
+                live weather, currency rates, or airport resolution.
+                Those are handled by MCP/tools.
+
+                Preserve the user's actual information need. Do not replace
+                a focused question with generic "travel tips".
+
+                Return JSON only:
+                {
+                  "retrieve": true|false,
+                  "query": "focused semantic query preserving the user's question",
+                  "reason": "short reason",
+                  "destination": "city or destination",
+                  "country": "country",
+                  "topics": ["safety","packing"]
+                }
                 """,
                 requestContext(state));
+
         var node = jsonSupport.readTree(raw).orElse(null);
-        List<String> topics = new ArrayList<>();
-        if (node != null && node.path("topics").isArray()) node.path("topics").forEach(v -> topics.add(v.asString()));
+        final List<String> extractedTopics = extractTopics(node);
+
+        String destination = node == null
+                ? TravelState.firstNonBlank(
+                        state.destination(),
+                        TripSlotHeuristics.extractDestinationHint(state.userRequest()))
+                : TravelState.firstNonBlank(
+                        node.path("destination").asString(""),
+                        state.destination(),
+                        TripSlotHeuristics.extractDestinationHint(state.userRequest()));
+
+        String country = node == null
+                ? inferCountry(destination)
+                : TravelState.firstNonBlank(
+                        node.path("country").asString(""),
+                        inferCountry(destination));
+
+        String query = node == null
+                ? state.userRequest()
+                : node.path("query").asString("");
+
+        // If the router returned an empty query, fall back to the actual user
+        // request instead of constructing a generic travel query.
+        if (query == null || query.isBlank()) {
+            query = state.userRequest();
+        }
+
         return new Decision(
                 node != null && node.path("retrieve").asBoolean(false),
-                node == null ? "" : node.path("query").asString(""),
+                query.trim(),
                 node == null ? "" : node.path("reason").asString(""),
-                node == null ? state.destination() : node.path("destination").asString(state.destination()),
-                node == null ? "" : node.path("country").asString(""),
-                topics);
+                destination,
+                country,
+                extractedTopics);
+    }
+
+    private List<String> extractTopics(JsonNode node) {
+        if (node == null || !node.path("topics").isArray()) {
+            return List.of();
+        }
+
+        final LinkedHashSet<String> topicSet = new LinkedHashSet<>();
+        for (JsonNode topicNode : node.path("topics")) {
+            String topic = topicNode.asString("").trim().toLowerCase(java.util.Locale.ROOT);
+            if (!topic.isBlank()) {
+                topicSet.add(topic);
+            }
+        }
+        return List.copyOf(topicSet);
+    }
+
+    /**
+     * Deterministic topic extraction for explicit knowledge requests.
+     *
+     * This is intentionally independent of an LLM so a simple question such
+     * as "what precautions should I take in Bangalore?" does not get broadened
+     * into a generic travel query.
+     */
+    private List<String> inferKnowledgeTopics(String userRequest) {
+        if (userRequest == null || userRequest.isBlank()) {
+            return List.of();
+        }
+
+        String lower = userRequest.toLowerCase(java.util.Locale.ROOT);
+        final LinkedHashSet<String> topicSet = new LinkedHashSet<>();
+
+        if (containsAny(lower, "precaution", "safety", "safe", "care",
+                "risk", "emergency", "scam", "danger")) {
+            topicSet.add("precautions");
+            topicSet.add("safety");
+        }
+        if (containsAny(lower, "pack", "packing", "what should i carry",
+                "what to carry", "luggage", "clothes")) {
+            topicSet.add("packing");
+        }
+        if (containsAny(lower, "transport", "metro", "bus", "taxi",
+                "cab", "get around", "commute")) {
+            topicSet.add("local transport");
+        }
+        if (containsAny(lower, "food", "eat", "restaurant", "hygiene",
+                "drink", "water")) {
+            topicSet.add("food and hygiene");
+        }
+        if (containsAny(lower, "culture", "custom", "etiquette",
+                "dress", "photograph", "temple", "tradition")) {
+            topicSet.add("culture and etiquette");
+        }
+        if (containsAny(lower, "weather", "season", "rain", "summer",
+                "winter", "monsoon", "climate")) {
+            topicSet.add("weather planning");
+        }
+        if (containsAny(lower, "visa", "entry", "immigration", "passport",
+                "permit", "rule", "regulation")) {
+            topicSet.add("travel rules");
+        }
+        if (containsAny(lower, "money", "cash", "card", "payment",
+                "atm", "tipping")) {
+            topicSet.add("payments");
+        }
+
+        return List.copyOf(topicSet);
+    }
+
+    private String inferCountry(String destination) {
+        if (destination == null || destination.isBlank()) {
+            return "";
+        }
+
+        String normalized = destination.toLowerCase(java.util.Locale.ROOT).trim();
+        if (containsAny(normalized, "bangalore", "bengaluru", "mumbai",
+                "delhi", "hyderabad", "chennai", "india")) {
+            return "India";
+        }
+        if (containsAny(normalized, "tokyo", "osaka", "kyoto", "japan")) {
+            return "Japan";
+        }
+        if (containsAny(normalized, "singapore")) {
+            return "Singapore";
+        }
+        if (containsAny(normalized, "dubai", "abu dhabi", "uae")) {
+            return "United Arab Emirates";
+        }
+        if (containsAny(normalized, "bangkok", "phuket", "thailand")) {
+            return "Thailand";
+        }
+        if (containsAny(normalized, "bali", "jakarta", "indonesia")) {
+            return "Indonesia";
+        }
+        if (containsAny(normalized, "kuala lumpur", "malaysia")) {
+            return "Malaysia";
+        }
+        if (containsAny(normalized, "kathmandu", "nepal")) {
+            return "Nepal";
+        }
+        if (containsAny(normalized, "colombo", "sri lanka")) {
+            return "Sri Lanka";
+        }
+        if (containsAny(normalized, "hanoi", "danang", "vietnam")) {
+            return "Vietnam";
+        }
+        return "";
+    }
+
+    /**
+     * Case-insensitive substring matcher used by deterministic RAG topic
+     * inference. Varargs avoids overloaded helpers for every topic count.
+     */
+    private boolean containsAny(String text, String... terms) {
+        if (text == null || text.isBlank() || terms == null || terms.length == 0) {
+            return false;
+        }
+
+        String normalizedText = text.toLowerCase(java.util.Locale.ROOT).trim();
+        for (String term : terms) {
+            if (term == null || term.isBlank()) {
+                continue;
+            }
+            String normalizedTerm = term.toLowerCase(java.util.Locale.ROOT).trim();
+            if (!normalizedTerm.isBlank() && normalizedText.contains(normalizedTerm)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private Retrieval hybridRetrieve(TravelState state, Decision decision, String query) {

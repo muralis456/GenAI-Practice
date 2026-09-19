@@ -1545,7 +1545,6 @@
             + '<div class="plan-header-facts"><span>✦ Requested information</span>' + (location ? '<span>📍 ' + escapeHtml(location) + '</span>' : '') + (userRequest ? '<span class="specialist-request">' + escapeHtml(String(userRequest).slice(0, 100)) + '</span>' : '') + '</div></header>'
             + (needsUserInput && clarification ? '<div class="agent-clarification-banner"><strong>✦ Action needed</strong><span>' + escapeHtml(clarification) + '</span></div>' : '')
             + nav + '<div class="plan-steps">' + steps + '</div>'
-            + (hasSpecialistKnowledge(data, plan) ? '<div class="specialist-knowledge-inline">' + buildSpecialistKnowledgeCard(data, plan) + '</div>' : '')
             + '</div>';
         return html;
     };

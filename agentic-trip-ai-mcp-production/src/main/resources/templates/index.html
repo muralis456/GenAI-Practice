@@ -3996,7 +3996,6 @@
             + (needsUserInput && clarification ? '<div class="agent-clarification-banner"><strong>✦ Action needed</strong><span>' + escapeHtml(clarification) + '</span></div>' : '')
             + nav + '<div class="plan-steps">' + steps + '</div>'
             + '<div class="widget-restore-tray" data-widget-restore-tray style="display:none"><span class="widget-restore-label">Closed widgets</span></div>'
-            + (hasSpecialistKnowledge(data, plan) ? '<div class="specialist-knowledge-inline">' + buildSpecialistKnowledgeCard(data, plan) + '</div>' : '')
             + '</div>';
         return html;
     };

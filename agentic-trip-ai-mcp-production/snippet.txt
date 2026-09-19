@@ -1287,7 +1287,6 @@
             + '<span class="complete-badge">✓ Complete</span></div>'
             + body
             + '</section>'
-            + (hasSpecialistKnowledge(data, plan) ? buildSpecialistKnowledgeCard(data, plan) : '')
             + '</div>';
     };
 
