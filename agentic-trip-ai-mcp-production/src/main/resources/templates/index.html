@@ -1872,6 +1872,39 @@
         }
         .server-memory-card p:last-child { margin-bottom:0; }
         .sidebar-session .user-field { margin-top:5px; padding:7px 9px; font-size:11px; background:rgba(255,255,255,.06); color:#c4d5e9; border-color:rgba(255,255,255,.08); }
+
+        .settings-view { display:none; padding:18px 4px 40px; max-width:980px; margin:0 auto; }
+        .settings-view.visible { display:block; }
+        .settings-head { margin-bottom:18px; }
+        .settings-eyebrow { color:#6f9fd5; font-size:10px; font-weight:800; letter-spacing:.13em; text-transform:uppercase; }
+        .settings-title { margin:5px 0 4px; font-size:27px; color:#eef6ff; }
+        .settings-sub { margin:0; color:#91a7c0; font-size:12px; line-height:1.6; }
+        .settings-grid { display:grid; grid-template-columns:minmax(0,1.05fr) minmax(320px,.95fr); gap:14px; align-items:start; }
+        .settings-card { background:rgba(13,27,46,.82); border:1px solid rgba(255,255,255,.075); border-radius:16px; padding:20px; box-shadow:0 12px 35px rgba(0,0,0,.16); }
+        .settings-card-head { display:flex; align-items:center; gap:11px; margin-bottom:18px; }
+        .settings-card-icon { width:38px; height:38px; border-radius:11px; display:grid; place-items:center; background:rgba(58,137,255,.12); border:1px solid rgba(85,157,255,.16); font-size:17px; }
+        .settings-card-title { margin:0; color:#edf5ff; font-size:15px; }
+        .settings-card-sub { margin:3px 0 0; color:#8298b3; font-size:10.5px; line-height:1.45; }
+        .account-fields { display:grid; grid-template-columns:1fr 1fr; gap:13px; }
+        .settings-field { min-width:0; }
+        .settings-field.full { grid-column:1/-1; }
+        .settings-field label { display:block; margin-bottom:6px; color:#8298b3; font-size:10px; font-weight:750; text-transform:uppercase; letter-spacing:.07em; }
+        .settings-value { min-height:39px; display:flex; align-items:center; padding:9px 11px; border-radius:10px; background:rgba(255,255,255,.035); border:1px solid rgba(255,255,255,.065); color:#dbe8f7; font-size:12px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .settings-value.muted { color:#8398b1; }
+        .password-form { display:grid; gap:13px; }
+        .settings-input { width:100%; padding:10px 11px; border-radius:10px; border:1px solid rgba(255,255,255,.09); background:rgba(2,10,20,.38); color:#edf5ff; outline:none; font-size:12px; }
+        .settings-input:focus { border-color:rgba(73,150,255,.58); box-shadow:0 0 0 3px rgba(52,133,255,.09); }
+        .settings-help { margin:-3px 0 2px; color:#7188a4; font-size:10px; line-height:1.5; }
+        .settings-action { display:flex; align-items:center; justify-content:flex-end; gap:10px; margin-top:3px; }
+        .settings-button { border:0; border-radius:10px; padding:10px 15px; background:linear-gradient(135deg,#328dff,#1766d8); color:#fff; font-size:11px; font-weight:800; cursor:pointer; box-shadow:0 8px 18px rgba(27,108,220,.2); }
+        .settings-button:hover { filter:brightness(1.08); }
+        .settings-button:disabled { opacity:.55; cursor:default; }
+        .settings-message { min-height:18px; margin-top:3px; font-size:10.5px; line-height:1.45; }
+        .settings-message.success { color:#72d6a0; }
+        .settings-message.error { color:#ff929a; }
+        .settings-security-note { margin-top:15px; padding:10px 11px; border-radius:10px; background:rgba(255,255,255,.025); border:1px solid rgba(255,255,255,.055); color:#8197b1; font-size:10px; line-height:1.55; }
+        @media (max-width:820px) { .settings-grid { grid-template-columns:1fr; } }
+        @media (max-width:560px) { .account-fields { grid-template-columns:1fr; } .settings-field.full { grid-column:auto; } .settings-view { padding:12px 0 30px; } }
         .account-panel { margin-top:18px; padding-top:14px; border-top:1px solid rgba(255,255,255,.08); }
         .account-label { font-size:11px; color:#7890aa; text-transform:uppercase; letter-spacing:.08em; }
         .signed-in-user { margin-top:5px; color:#dce9f8; font-size:13px; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -2339,6 +2372,46 @@
                 <div id="tripsGrid" class="trips-grid"><div class="trips-empty"><strong>Loading your trips…</strong>Please wait.</div></div>
             </section>
 
+
+            <section id="settingsView" class="settings-view" aria-label="Settings">
+                <div class="settings-head">
+                    <div class="settings-eyebrow">Account & security</div>
+                    <h2 class="settings-title">Settings</h2>
+                    <p class="settings-sub">Manage your account details and keep your AgenticTripAI account secure.</p>
+                </div>
+                <div class="settings-grid">
+                    <section class="settings-card">
+                        <div class="settings-card-head">
+                            <div class="settings-card-icon">👤</div>
+                            <div><h3 class="settings-card-title">Account details</h3><p class="settings-card-sub">Your registered profile information.</p></div>
+                        </div>
+                        <div class="account-fields">
+                            <div class="settings-field"><label>First name</label><div id="settingsFirstName" class="settings-value muted">Loading…</div></div>
+                            <div class="settings-field"><label>Last name</label><div id="settingsLastName" class="settings-value muted">Loading…</div></div>
+                            <div class="settings-field full"><label>Email</label><div id="settingsEmail" class="settings-value muted">Loading…</div></div>
+                            <div class="settings-field"><label>Username</label><div id="settingsUsername" class="settings-value muted">Loading…</div></div>
+                            <div class="settings-field"><label>Account role</label><div id="settingsRole" class="settings-value muted">Loading…</div></div>
+                        </div>
+                    </section>
+
+                    <section class="settings-card">
+                        <div class="settings-card-head">
+                            <div class="settings-card-icon">🔒</div>
+                            <div><h3 class="settings-card-title">Change password</h3><p class="settings-card-sub">Use a strong password that you do not reuse elsewhere.</p></div>
+                        </div>
+                        <form id="changePasswordForm" class="password-form">
+                            <div class="settings-field"><label for="currentPassword">Current password</label><input id="currentPassword" class="settings-input" type="password" autocomplete="current-password" required></div>
+                            <div class="settings-field"><label for="newPassword">New password</label><input id="newPassword" class="settings-input" type="password" autocomplete="new-password" minlength="10" maxlength="128" required></div>
+                            <div class="settings-field"><label for="confirmNewPassword">Confirm new password</label><input id="confirmNewPassword" class="settings-input" type="password" autocomplete="new-password" minlength="10" maxlength="128" required></div>
+                            <div class="settings-help">Password must be between 10 and 128 characters.</div>
+                            <div id="passwordMessage" class="settings-message" role="status" aria-live="polite"></div>
+                            <div class="settings-action"><button id="changePasswordButton" class="settings-button" type="submit">Change password</button></div>
+                        </form>
+                        <div class="settings-security-note">Your password is stored as a one-way hash. AgenticTripAI never displays your existing password.</div>
+                    </section>
+                </div>
+            </section>
+
             <div id="chatThread" class="chat-thread" aria-live="polite">
                 <div class="chat-empty">Your trip plans will appear here and stay as you chat.</div>
             </div>
@@ -2429,6 +2502,18 @@
     const tripsView = document.getElementById('tripsView');
     const tripsGrid = document.getElementById('tripsGrid');
     const tripsRefresh = document.getElementById('tripsRefresh');
+    const settingsView = document.getElementById('settingsView');
+    const settingsFirstName = document.getElementById('settingsFirstName');
+    const settingsLastName = document.getElementById('settingsLastName');
+    const settingsEmail = document.getElementById('settingsEmail');
+    const settingsUsername = document.getElementById('settingsUsername');
+    const settingsRole = document.getElementById('settingsRole');
+    const changePasswordForm = document.getElementById('changePasswordForm');
+    const currentPasswordInput = document.getElementById('currentPassword');
+    const newPasswordInput = document.getElementById('newPassword');
+    const confirmNewPasswordInput = document.getElementById('confirmNewPassword');
+    const changePasswordButton = document.getElementById('changePasswordButton');
+    const passwordMessage = document.getElementById('passwordMessage');
     const historyDeleteModal = document.getElementById('historyDeleteModal');
     const historyDeleteItem = document.getElementById('historyDeleteItem');
     const historyDeleteNote = document.getElementById('historyDeleteNote');
@@ -2482,6 +2567,7 @@
 
     const showHomeView = () => {
         tripsView.classList.remove('visible');
+        settingsView.classList.remove('visible');
         chatThread.style.display = '';
         const welcome = document.querySelector('.welcome-block');
         if (welcome) welcome.style.display = '';
@@ -2495,6 +2581,39 @@
         if (welcome) welcome.style.display = 'none';
         setActiveNav('trips');
         await loadDbTrips(true);
+        messagesPane.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
+    const loadSettings = async () => {
+        try {
+            const response = await apiFetch('/api/auth/me', { cache: 'no-store' });
+            if (!response.ok) throw new Error('Could not load account details.');
+            const identity = await response.json();
+            const setValue = (element, value) => {
+                if (!element) return;
+                const text = String(value || '').trim();
+                element.textContent = text || 'Not provided';
+                element.classList.toggle('muted', !text);
+            };
+            setValue(settingsFirstName, identity.firstName);
+            setValue(settingsLastName, identity.lastName);
+            setValue(settingsEmail, identity.email);
+            setValue(settingsUsername, identity.username);
+            setValue(settingsRole, identity.role);
+            if (signedInUser) signedInUser.textContent = identity.username || identity.userId || '';
+        } catch (error) {
+            showToast(error.message || 'Unable to load account details.');
+        }
+    };
+
+    const showSettingsView = async () => {
+        tripsView.classList.remove('visible');
+        settingsView.classList.add('visible');
+        chatThread.style.display = 'none';
+        const welcome = document.querySelector('.welcome-block');
+        if (welcome) welcome.style.display = 'none';
+        setActiveNav('settings');
+        await loadSettings();
         messagesPane.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
@@ -2514,10 +2633,7 @@
                 showHomeView();
                 showToast('Saved Places will be connected to your saved destinations next.');
             } else if (nav === 'settings') {
-                showHomeView();
-                userIdField.focus();
-                userIdField.select();
-                showToast('Settings: update the session user ID here.');
+                await showSettingsView();
             } else if (nav === 'help') {
                 showHomeView();
                 showToast('Use New Trip to start fresh. Review the plan, then approve, modify, or reject it.');
@@ -2565,7 +2681,8 @@
         promptInput.placeholder = 'Ask anything — plan a trip, get travel advice, check weather, find hotels, or ask about a destination…';
         if (clearInput) {
             promptInput.value = '';
-            resizePrompt();
+            
+    resizePrompt();
         }
     };
 
@@ -2582,7 +2699,8 @@
         }
         promptInput.placeholder = 'What should we change in this plan?';
         promptInput.focus();
-        resizePrompt();
+        
+    resizePrompt();
         showToast('Modify mode enabled — your next message will update this trip.');
     };
 
@@ -2612,7 +2730,8 @@
     document.querySelectorAll('.city-card[data-prompt]').forEach(card => {
         card.addEventListener('click', () => {
             promptInput.value = card.getAttribute('data-prompt');
-            resizePrompt();
+            
+    resizePrompt();
             promptInput.focus();
         });
     });
@@ -3105,7 +3224,8 @@
                 startedFreshChat = true;
                 clearThreadDom();
                 promptInput.value = '';
-                resizePrompt();
+                
+    resizePrompt();
             }
 
             renderHistoryList();
@@ -3240,7 +3360,8 @@
         clearThreadDom();
         renderHistoryList();
         promptInput.value = '';
-        resizePrompt();
+        
+    resizePrompt();
         loadingState.classList.remove('visible');
         submitButton.disabled = false;
         promptInput.focus();
@@ -3253,7 +3374,8 @@
     }
 
     promptInput.addEventListener('input', () => {
-        resizePrompt();
+        
+    resizePrompt();
         updateComposerState();
         requestAnimationFrame(resizePrompt);
     });
@@ -4863,6 +4985,48 @@
 
         if (!submitButton.disabled && promptInput.value.trim()) {
             submitButton.click();
+        }
+    });
+
+
+
+    
+
+    changePasswordForm?.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        passwordMessage.textContent = '';
+        passwordMessage.className = 'settings-message';
+        const currentPassword = currentPasswordInput.value;
+        const newPassword = newPasswordInput.value;
+        const confirmPassword = confirmNewPasswordInput.value;
+        if (newPassword.length < 10 || newPassword.length > 128) {
+            passwordMessage.textContent = 'New password must be between 10 and 128 characters.';
+            passwordMessage.classList.add('error');
+            return;
+        }
+        if (newPassword !== confirmPassword) {
+            passwordMessage.textContent = 'New password and confirmation do not match.';
+            passwordMessage.classList.add('error');
+            return;
+        }
+        changePasswordButton.disabled = true;
+        try {
+            const response = await apiFetch('/api/auth/change-password', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ currentPassword, newPassword })
+            });
+            const result = await response.json().catch(() => ({}));
+            if (!response.ok) throw new Error(result.error || 'Unable to change password.');
+            changePasswordForm.reset();
+            passwordMessage.textContent = result.message || 'Password changed successfully.';
+            passwordMessage.classList.add('success');
+            showToast('Password changed successfully.');
+        } catch (error) {
+            passwordMessage.textContent = error.message || 'Unable to change password.';
+            passwordMessage.classList.add('error');
+        } finally {
+            changePasswordButton.disabled = false;
         }
     });
 

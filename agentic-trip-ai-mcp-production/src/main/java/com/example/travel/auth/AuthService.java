@@ -46,6 +46,9 @@ public class AuthService {
         if (repository.existsByUsernameIgnoreCase(normalizedUsername)) {
             throw new IllegalArgumentException("That username is already registered.");
         }
+        if (repository.existsByEmailIgnoreCase(normalizedEmail)) {
+            throw new IllegalArgumentException("That email address is already registered.");
+        }
 
         AppUser user = new AppUser();
         user.setFirstName(normalizedFirstName);
@@ -63,6 +66,36 @@ public class AuthService {
         } catch (DataIntegrityViolationException ex) {
             throw new IllegalArgumentException("That username or email is already registered.");
         }
+    }
+
+
+    @Transactional(readOnly = true)
+    public AppUser findByUsername(String username) {
+        return repository.findByUsernameIgnoreCase(normalizeUsername(username))
+                .orElseThrow(() -> new IllegalArgumentException("Account not found."));
+    }
+
+    @Transactional
+    public void changePassword(String username, String currentPassword, String newPassword) {
+        String normalizedUsername = normalizeUsername(username);
+        if (currentPassword == null || currentPassword.isBlank()) {
+            throw new IllegalArgumentException("Current password is required.");
+        }
+        if (newPassword == null || newPassword.length() < 10 || newPassword.length() > 128) {
+            throw new IllegalArgumentException("New password must be between 10 and 128 characters.");
+        }
+
+        AppUser user = repository.findByUsernameIgnoreCase(normalizedUsername)
+                .orElseThrow(() -> new IllegalArgumentException("Account not found."));
+        if (!passwordEncoder.matches(currentPassword, user.getPasswordHash())) {
+            throw new IllegalArgumentException("Current password is incorrect.");
+        }
+        if (passwordEncoder.matches(newPassword, user.getPasswordHash())) {
+            throw new IllegalArgumentException("New password must be different from your current password.");
+        }
+
+        user.setPasswordHash(passwordEncoder.encode(newPassword));
+        repository.save(user);
     }
 
     /** Backward-compatible overload for internal callers/tests that only provide credentials. */

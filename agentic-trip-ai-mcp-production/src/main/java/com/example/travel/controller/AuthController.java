@@ -53,10 +53,31 @@ public class AuthController {
     @GetMapping("/api/auth/me")
     @ResponseBody
     public ResponseEntity<Map<String, Object>> me(Authentication authentication) {
+        AppUser user = authService.findByUsername(authentication.getName());
         return ResponseEntity.ok(Map.of(
                 "authenticated", true,
-                "userId", authentication.getName(),
-                "username", authentication.getName()));
+                "userId", user.getUsername(),
+                "username", user.getUsername(),
+                "firstName", user.getFirstName() == null ? "" : user.getFirstName(),
+                "lastName", user.getLastName() == null ? "" : user.getLastName(),
+                "email", user.getEmail() == null ? "" : user.getEmail(),
+                "role", user.getRole() == null ? "USER" : user.getRole(),
+                "createdAt", user.getCreatedAt() == null ? "" : user.getCreatedAt().toString()));
+    }
+
+    @PostMapping("/api/auth/change-password")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> changePassword(
+            Authentication authentication, @RequestBody ChangePasswordRequest request) {
+        if (request == null) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Password details are required."));
+        }
+        try {
+            authService.changePassword(authentication.getName(), request.currentPassword(), request.newPassword());
+            return ResponseEntity.ok(Map.of("changed", true, "message", "Password changed successfully."));
+        } catch (IllegalArgumentException ex) {
+            return ResponseEntity.badRequest().body(Map.of("error", ex.getMessage()));
+        }
     }
 
     @PostMapping("/api/auth/register")
@@ -81,4 +102,6 @@ public class AuthController {
     }
 
     public record RegisterRequest(String firstName, String lastName, String email, String username, String password) {}
+
+    public record ChangePasswordRequest(String currentPassword, String newPassword) {}
 }
