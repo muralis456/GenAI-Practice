@@ -29,6 +29,9 @@ public class TravelPlanResponse {
 
     private boolean awaitingApproval;
 
+    /** Explicit human-decision lifecycle: NOT_REQUIRED, PENDING, APPROVED, or REJECTED. */
+    private String approvalState = "NOT_REQUIRED";
+
     /** True when execution is paused because a required user detail is missing. */
     private boolean clarificationRequired;
     private String clarificationQuestion = "";
@@ -117,6 +120,11 @@ public class TravelPlanResponse {
 
         this.awaitingApproval = awaitingApproval;
 
+    }
+
+    public String getApprovalState() { return approvalState; }
+    public void setApprovalState(String approvalState) {
+        this.approvalState = approvalState == null || approvalState.isBlank() ? "NOT_REQUIRED" : approvalState;
     }
 
     public boolean isClarificationRequired() { return clarificationRequired; }

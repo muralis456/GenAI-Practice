@@ -108,6 +108,16 @@ public final class TripSlotHeuristics {
         return DAYS.matcher(request).find() || NIGHTS.matcher(request).find();
     }
 
+    /**
+     * Detects an explicit origin-to-destination structure without deciding
+     * what the user wants to do with that route. Semantic intent remains
+     * responsible for the capability decision.
+     */
+    public static boolean hasRouteHint(String request) {
+        if (request == null || request.isBlank()) return false;
+        return ROUTE.matcher(request).find();
+    }
+
     public static LocalDate inferReturnDate(String request, LocalDate departure, LocalDate fallbackReturn) {
         LocalDate start = departure == null ? LocalDate.now() : departure;
         Matcher days = DAYS.matcher(request == null ? "" : request);

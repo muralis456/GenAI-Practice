@@ -56,7 +56,7 @@ public final class IntentCapabilitySafetyGuard {
                 "things to do", "what to see", "activities", "recommend",
                 "recommendation", "tourist spots", "must see", "restaurants",
                 "cafes", "things worth visiting");
-        if (plan.isNeedsResearch() && plan.isNeedsKnowledge() && !researchCue) {
+        if (plan.isNeedsResearch() && plan.isNeedsKnowledge() && !researchCue && !fullTrip) {
             plan.setNeedsResearch(false);
         }
     }

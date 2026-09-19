@@ -220,6 +220,15 @@ public class TripPlanAssembler {
         header.setStatus(status);
 
         header.setAwaitingApproval(awaitingApproval);
+        if (awaitingApproval || state.awaitingApproval()) {
+            header.setApprovalState("PENDING");
+        } else if ("approve".equalsIgnoreCase(state.hitlDecision())) {
+            header.setApprovalState("APPROVED");
+        } else if ("reject".equalsIgnoreCase(state.hitlDecision())) {
+            header.setApprovalState("REJECTED");
+        } else {
+            header.setApprovalState("NOT_REQUIRED");
+        }
 
         PlanQualityScore quality = state.planQuality();
 

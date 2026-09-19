@@ -1582,15 +1582,15 @@
         .plan-section-nav{position:sticky;top:8px;z-index:12;display:flex;gap:6px;overflow:auto;padding:5px;margin:0 0 10px;border:1px solid rgba(255,255,255,.07);border-radius:13px;background:rgba(8,20,37,.9);backdrop-filter:blur(14px);scrollbar-width:none}.plan-section-nav::-webkit-scrollbar{display:none}
         .plan-nav-btn{border:1px solid transparent;background:transparent;color:#9fb4cc;border-radius:9px;padding:9px 13px;font-size:11px;font-weight:800;white-space:nowrap;cursor:pointer}.plan-nav-btn:hover{background:rgba(255,255,255,.04);color:#eaf4ff}.plan-nav-btn.active{background:rgba(48,128,240,.18);border-color:rgba(82,157,255,.3);color:#eef6ff}
         .plan-steps{position:relative}.plan-step{position:relative;display:block;scroll-margin-top:70px}.plan-step-rail{position:absolute;left:12px;top:0;bottom:0;width:30px;display:flex;justify-content:center;pointer-events:none;z-index:3}.plan-step-number{width:30px;height:30px;margin-top:14px;border-radius:50%;display:grid;place-items:center;background:#146ff1;border:3px solid #0a2340;box-shadow:0 0 0 1px rgba(88,161,255,.5),0 5px 18px rgba(20,111,241,.3);color:white;font-size:11px;font-weight:900;z-index:2}.plan-step-line{position:absolute;top:44px;bottom:-2px;width:2px;background:linear-gradient(180deg,rgba(61,143,255,.75),rgba(61,143,255,.12))}.plan-step:last-child .plan-step-line{display:none}
-        .plan-step-card{min-width:0;width:calc(100% - 48px);box-sizing:border-box;margin:8px 0 8px 48px;border:1px solid rgba(255,255,255,.075);border-radius:16px;padding:15px;background:linear-gradient(180deg,rgba(14,33,57,.96),rgba(7,20,36,.97));box-shadow:0 12px 32px rgba(0,0,0,.13)}
+        .plan-step-card{min-width:0;width:100%;box-sizing:border-box;margin:8px 0 8px;border:1px solid rgba(255,255,255,.075);border-radius:16px;padding:15px;background:linear-gradient(180deg,rgba(14,33,57,.96),rgba(7,20,36,.97));box-shadow:0 12px 32px rgba(0,0,0,.13)}
         .plan-step-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:12px}.plan-step-heading{display:flex;gap:10px;align-items:center;min-width:0}.plan-step-icon{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;background:rgba(65,139,241,.12);border:1px solid rgba(81,158,255,.18);font-size:17px;flex:0 0 auto}.plan-step-heading h3{margin:0;color:#edf5ff;font-size:16px;font-weight:850}.plan-step-heading p{margin:3px 0 0;color:#89a2bd;font-size:11px}.plan-check{display:inline-grid;place-items:center;width:17px;height:17px;border-radius:50%;margin-left:3px;background:rgba(45,202,123,.14);color:#77e8a6;font-size:10px;vertical-align:1px}
         .plan-step-itinerary .plan-step-card{padding-bottom:17px}.plan-step-itinerary .itin-compact{grid-template-columns:repeat(auto-fit,minmax(190px,1fr))}
         .plan-validation{margin:8px 0 12px;padding-left:48px}.plan-validation .validation-banner{margin:0}
         .plan-final-action{margin:12px 0 0 48px;border:1px solid rgba(82,160,255,.2);border-radius:16px;padding:16px;background:linear-gradient(180deg,rgba(17,39,66,.97),rgba(8,22,39,.98));display:flex;align-items:center;justify-content:space-between;gap:18px}.plan-final-action h3{margin:7px 0 3px;font-size:16px}.plan-final-action p{margin:0;color:#8fa9c5;font-size:12px}.plan-final-action.confirmed{border-color:rgba(45,202,123,.2)}.final-actions-inline{display:flex;gap:8px;flex:0 0 auto}.final-actions-inline button{border:0;border-radius:10px;padding:11px 16px;color:#fff;font-weight:850;cursor:pointer;transition:opacity .15s,transform .15s}.final-actions-inline button:disabled{cursor:wait;opacity:.65}.final-actions-inline button.is-busy{position:relative;pointer-events:none}.decision-progress{display:none;align-items:center;gap:8px;margin-top:10px;padding:8px 10px;border-radius:10px;background:rgba(76,157,255,.08);border:1px solid rgba(76,157,255,.16);color:#bcdcff;font-size:11px;font-weight:750}.decision-progress.visible{display:flex}.decision-progress.success{background:rgba(45,202,123,.08);border-color:rgba(45,202,123,.18);color:#a9efc7}.decision-progress.error{background:rgba(255,93,93,.08);border-color:rgba(255,93,93,.18);color:#ffc0c0}.decision-spinner{width:13px;height:13px;border:2px solid rgba(190,220,255,.28);border-top-color:#8bc2ff;border-radius:50%;animation:decisionSpin .75s linear infinite;flex:0 0 auto}.decision-progress.success .decision-spinner,.decision-progress.error .decision-spinner{display:none}@keyframes decisionSpin{to{transform:rotate(360deg)}}.decision-button-spinner{display:inline-block;width:12px;height:12px;border:2px solid rgba(255,255,255,.35);border-top-color:#fff;border-radius:50%;vertical-align:-2px;margin-right:7px;animation:decisionSpin .7s linear infinite}.decision-progress-icon{font-size:13px}.final-actions-inline button.final-approve{background:linear-gradient(135deg,#199c65,#25c77d)}.final-actions-inline button.final-modify{background:linear-gradient(135deg,#226fd2,#3b8ff5)}.final-actions-inline button.final-reject{background:linear-gradient(135deg,#a9404c,#d45b65)}
         .specialist-request{max-width:520px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.specialist-dynamic-header .plan-header-facts{margin-top:2px}
         .plan-workspace .flight-rich-widget,.plan-workspace .weather-dashboard-card{width:100%}.plan-workspace .rich-flight-card{grid-template-columns:minmax(145px,.75fr) minmax(320px,1.7fr) minmax(130px,.6fr)}
-        @media(max-width:850px){.plan-step-rail{left:10px}.plan-step-card{width:calc(100% - 38px);margin-left:38px}.plan-final-action{margin-left:38px;flex-direction:column;align-items:stretch}.final-actions-inline{display:grid;grid-template-columns:repeat(3,1fr)}.final-actions-inline button{padding:10px 6px}.plan-header{padding:18px}.plan-header-top{flex-direction:column;gap:8px}.plan-header-status{align-self:flex-start}}
-        @media(max-width:620px){.plan-step-rail{left:8px;width:24px}.plan-step-number{width:24px;height:24px;font-size:9px}.plan-step-line{top:39px}.plan-step-card{padding:12px}.plan-step-heading h3{font-size:14px}.plan-step-heading p{font-size:10px}.plan-step-card{width:calc(100% - 28px);margin-left:28px}.plan-validation,.plan-final-action{margin-left:28px;padding-left:0}.plan-final-action{padding:13px}.plan-workspace .plan-section-nav{top:2px}.plan-header-facts span,.plan-requirements span{font-size:10px;padding:6px 8px}.final-actions-inline{grid-template-columns:1fr}.plan-workspace .plan-step .rich-flight-card{grid-template-columns:1fr}.plan-workspace .flight-path{margin-top:8px}}
+        @media(max-width:850px){.plan-step-rail{left:10px}.plan-final-action{margin-left:38px;flex-direction:column;align-items:stretch}.final-actions-inline{display:grid;grid-template-columns:repeat(3,1fr)}.final-actions-inline button{padding:10px 6px}.plan-header{padding:18px}.plan-header-top{flex-direction:column;gap:8px}.plan-header-status{align-self:flex-start}}
+        @media(max-width:620px){.plan-step-rail{left:8px;width:24px}.plan-step-number{width:24px;height:24px;font-size:9px}.plan-step-line{top:39px}.plan-step-card{padding:12px}.plan-step-heading h3{font-size:14px}.plan-step-heading p{font-size:10px}.plan-validation,.plan-final-action{margin-left:28px;padding-left:0}.plan-final-action{padding:13px}.plan-workspace .plan-section-nav{top:2px}.plan-header-facts span,.plan-requirements span{font-size:10px;padding:6px 8px}.final-actions-inline{grid-template-columns:1fr}.plan-workspace .plan-step .rich-flight-card{grid-template-columns:1fr}.plan-workspace .flight-path{margin-top:8px}}
 
         /* ===== V5 Travel Workspace UI ===== */
         .travel-dashboard { display:grid; grid-template-columns:minmax(0,1fr) 310px; gap:16px; width:100%; }
@@ -1614,8 +1614,6 @@
         .workspace-card-sub { margin-top:3px; color:#8fa9c5; font-size:12px; }
         .ready-badge { color:#9cf2c0; background:rgba(37,192,111,.12); border:1px solid rgba(37,192,111,.28); border-radius:999px; padding:5px 9px; font-size:11px; font-weight:800; }
         .ready-badge.review-badge { color:#ffd28a; background:rgba(245,168,60,.10); border-color:rgba(245,168,60,.26); }
-        .ready-badge.approved-badge { color:#9cf2c0; background:rgba(37,192,111,.14); border-color:rgba(37,192,111,.34); }
-        .ready-badge.rejected-badge { color:#ffb0b0; background:rgba(214,76,76,.13); border-color:rgba(214,76,76,.34); }
         .workspace-view { color:#9fc7f7; font-size:11px; font-weight:700; }
         .workspace-content { min-width:0; }
         .workspace-content .flight-card,.workspace-content .hotel-card { background:rgba(255,255,255,.025); border:1px solid rgba(255,255,255,.055); border-radius:11px; padding:10px 11px; margin-bottom:7px; }
@@ -4050,20 +4048,7 @@
         const budgetLabel = trip.budgetLabel || data.budgetLabel || '';
         const requirements = Array.isArray(trip.requirements) ? trip.requirements : [];
         const imageUrl = trip.imageUrl || trip.heroImageUrl || data.destinationImageUrl || '';
-        const statusText = approvalState === 'APPROVED'
-            ? 'Plan Approved'
-            : approvalState === 'REJECTED'
-                ? 'Plan Rejected'
-                : complete
-                    ? 'Plan Ready'
-                    : (awaitingApproval || (isTripPlan && approvalState !== 'APPROVED'))
-                        ? 'Ready for review'
-                        : 'Planning in progress';
-        const widgetBadge = (badge) => {
-            if (approvalState === 'APPROVED') return '✓ Approved';
-            if (approvalState === 'REJECTED') return '✕ Rejected';
-            return badge;
-        };
+        const statusText = complete ? 'Plan Ready' : (awaitingApproval || (isTripPlan && approvalState !== 'APPROVED')) ? 'Ready for review' : 'Planning in progress';
 
         // Non-trip requests stay intentionally lightweight: only requested/returned widgets are shown.
         if (!isTripPlan) {
@@ -4077,7 +4062,7 @@
                 + '<div class="plan-step-card">'
                 + '<div class="plan-step-head"><div class="plan-step-heading"><div class="plan-step-icon">' + icon + '</div><div><h3>' + title + ' <span class="plan-check">✓</span></h3><p>' + subtitle + '</p></div></div>'
                 + '<div class="widget-head-actions">'
-                + (badge ? '<span class="ready-badge ' + (badge === 'Review' ? 'review-badge' : badge === '✓ Approved' ? 'approved-badge' : badge === '✕ Rejected' ? 'rejected-badge' : '') + '">' + badge + '</span>' : '')
+                + (badge ? '<span class="ready-badge ' + (badge === 'Review' ? 'review-badge' : '') + '">' + badge + '</span>' : '')
                 + widgetControls(key, title)
                 + '</div></div>' + body + '</div></section>';
         };
@@ -4110,17 +4095,17 @@
         let step = 1;
         if (hasFlights) {
             const badge = (flightDateUnconfirmed || roundTripReturnMissing) ? 'Review' : '✓ Ready';
-            html += section(step++, 'flights', '✈️', 'Flights', flightDateUnconfirmed ? 'Live schedules · requested date not independently confirmed' : 'Best available flight options for your trip', buildFlightsSection(flights), widgetBadge(badge));
+            html += section(step++, 'flights', '✈️', 'Flights', flightDateUnconfirmed ? 'Live schedules · requested date not independently confirmed' : 'Best available flight options for your trip', buildFlightsSection(flights), badge);
         }
-        if (hasHotels) html += section(step++, 'hotels', '🏨', 'Hotels', 'Top accommodation recommendations', buildHotelsSection(hotels), widgetBadge('✓ Ready'));
-        if (hasItinerary) html += section(step++, 'itinerary', '🗓️', 'Day-wise Itinerary', 'A complete day-by-day plan', buildItinerarySection(plan.itinerary), widgetBadge('✓ Ready'), 'plan-step-itinerary');
-        if (hasWeather) html += section(step++, 'weather', '☀️', 'Weather & Best Time', 'Travel-date forecast and planning guidance', buildWeatherSection(plan.weather), widgetBadge('✓ Ready'));
-        if (hasBudget) html += section(step++, 'budget', '💰', 'Budget Breakdown', 'Estimated cost for your trip', buildBudgetTable(plan.budget), widgetBadge('✓ Ready'));
+        if (hasHotels) html += section(step++, 'hotels', '🏨', 'Hotels', 'Top accommodation recommendations', buildHotelsSection(hotels), '✓ Ready');
+        if (hasItinerary) html += section(step++, 'itinerary', '🗓️', 'Day-wise Itinerary', 'A complete day-by-day plan', buildItinerarySection(plan.itinerary), '✓ Ready', 'plan-step-itinerary');
+        if (hasWeather) html += section(step++, 'weather', '☀️', 'Weather & Best Time', 'Travel-date forecast and planning guidance', buildWeatherSection(plan.weather), '✓ Ready');
+        if (hasBudget) html += section(step++, 'budget', '💰', 'Budget Breakdown', 'Estimated cost for your trip', buildBudgetTable(plan.budget), '✓ Ready');
         if (hasKnowledge) {
             const knowledgeBody = buildKnowledgeGuidanceSection(data, plan);
-            if (knowledgeBody) html += section(step++, 'knowledge', '🧠', 'Travel Knowledge & Tips', 'Useful destination guidance for your trip', knowledgeBody.replace(/^<section[^>]*>|<\/section>$/g, ''), widgetBadge('✓ Grounded'));
+            if (knowledgeBody) html += section(step++, 'knowledge', '🧠', 'Travel Knowledge & Tips', 'Useful destination guidance for your trip', knowledgeBody.replace(/^<section[^>]*>|<\/section>$/g, ''), '✓ Grounded');
         }
-        if (tips && !hasKnowledge) html += section(step++, 'tips', '💡', 'Travel Tips', 'Practical trip-specific suggestions', '<div class="knowledge-answer">' + formatKnowledgeText(tips) + '</div>', widgetBadge('✓ Ready'));
+        if (tips && !hasKnowledge) html += section(step++, 'tips', '💡', 'Travel Tips', 'Practical trip-specific suggestions', '<div class="knowledge-answer">' + formatKnowledgeText(tips) + '</div>', '✓ Ready');
         html += '<div class="widget-restore-tray" data-widget-restore-tray style="display:none"><span class="widget-restore-label">Closed widgets</span></div>';
         html += '</div>';
 
@@ -4130,10 +4115,8 @@
 
         if (awaitingApproval && data.threadId && data.tripPlanning !== false) {
             html += '<section class="plan-final-action"><div><span class="decision-status pending"><i class="decision-dot"></i> Waiting for your decision</span><h3>Ready to finalize?</h3><p>Review the plan, then approve it, request a change, or reject it.</p></div><div class="final-actions-inline"><button type="button" class="final-approve" data-plan-action="approve" data-thread-id="' + escapeHtml(data.threadId) + '">✓ Approve</button><button type="button" class="final-modify" data-plan-action="modify" data-thread-id="' + escapeHtml(data.threadId) + '">✎ Modify</button><button type="button" class="final-reject" data-plan-action="reject" data-thread-id="' + escapeHtml(data.threadId) + '">✕ Reject</button></div></section>';
-        } else if (approvalState === 'APPROVED') {
-            html += '<section class="plan-final-action confirmed"><div><span class="decision-status"><i class="decision-dot"></i> Plan approved</span><h3>✓ Trip plan approved</h3><p>This plan has been approved and finalized.</p></div></section>';
-        } else if (approvalState === 'REJECTED') {
-            html += '<section class="plan-final-action rejected"><div><span class="decision-status"><i class="decision-dot"></i> Plan rejected</span><h3>✕ Trip plan rejected</h3><p>This plan was rejected and is no longer awaiting a decision.</p></div></section>';
+        } else if (complete) {
+            html += '<section class="plan-final-action confirmed"><div><span class="decision-status"><i class="decision-dot"></i> Plan confirmed</span><h3>✓ Trip plan confirmed</h3><p>This plan has already been finalized.</p></div></section>';
         }
 
         html += '</div>';
@@ -4203,8 +4186,24 @@
         }
     };
 
-    const renderAssistantBody = (body, data, userRequestHint) => {
-        const userRequest = userRequestHint || '';
+    const renderAssistantMessage = (data, persist, userRequestHint) => {
+        markChatActive();
+        const row = document.createElement('div');
+        row.className = 'chat-msg assistant';
+        if (data?.threadId) row.dataset.threadId = String(data.threadId);
+        row.innerHTML =
+            '<div class="chat-avatar">AI</div>' +
+            '<div class="chat-bubble">' +
+            '<div class="chat-role">AgenticTripAI</div>' +
+            '<div class="chat-body"></div>' +
+            '<div class="chat-actions"></div>' +
+            '</div>';
+        const userRequest = userRequestHint || findUserRequestForPlan(row);
+        const body = row.querySelector('.chat-body');
+        // TravelPlanResponse is also used for specialist responses. Those
+        // responses can legitimately have no plan object while still carrying
+        // requestType, weather/hotels/flights/budget or RAG knowledge. Always
+        // let the structured renderer decide which UI is appropriate.
         const responseType = String(data?.requestType || data?.plan?.trip?.requestType || '').toUpperCase();
         const specialistResponse = data && data.tripPlanning !== true
             && ['WEATHER','FLIGHT_SEARCH','HOTEL_SEARCH','BUDGET','RESEARCH','MULTI_CAPABILITY','MULTI_INTENT','TRAVEL_INFORMATION','HISTORY','GENERAL'].includes(responseType);
@@ -4235,6 +4234,8 @@
                 }
                 const section = body.querySelector('#section-' + CSS.escape(target));
                 if (!section) return;
+                // The top widget tabs are also a quick way to unfold a widget.
+                // This makes the navigation useful even after every widget has been folded in.
                 if (section.classList.contains('widget-collapsed')) {
                     section.classList.remove('widget-collapsed');
                     updateWidgetFoldState(section);
@@ -4242,22 +4243,6 @@
                 section.scrollIntoView({behavior:'smooth', block:'center'});
             });
         });
-    };
-
-    const renderAssistantMessage = (data, persist, userRequestHint) => {
-        markChatActive();
-        const row = document.createElement('div');
-        row.className = 'chat-msg assistant';
-        if (data?.threadId) row.dataset.threadId = String(data.threadId);
-        row.innerHTML =
-            '<div class="chat-avatar">AI</div>' +
-            '<div class="chat-bubble">' +
-            '<div class="chat-role">AgenticTripAI</div>' +
-            '<div class="chat-body"></div>' +
-            '<div class="chat-actions"></div>' +
-            '</div>';
-        const userRequest = userRequestHint || findUserRequestForPlan(row);
-        renderAssistantBody(row.querySelector('.chat-body'), data, userRequest);
         chatThread.appendChild(row);
         scrollChat();
         if (persist) {
@@ -4265,38 +4250,6 @@
             persistMessage('assistant', formatPlanSummary(data), data);
         }
         return row;
-    };
-
-    const updatePersistedPlanForThread = (threadId, data) => {
-        try {
-            const store = loadStore();
-            const chat = store.chats.find(c => c.id === currentChatId);
-            if (!chat || !Array.isArray(chat.messages)) return;
-            for (let i = chat.messages.length - 1; i >= 0; i--) {
-                const message = chat.messages[i];
-                if (message?.role === 'assistant' && String(message?.planData?.threadId || '') === String(threadId)) {
-                    message.planData = data;
-                    message.text = formatPlanSummary(data);
-                    chat.updatedAt = Date.now();
-                    saveStore(store);
-                    renderHistoryList();
-                    return;
-                }
-            }
-        } catch (e) {
-            console.warn('Could not update persisted plan decision state', e);
-        }
-    };
-
-    const replaceDecisionPlanInPlace = (sourceRow, data) => {
-        if (!sourceRow) return false;
-        const body = sourceRow.querySelector('.chat-body');
-        if (!body) return false;
-        if (data?.threadId) sourceRow.dataset.threadId = String(data.threadId);
-        renderAssistantBody(body, data, findUserRequestForPlan(sourceRow));
-        updatePersistedPlanForThread(data?.threadId, data);
-        scrollChat();
-        return true;
     };
 
     const appendUserMessage = (text) => renderUserMessage(text, true);
@@ -4791,17 +4744,14 @@
             if (!res.ok) {
                 throw new Error(payload.error || safeUiErrorMessage());
             }
-            if (url.includes('/plan/modify')) {
-                if (notes) appendUserMessage(notes);
-                appendAssistantMessage(payload);
-            } else {
-                if (url.includes('reject')) {
-                    appendUserMessage('Rejected this plan.');
-                } else {
-                    appendUserMessage('Approved this plan.');
-                }
-                replaceDecisionPlanInPlace(sourceRow, payload);
+            if (notes) {
+                appendUserMessage(notes);
+            } else if (url.includes('reject')) {
+                appendUserMessage('Rejected this plan.');
+            } else if (url.includes('approve')) {
+                appendUserMessage('Approved this plan.');
             }
+            appendAssistantMessage(payload);
             loadDbTrips(false);
             return true;
         } catch (error) {

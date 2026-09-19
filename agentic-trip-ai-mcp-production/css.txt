@@ -65,6 +65,8 @@
         .workspace-card-sub { margin-top:3px; color:#8fa9c5; font-size:12px; }
         .ready-badge { color:#9cf2c0; background:rgba(37,192,111,.12); border:1px solid rgba(37,192,111,.28); border-radius:999px; padding:5px 9px; font-size:11px; font-weight:800; }
         .ready-badge.review-badge { color:#ffd28a; background:rgba(245,168,60,.10); border-color:rgba(245,168,60,.26); }
+        .ready-badge.approved-badge { color:#9cf2c0; background:rgba(37,192,111,.14); border-color:rgba(37,192,111,.34); }
+        .ready-badge.rejected-badge { color:#ffb0b0; background:rgba(214,76,76,.13); border-color:rgba(214,76,76,.34); }
         .workspace-view { color:#9fc7f7; font-size:11px; font-weight:700; }
         .workspace-content { min-width:0; }
         .workspace-content .flight-card,.workspace-content .hotel-card { background:rgba(255,255,255,.025); border:1px solid rgba(255,255,255,.055); border-radius:11px; padding:10px 11px; margin-bottom:7px; }

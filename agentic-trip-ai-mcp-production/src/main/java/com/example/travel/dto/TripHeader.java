@@ -26,6 +26,7 @@ public class TripHeader implements Serializable {
     private String audienceLabel = "";
     private String status = "";
     private boolean awaitingApproval;
+    private String approvalState = "NOT_REQUIRED";
     private int qualityScore;
     private String qualityLabel = "";
     private String qualityExplanation = "";
@@ -152,6 +153,11 @@ public class TripHeader implements Serializable {
 
     public void setAwaitingApproval(boolean awaitingApproval) {
         this.awaitingApproval = awaitingApproval;
+    }
+
+    public String getApprovalState() { return approvalState; }
+    public void setApprovalState(String approvalState) {
+        this.approvalState = approvalState == null || approvalState.isBlank() ? "NOT_REQUIRED" : approvalState;
     }
 
     public String getQualityLabel() { return qualityLabel; }

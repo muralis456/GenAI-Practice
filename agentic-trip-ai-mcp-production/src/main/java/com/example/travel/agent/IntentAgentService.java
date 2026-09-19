@@ -442,9 +442,18 @@ public class IntentAgentService {
 
     private IntentPlan finalizeSemanticPlan(String request, IntentPlan plan) {
         IntentPlan result = plan == null ? emptyPlan() : plan;
-        // Only an explicit semantic TRIP_PLANNING classification creates the
-        // complete-trip contract. An itinerary flag alone is a specialist
-        // capability and must never pull in flights/hotels/weather/budget.
+
+        // The semantic model is authoritative for meaning, while deterministic
+        // heuristics only validate the structure of an implicit trip request.
+        // Example: "From Bengaluru to Tokyo for 7 days under ₹2 lakh" is a
+        // complete trip-planning contract even though it never says
+        // "itinerary" or "plan". Do not make capability selection depend on
+        // literal keywords.
+        boolean implicitTripPlanning = isImplicitTripPlanning(request, result);
+        if (implicitTripPlanning) {
+            result.setRequestType(IntentPlan.TRIP_PLANNING);
+        }
+
         boolean tripPlanning = IntentPlan.TRIP_PLANNING.equalsIgnoreCase(result.getRequestType());
         IntentCapabilitySafetyGuard.apply(request, result);
         if (tripPlanning) {
@@ -520,6 +529,24 @@ public class IntentAgentService {
                     : "knowledge");
         }
         return result;
+    }
+
+    private boolean isImplicitTripPlanning(String request, IntentPlan plan) {
+        if (request == null || request.isBlank() || plan == null) return false;
+        if (IntentPlan.TRIP_PLANNING.equalsIgnoreCase(plan.getRequestType())) return true;
+
+        boolean route = com.example.travel.support.TripSlotHeuristics.hasRouteHint(request);
+        boolean duration = com.example.travel.support.TripSlotHeuristics.hasDurationHint(request);
+        if (!route || !duration) return false;
+
+        // Require a meaningful trip-planning capability in addition to route +
+        // duration. This prevents ordinary round-trip flight/date requests from
+        // being promoted into a full itinerary.
+        return plan.isNeedsHotels()
+                || plan.isNeedsResearch()
+                || plan.isNeedsBudget()
+                || plan.isNeedsItinerary()
+                || plan.isNeedsKnowledge();
     }
 
     private IntentPlan sanitizeSemanticPlan(IntentPlan plan) {

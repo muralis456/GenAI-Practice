@@ -1611,7 +1611,8 @@
         const responseStatus = String(data.status || '').toUpperCase();
         const tripStatus = String(trip.status || '').toUpperCase();
         const awaitingApproval = Boolean(data.awaitingApproval === true || trip.awaitingApproval === true || responseStatus === 'PENDING_APPROVAL' || tripStatus === 'PENDING_APPROVAL');
-        const complete = !awaitingApproval && (responseStatus === 'COMPLETE' || tripStatus === 'COMPLETE');
+        const approvalState = String(data.approvalState || trip.approvalState || '').toUpperCase();
+        const complete = !awaitingApproval && (!isTripPlan || approvalState === 'APPROVED');
         const flightDateUnconfirmed = hasFlights && flights.some(f => /not independently confirmed/i.test(String(f.notes || '')));
         const origin = trip.origin || data.origin || '';
         const destination = trip.destination || data.destination || '';
@@ -1621,7 +1622,20 @@
         const budgetLabel = trip.budgetLabel || data.budgetLabel || '';
         const requirements = Array.isArray(trip.requirements) ? trip.requirements : [];
         const imageUrl = trip.imageUrl || trip.heroImageUrl || data.destinationImageUrl || '';
-        const statusText = complete ? 'Plan Ready' : awaitingApproval ? 'Ready for review' : 'Planning in progress';
+        const statusText = approvalState === 'APPROVED'
+            ? 'Plan Approved'
+            : approvalState === 'REJECTED'
+                ? 'Plan Rejected'
+                : complete
+                    ? 'Plan Ready'
+                    : (awaitingApproval || (isTripPlan && approvalState !== 'APPROVED'))
+                        ? 'Ready for review'
+                        : 'Planning in progress';
+        const widgetBadge = (badge) => {
+            if (approvalState === 'APPROVED') return '✓ Approved';
+            if (approvalState === 'REJECTED') return '✕ Rejected';
+            return badge;
+        };
 
         // Non-trip requests stay intentionally lightweight: only requested/returned widgets are shown.
         if (!isTripPlan) {
@@ -1634,7 +1648,7 @@
                 + '<div class="plan-step-rail"><span class="plan-step-number">' + number + '</span><span class="plan-step-line"></span></div>'
                 + '<div class="plan-step-card">'
                 + '<div class="plan-step-head"><div class="plan-step-heading"><div class="plan-step-icon">' + icon + '</div><div><h3>' + title + ' <span class="plan-check">✓</span></h3><p>' + subtitle + '</p></div></div>'
-                + (badge ? '<span class="ready-badge ' + (badge === 'Review' ? 'review-badge' : '') + '">' + badge + '</span>' : '')
+                + (badge ? '<span class="ready-badge ' + (badge === 'Review' ? 'review-badge' : badge === '✓ Approved' ? 'approved-badge' : badge === '✕ Rejected' ? 'rejected-badge' : '') + '">' + badge + '</span>' : '')
                 + '</div>' + body + '</div></section>';
         };
 
@@ -1666,17 +1680,17 @@
         let step = 1;
         if (hasFlights) {
             const badge = (flightDateUnconfirmed || roundTripReturnMissing) ? 'Review' : '✓ Ready';
-            html += section(step++, 'flights', '✈️', 'Flights', flightDateUnconfirmed ? 'Live schedules · requested date not independently confirmed' : 'Best available flight options for your trip', buildFlightsSection(flights), badge);
+            html += section(step++, 'flights', '✈️', 'Flights', flightDateUnconfirmed ? 'Live schedules · requested date not independently confirmed' : 'Best available flight options for your trip', buildFlightsSection(flights), widgetBadge(badge));
         }
-        if (hasHotels) html += section(step++, 'hotels', '🏨', 'Hotels', 'Top accommodation recommendations', buildHotelsSection(hotels), '✓ Ready');
-        if (hasItinerary) html += section(step++, 'itinerary', '🗓️', 'Day-wise Itinerary', 'A complete day-by-day plan', buildItinerarySection(plan.itinerary), '✓ Ready', 'plan-step-itinerary');
-        if (hasWeather) html += section(step++, 'weather', '☀️', 'Weather & Best Time', 'Travel-date forecast and planning guidance', buildWeatherSection(plan.weather), '✓ Ready');
-        if (hasBudget) html += section(step++, 'budget', '💰', 'Budget Breakdown', 'Estimated cost for your trip', buildBudgetTable(plan.budget), '✓ Ready');
+        if (hasHotels) html += section(step++, 'hotels', '🏨', 'Hotels', 'Top accommodation recommendations', buildHotelsSection(hotels), widgetBadge('✓ Ready'));
+        if (hasItinerary) html += section(step++, 'itinerary', '🗓️', 'Day-wise Itinerary', 'A complete day-by-day plan', buildItinerarySection(plan.itinerary), widgetBadge('✓ Ready'), 'plan-step-itinerary');
+        if (hasWeather) html += section(step++, 'weather', '☀️', 'Weather & Best Time', 'Travel-date forecast and planning guidance', buildWeatherSection(plan.weather), widgetBadge('✓ Ready'));
+        if (hasBudget) html += section(step++, 'budget', '💰', 'Budget Breakdown', 'Estimated cost for your trip', buildBudgetTable(plan.budget), widgetBadge('✓ Ready'));
         if (hasKnowledge) {
             const knowledgeBody = buildKnowledgeGuidanceSection(data, plan);
-            if (knowledgeBody) html += section(step++, 'knowledge', '🧠', 'Travel Knowledge & Tips', 'Useful destination guidance for your trip', knowledgeBody.replace(/^<section[^>]*>|<\/section>$/g, ''), '✓ Grounded');
+            if (knowledgeBody) html += section(step++, 'knowledge', '🧠', 'Travel Knowledge & Tips', 'Useful destination guidance for your trip', knowledgeBody.replace(/^<section[^>]*>|<\/section>$/g, ''), widgetBadge('✓ Grounded'));
         }
-        if (tips && !hasKnowledge) html += section(step++, 'tips', '💡', 'Travel Tips', 'Practical trip-specific suggestions', '<div class="knowledge-answer">' + formatKnowledgeText(tips) + '</div>', '✓ Ready');
+        if (tips && !hasKnowledge) html += section(step++, 'tips', '💡', 'Travel Tips', 'Practical trip-specific suggestions', '<div class="knowledge-answer">' + formatKnowledgeText(tips) + '</div>', widgetBadge('✓ Ready'));
         html += '</div>';
 
         if (data.validationErrors?.length || data.semanticNotes?.length || data.ragJudge) {
@@ -1690,8 +1704,10 @@
             } else {
                 html += '<section class="plan-final-action" data-decision-panel><div><span class="decision-status pending"><i class="decision-dot"></i> Waiting for your decision</span><h3>Ready to finalize?</h3><p>Review the plan, then approve it, request a change, or reject it.</p><div class="decision-progress" data-decision-progress><span class="decision-spinner"></span><span data-decision-message>Working…</span></div></div><div class="final-actions-inline"><button type="button" class="final-approve" data-plan-action="approve" data-thread-id="' + escapeHtml(data.threadId) + '">✓ Approve</button><button type="button" class="final-modify" data-plan-action="modify" data-thread-id="' + escapeHtml(data.threadId) + '">✎ Modify</button><button type="button" class="final-reject" data-plan-action="reject" data-thread-id="' + escapeHtml(data.threadId) + '">✕ Reject</button></div></section>';
             }
-        } else if (complete) {
-            html += '<section class="plan-final-action confirmed"><div><span class="decision-status"><i class="decision-dot"></i> Plan confirmed</span><h3>✓ Trip plan confirmed</h3><p>This plan has already been finalized.</p></div></section>';
+        } else if (approvalState === 'APPROVED') {
+            html += '<section class="plan-final-action confirmed"><div><span class="decision-status"><i class="decision-dot"></i> Plan approved</span><h3>✓ Trip plan approved</h3><p>This plan has been approved and finalized.</p></div></section>';
+        } else if (approvalState === 'REJECTED') {
+            html += '<section class="plan-final-action rejected"><div><span class="decision-status"><i class="decision-dot"></i> Plan rejected</span><h3>✕ Trip plan rejected</h3><p>This plan was rejected and is no longer awaiting a decision.</p></div></section>';
         }
 
         html += '</div>';
@@ -1734,20 +1750,8 @@
         }
     };
 
-    const renderAssistantMessage = (data, persist, userRequestHint) => {
-        markChatActive();
-        const row = document.createElement('div');
-        row.className = 'chat-msg assistant';
-        if (data?.threadId) row.dataset.threadId = String(data.threadId);
-        row.innerHTML =
-            '<div class="chat-avatar">AI</div>' +
-            '<div class="chat-bubble">' +
-            '<div class="chat-role">AgenticTripAI</div>' +
-            '<div class="chat-body"></div>' +
-            '<div class="chat-actions"></div>' +
-            '</div>';
-        const userRequest = userRequestHint || findUserRequestForPlan(row);
-        const body = row.querySelector('.chat-body');
+    const renderAssistantBody = (body, data, userRequestHint) => {
+        const userRequest = userRequestHint || '';
         // TravelPlanResponse is also used for specialist responses. Those
         // responses can legitimately have no plan object while still carrying
         // requestType, weather/hotels/flights/budget or RAG knowledge. Always
@@ -1770,6 +1774,7 @@
             const text = data && (data.finalPlan || data.text) ? (data.finalPlan || data.text) : 'Plan response available.';
             body.innerHTML = '<div class="server-memory-card">' + formatKnowledgeText(text) + '</div>';
         }
+
         body.querySelectorAll('[data-section-target]').forEach(tab => {
             tab.addEventListener('click', () => {
                 body.querySelectorAll('.workspace-tab,.plan-nav-btn').forEach(t => t.classList.remove('active'));
@@ -1781,8 +1786,6 @@
                 }
                 const section = body.querySelector('#section-' + CSS.escape(target));
                 if (!section) return;
-                // The top widget tabs are also a quick way to unfold a widget.
-                // This makes the navigation useful even after every widget has been folded in.
                 if (section.classList.contains('widget-collapsed')) {
                     section.classList.remove('widget-collapsed');
                     updateWidgetFoldState(section);
@@ -1790,6 +1793,23 @@
                 section.scrollIntoView({behavior:'smooth', block:'center'});
             });
         });
+    };
+
+    const renderAssistantMessage = (data, persist, userRequestHint) => {
+        markChatActive();
+        const row = document.createElement('div');
+        row.className = 'chat-msg assistant';
+        if (data?.threadId) row.dataset.threadId = String(data.threadId);
+        row.innerHTML =
+            '<div class="chat-avatar">AI</div>' +
+            '<div class="chat-bubble">' +
+            '<div class="chat-role">AgenticTripAI</div>' +
+            '<div class="chat-body"></div>' +
+            '<div class="chat-actions"></div>' +
+            '</div>';
+        const userRequest = userRequestHint || findUserRequestForPlan(row);
+        const body = row.querySelector('.chat-body');
+        renderAssistantBody(body, data, userRequest);
         chatThread.appendChild(row);
         scrollChat();
         if (persist) {
@@ -1797,6 +1817,38 @@
             persistMessage('assistant', formatPlanSummary(data), data);
         }
         return row;
+    };
+
+    const updatePersistedPlanForThread = (threadId, data) => {
+        try {
+            const store = loadStore();
+            const chat = store.chats.find(c => c.id === currentChatId);
+            if (!chat || !Array.isArray(chat.messages)) return;
+            for (let i = chat.messages.length - 1; i >= 0; i--) {
+                const message = chat.messages[i];
+                if (message?.role === 'assistant' && String(message?.planData?.threadId || '') === String(threadId)) {
+                    message.planData = data;
+                    message.text = formatPlanSummary(data);
+                    chat.updatedAt = Date.now();
+                    saveStore(store);
+                    renderHistoryList();
+                    return;
+                }
+            }
+        } catch (e) {
+            console.warn('Could not update persisted plan decision state', e);
+        }
+    };
+
+    const replaceDecisionPlanInPlace = (sourceRow, data) => {
+        if (!sourceRow) return false;
+        const body = sourceRow.querySelector('.chat-body');
+        if (!body) return false;
+        if (data?.threadId) sourceRow.dataset.threadId = String(data.threadId);
+        renderAssistantBody(body, data, findUserRequestForPlan(sourceRow));
+        updatePersistedPlanForThread(data?.threadId, data);
+        scrollChat();
+        return true;
     };
 
     const getCurrentConversationContext = () => {
@@ -2258,14 +2310,21 @@
                 throw new Error(payload.error || safeUiErrorMessage());
             }
             setDecisionProgress(sourceRow, action === 'approve' ? 'Plan approved successfully.' : action === 'reject' ? 'Plan rejected successfully.' : 'Plan updated successfully.', 'success');
-            if (notes) {
-                appendUserMessage(notes);
-            } else if (url.includes('reject')) {
-                appendUserMessage('Rejected this plan.');
-            } else if (url.includes('approve')) {
-                appendUserMessage('Approved this plan.');
+            if (action === 'modify') {
+                if (notes) appendUserMessage(notes);
+                appendAssistantMessage(payload);
+            } else {
+                // Approve/Reject are lifecycle transitions of the SAME plan.
+                // Replace the existing assistant card instead of appending a
+                // second stale card, so the header, every widget badge and the
+                // final decision panel all reflect the new decision immediately.
+                if (url.includes('reject')) {
+                    appendUserMessage('Rejected this plan.');
+                } else {
+                    appendUserMessage('Approved this plan.');
+                }
+                replaceDecisionPlanInPlace(sourceRow, payload);
             }
-            appendAssistantMessage(payload);
             loadDbTrips(false);
             return true;
         } catch (error) {

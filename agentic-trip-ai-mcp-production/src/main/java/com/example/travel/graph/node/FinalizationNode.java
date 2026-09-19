@@ -5,6 +5,8 @@ import com.example.travel.graph.TravelGraphNodes;
 import com.example.travel.graph.TravelState;
 import org.bsc.langgraph4j.action.NodeAction;
 import org.springframework.stereotype.Component;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -15,6 +17,8 @@ import java.util.Map;
 @Component
 public class FinalizationNode implements NodeAction<TravelState> {
 
+    private static final Logger log = LoggerFactory.getLogger(FinalizationNode.class);
+
     private final FinalPlannerAgentService finalPlannerAgentService;
 
     public FinalizationNode(FinalPlannerAgentService finalPlannerAgentService) {
@@ -24,19 +28,27 @@ public class FinalizationNode implements NodeAction<TravelState> {
     @Override
     public Map<String, Object> apply(TravelState state) {
         boolean tripPlanning = state != null && state.isTripPlanningWorkflow();
-        boolean goalAchieved = state != null
-                && state.goalEvaluation() != null
-                && state.goalEvaluation().getStatus() == com.example.travel.model.GoalEvaluation.Status.ACHIEVED;
         boolean hasCompletedItinerary = state != null
                 && state.itinerary() != null
                 && state.itinerary().getDays() != null
                 && !state.itinerary().getDays().isEmpty();
 
-        // A successful trip-planning workflow must stop at the human decision
-        // boundary. Never auto-confirm a generated trip merely because the
-        // final node was reached. Informational requests can complete directly.
+        // Every generated trip plan must stop at the human decision boundary.
+        // Do NOT make approval depend on goalEvaluation=ACHIEVED: a trip can be
+        // usable but PARTIAL when a provider (for example flights) is unavailable.
+        // In that case the UI must still ask the human to approve/modify/reject
+        // the generated plan instead of silently treating it as confirmed.
         boolean clarificationRequired = state != null && state.userInputRequired();
-        boolean requiresApproval = clarificationRequired || (tripPlanning && goalAchieved && hasCompletedItinerary);
+        boolean requiresApproval = clarificationRequired || (tripPlanning && hasCompletedItinerary);
+
+        log.info(
+                "[HITL] finalization tripPlanning={} goalStatus={} itineraryDays={} clarificationRequired={} requiresApproval={} ",
+                tripPlanning,
+                state != null && state.goalEvaluation() != null ? state.goalEvaluation().getStatus() : null,
+                hasCompletedItinerary && state.itinerary() != null && state.itinerary().getDays() != null
+                        ? state.itinerary().getDays().size() : 0,
+                clarificationRequired,
+                requiresApproval);
 
         String tips = "";
         if ("HISTORY".equalsIgnoreCase(state.requestType())) {

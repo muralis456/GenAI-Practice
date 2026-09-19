@@ -998,14 +998,14 @@ public class TravelPlannerAgentService {
                 return false;
             }
 
-            // The persisted state is the authoritative approval boundary.
-            // LangGraph4j's snapshot.next() can vary around interruptBefore()
-            // depending on the checkpoint implementation; using it as the
-            // primary signal caused valid approval states to be reported as
-            // COMPLETE. An explicit human decision always clears the gate.
-            String decision = checkpoint.hitlDecision();
-            return TravelState.isBlank(decision)
-                    || "modify".equalsIgnoreCase(decision);
+            // The persisted awaitingApproval flag is the authoritative
+            // approval boundary. The finalization node sets it to TRUE before
+            // the graph reaches the interrupt-before-HITL breakpoint, and the
+            // approve/reject endpoints explicitly clear it before resuming.
+            // Do not additionally infer approval from snapshot.next() or the
+            // decision value: a PARTIAL provider result must still remain
+            // pending human review.
+            return checkpoint.awaitingApproval();
 
         } catch (Exception ex) {
 
@@ -1139,6 +1139,7 @@ public class TravelPlannerAgentService {
                 saved.setRequestType("HISTORY");
                 saved.setTripPlanning(false);
                 saved.setAwaitingApproval(false);
+                saved.setApprovalState("NOT_REQUIRED");
                 saved.setStatus("COMPLETE");
                 if (saved.getPlan() != null && saved.getPlan().getTrip() != null) {
                     // A recalled plan is a read-only snapshot. Never expose the
@@ -1183,6 +1184,7 @@ public class TravelPlannerAgentService {
 
         response.setAwaitingApproval(
                 awaitingApproval);
+        response.setApprovalState(approvalState(state, awaitingApproval));
         response.setClarificationRequired(state.userInputRequired());
         response.setClarificationQuestion(state.userInputQuestion());
 
@@ -1207,6 +1209,16 @@ public class TravelPlannerAgentService {
 
     private boolean requiresTripPlanning(TravelState state) {
         return state != null && state.isTripPlanningWorkflow();
+    }
+
+    private String approvalState(TravelState state, boolean awaitingApproval) {
+        if (state == null) return "NOT_REQUIRED";
+        if (state.userInputRequired()) return "PENDING";
+        if (awaitingApproval || state.awaitingApproval()) return "PENDING";
+        String decision = state.hitlDecision();
+        if ("approve".equalsIgnoreCase(decision)) return "APPROVED";
+        if ("reject".equalsIgnoreCase(decision)) return "REJECTED";
+        return requiresTripPlanning(state) ? "PENDING" : "NOT_REQUIRED";
     }
 
     private String configuredModelsLabel() {
