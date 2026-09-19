@@ -478,6 +478,27 @@ public class TravelState extends AgentState {
         return Boolean.TRUE.equals(this.<Boolean>value(AWAITING_APPROVAL).orElse(Boolean.FALSE));
     }
 
+    /**
+     * Returns whether this turn represents a user-facing trip plan that must
+     * stop at the human approval boundary.  Do not rely only on REQUEST_TYPE:
+     * the semantic planner may correctly construct a complete trip graph from
+     * a natural request that was classified as MULTI_CAPABILITY.
+     */
+    public boolean isTripPlanningWorkflow() {
+        if ("TRIP_PLANNING".equalsIgnoreCase(requestType())) return true;
+        AgentPlan plan = agentPlan();
+        if (plan != null && "TRIP_PLANNING".equalsIgnoreCase(plan.getGoal())) return true;
+
+        if (plan == null || !plan.has("itinerary")) return false;
+
+        // An itinerary-only request is informational and should not be forced
+        // through approval. A composed trip plan is one where the itinerary is
+        // tied to travel logistics/costs.
+        return plan.has("budget")
+                || (plan.has("flights") && plan.has("hotels"))
+                || (plan.has("flights") && plan.has("hotels") && plan.has("research"));
+    }
+
     public String hitlDecision() {
         return this.<String>value(HITL_DECISION).orElse("");
     }

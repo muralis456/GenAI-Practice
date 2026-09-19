@@ -23,8 +23,7 @@ public class FinalizationNode implements NodeAction<TravelState> {
 
     @Override
     public Map<String, Object> apply(TravelState state) {
-        boolean tripPlanning = state != null
-                && "TRIP_PLANNING".equalsIgnoreCase(state.requestType());
+        boolean tripPlanning = state != null && state.isTripPlanningWorkflow();
         boolean goalAchieved = state != null
                 && state.goalEvaluation() != null
                 && state.goalEvaluation().getStatus() == com.example.travel.model.GoalEvaluation.Status.ACHIEVED;

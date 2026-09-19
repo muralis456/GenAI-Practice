@@ -179,8 +179,7 @@ public class TripPlanAssembler {
         if (state == null) {
             return false;
         }
-        return state.needsItinerary()
-                || "TRIP_PLANNING".equalsIgnoreCase(state.requestType());
+        return state.isTripPlanningWorkflow();
     }
 
     private TripHeader buildHeader(TravelState state, String status, boolean awaitingApproval) {

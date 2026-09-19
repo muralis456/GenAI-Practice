@@ -986,14 +986,19 @@ public class TravelPlannerAgentService {
                 return false;
             }
 
-            String next = snapshot.next();
+            TravelState checkpoint = snapshot.state();
+            if (checkpoint == null || !checkpoint.awaitingApproval()) {
+                return false;
+            }
 
-            return TravelGraphNodes.HITL.equals(next)
-                    || Boolean.TRUE.equals(
-                            snapshot.state()
-                                    .awaitingApproval())
-                            && !TravelGraphNodes.COMPLETE.equals(next)
-                            && !org.bsc.langgraph4j.StateGraph.END.equals(next);
+            // The persisted state is the authoritative approval boundary.
+            // LangGraph4j's snapshot.next() can vary around interruptBefore()
+            // depending on the checkpoint implementation; using it as the
+            // primary signal caused valid approval states to be reported as
+            // COMPLETE. An explicit human decision always clears the gate.
+            String decision = checkpoint.hitlDecision();
+            return TravelState.isBlank(decision)
+                    || "modify".equalsIgnoreCase(decision);
 
         } catch (Exception ex) {
 
@@ -1194,7 +1199,7 @@ public class TravelPlannerAgentService {
     }
 
     private boolean requiresTripPlanning(TravelState state) {
-        return state != null && "TRIP_PLANNING".equalsIgnoreCase(state.requestType());
+        return state != null && state.isTripPlanningWorkflow();
     }
 
     private String configuredModelsLabel() {

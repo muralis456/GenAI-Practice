@@ -4332,9 +4332,9 @@
             '</div>'
         ).join('');
         row.innerHTML = '<div class="chat-avatar">AI</div><div class="live-response-card">'
-            + '<div class="live-head"><div class="live-title">AgenticTripAI <span class="live-dots"><i></i><i></i><i></i></span></div><div class="live-state">Live execution</div></div>'
+            + '<div class="live-head"><div class="live-title">AgenticTripAI <span class="live-dots"><i></i><i></i><i></i></span></div><div class="live-state">Working</div></div>'
             + '<div class="live-timeline">' + phases + '</div>'
-            + '<div class="live-activity"><i class="live-activity-dot"></i><span class="live-activity-text">Understanding your travel request…</span></div>'
+            + '<div class="live-activity"><i class="live-activity-dot"></i><span class="live-activity-text">Starting…</span></div>'
             + '<div class="live-tasks"><div class="live-tasks-head"><span>Live execution</span><span class="live-task-count"></span></div><div class="live-task-list"></div></div>'
             + '</div>';
         chatThread.appendChild(row);
@@ -4402,13 +4402,17 @@
         const phaseId = phaseForNode(id);
         if (!phaseId) return;
         const status = phase === 'start' ? 'RUNNING' : 'SUCCEEDED';
-        setLivePhase(live, phaseId, status, message || (status === 'RUNNING' ? 'In progress' : 'Complete'));
-        if (phase === 'start') {
-            live.state.textContent = message || ('Running ' + raw + '…');
-            if (live.activity) live.activity.textContent = (message || ('Running ' + raw)) + '…';
-        } else {
-            if (phaseId !== 'execute') live.state.textContent = message || (raw + ' complete');
-            if (live.activity && !live.taskMap?.size) live.activity.textContent = message || (raw + ' complete');
+
+        // Phase cards communicate workflow position only. They deliberately do
+        // not repeat the detailed live activity message.
+        setLivePhase(live, phaseId, status);
+
+        // Keep the header intentionally stable: the exact current operation is
+        // shown in ONE place only, in .live-activity.
+        if (phase === 'start' && live.activity) {
+            live.activity.textContent = message || ('Running ' + raw) + '…';
+        } else if (phase === 'complete' && live.activity && !live.taskMap?.size) {
+            live.activity.textContent = message || (raw + ' complete');
         }
     };
 
@@ -4476,8 +4480,8 @@
                     try {
                         const data = JSON.parse(evt.data);
                         if (!data.node || String(data.node).toUpperCase() === 'START') {
-                            liveResponse.state.textContent = 'Live planning started';
-                            if (liveResponse.activity) liveResponse.activity.textContent = 'Waiting for the first planning step…';
+                            liveResponse.state.textContent = 'Working';
+                            if (liveResponse.activity) liveResponse.activity.textContent = 'Starting…';
                         }
                     } catch (ignored) {}
                 });
@@ -4486,11 +4490,9 @@
                         const data = JSON.parse(evt.data);
                         const msg = data.message || '';
                         if (!msg) return;
-                        if (statusSpan) statusSpan.textContent = msg + '…';
                         if (liveResponse.activity) liveResponse.activity.textContent = msg + '…';
-                        if (liveResponse.state) liveResponse.state.textContent = msg + '…';
                         const phaseId = phaseForNode(data.phase || '');
-                        if (phaseId) setLivePhase(liveResponse, phaseId, 'RUNNING', msg);
+                        if (phaseId) setLivePhase(liveResponse, phaseId, 'RUNNING');
                     } catch (ignored) {}
                 });
                 es.addEventListener('node_start', (evt) => {
@@ -4520,7 +4522,6 @@
                             const msg = data.message || data.task;
                             if (statusSpan) statusSpan.textContent = msg + '…';
                             setLiveTask(liveResponse, data.task, 'RUNNING', msg);
-                            liveResponse.state.textContent = msg + '…';
                         }
                     } catch (ignored) {}
                 });
@@ -4532,7 +4533,6 @@
                             const failed = data.status === 'FAILED';
                             if (statusSpan) statusSpan.textContent = failed ? msg + ' — failed' : msg;
                             setLiveTask(liveResponse, data.task, failed ? 'FAILED' : 'SUCCEEDED', msg);
-                            if (failed) liveResponse.state.textContent = msg + ' failed';
                         }
                     } catch (ignored) {}
                 });
