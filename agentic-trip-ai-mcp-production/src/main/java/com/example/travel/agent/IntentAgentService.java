@@ -9,6 +9,7 @@ import com.example.travel.service.RoutedLlm;
 import com.example.travel.service.GraphProgressHub;
 import com.example.travel.support.JsonSupport;
 import com.example.travel.support.TripRequirementsParser;
+import com.example.travel.support.IntentCapabilitySafetyGuard;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -127,7 +128,7 @@ public class IntentAgentService {
                 historyPlan.setConfidence(memoryIntent.getConfidence());
                 historyPlan.setStrategy("history_retrieval");
                 historyPlan.setPriority("history");
-                return finalizeSemanticPlan(historyPlan);
+                return finalizeSemanticPlan(request, historyPlan);
             }
             primary.setNeedsHistory(true);
             primary.setHistorySelection(normalizeHistorySelection(memoryIntent.getSelection()));
@@ -139,7 +140,7 @@ public class IntentAgentService {
         // correctly detected flights/budget/itinerary, then embedding similarity
         // returned all false and the request became GENERAL.
         if (hasAnyCapability(primary) && primary.getConfidence() >= 0.55) {
-            return finalizeSemanticPlan(primary);
+            return finalizeSemanticPlan(request, primary);
         }
 
         // If the first model is uncertain or returns an empty capability vector,
@@ -154,11 +155,11 @@ public class IntentAgentService {
 
         if (hasAnyCapability(adjudicated)
                 && (!hasAnyCapability(primary) || adjudicated.getConfidence() >= primary.getConfidence())) {
-            return finalizeSemanticPlan(adjudicated);
+            return finalizeSemanticPlan(request, adjudicated);
         }
 
         if (hasAnyCapability(primary)) {
-            return finalizeSemanticPlan(primary);
+            return finalizeSemanticPlan(request, primary);
         }
 
         // Embeddings remain an observability/recovery signal only. They are not
@@ -166,7 +167,7 @@ public class IntentAgentService {
         // capabilities. If both semantic passes are genuinely uncertain, the
         // safe result is GENERAL rather than an invented specialist action.
         log.info("Intent semantic classification unresolved request={}; returning GENERAL", request);
-        return finalizeSemanticPlan(emptyPlan());
+        return finalizeSemanticPlan(request, emptyPlan());
     }
 
     private IntentPlan runSemanticIntentPass(String request, boolean adjudication) {
@@ -193,7 +194,9 @@ public class IntentAgentService {
                          under X) is a constraint for that specialist, NOT a budget capability.
                          Return its scope separately as HOTEL, FLIGHT, ACTIVITY or OTHER.
                 itinerary = organizing a journey into a coherent schedule or day-by-day plan,
-                            including a request to create or modify that schedule.
+                            including a request to create or modify that schedule. Do NOT select
+                            itinerary merely because the user says travel, trip, visit, or asks when
+                            they want to travel; generic travel advice is not an itinerary.
                 knowledge = durable/general travel guidance such as culture, customs, safety,
                             packing, visa guidance, local practical advice or overview. It can be
                             combined with a live capability when the user explicitly wants practical
@@ -255,10 +258,15 @@ public class IntentAgentService {
                 - flights: airline/airfare/flight search, options, availability or details
                 - hotels: accommodation/lodging/rooms/stay options
                 - research: recommendations, attractions, activities or current destination research
-                - weather: current/forecast weather, temperature, precipitation or conditions
+                - weather: current/forecast weather, temperature, precipitation or conditions.
+                  Do NOT enable weather merely because the user mentions travelling to a destination
+                  or asks for precautions. Precautions, safety, packing and practical travel advice
+                  belong to knowledge unless live weather is explicitly requested.
                 - budget: overall trip cost estimation, comparison, constraints or optimization. A price
                   ceiling scoped to another requested capability is not a budget capability.
-                - itinerary: a coherent trip schedule, day-by-day journey plan, or schedule change
+                - itinerary: a coherent trip schedule, day-by-day journey plan, or schedule change.
+                  Do NOT enable itinerary for generic travel advice or a precautions question; it
+                  requires an actual schedule/planning objective.
                 - knowledge: durable travel guidance such as culture, customs, safety, packing,
                   visa guidance, practical local advice or destination overview. It may be
                   requested alongside a live capability when the user is asking for the travel
@@ -429,10 +437,13 @@ public class IntentAgentService {
                 || plan.isNeedsKnowledge() || plan.isNeedsHistory());
     }
 
-    private IntentPlan finalizeSemanticPlan(IntentPlan plan) {
+    private IntentPlan finalizeSemanticPlan(String request, IntentPlan plan) {
         IntentPlan result = plan == null ? emptyPlan() : plan;
-        boolean tripPlanning = result.isNeedsItinerary()
-                || IntentPlan.TRIP_PLANNING.equalsIgnoreCase(result.getRequestType());
+        // Only an explicit semantic TRIP_PLANNING classification creates the
+        // complete-trip contract. An itinerary flag alone is a specialist
+        // capability and must never pull in flights/hotels/weather/budget.
+        boolean tripPlanning = IntentPlan.TRIP_PLANNING.equalsIgnoreCase(result.getRequestType());
+        IntentCapabilitySafetyGuard.apply(request, result);
         if (tripPlanning) {
             result.setRequestType(IntentPlan.TRIP_PLANNING);
             result.setNeedsFlights(true);
