@@ -3,6 +3,8 @@ package com.example.travel.dto;
 public class TravelRequest {
 
     private String userId;
+    /** Stable browser/application conversation id. Unlike threadId, this survives follow-up turns. */
+    private String conversationId;
     private String destination;
     private String departureCity;
     private String departureDate;
@@ -14,6 +16,14 @@ public class TravelRequest {
     private String preferences;
     private String selectedModel;
     private String prompt;
+
+    public String getConversationId() {
+        return conversationId;
+    }
+
+    public void setConversationId(String conversationId) {
+        this.conversationId = conversationId;
+    }
 
     public String getUserId() {
         return userId;

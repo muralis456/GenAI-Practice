@@ -75,10 +75,21 @@ public class TravelController {
     @PostMapping("/plan/start")
     public ResponseEntity<Map<String, String>> startPlan(@Valid @RequestBody TravelRequest request) {
         String userId = request.getUserId() != null ? request.getUserId() : "anonymous";
-        // Use the user-wide history as context for a brand-new trip, then bind
-        // the new message to the generated thread so DB history can represent
-        // individual trips instead of one giant session.
-        String historyContext = conversationMemoryService.buildHistoryContext(userId, userId);
+        String conversationId = request.getConversationId();
+        if (conversationId == null || conversationId.isBlank()) {
+            // Backward-compatible fallback for API clients that have not adopted
+            // conversationId yet. New browser clients always send a stable id.
+            conversationId = userId;
+            request.setConversationId(conversationId);
+        }
+
+        // IMPORTANT: history is scoped to the stable conversation, not to the
+        // new LangGraph thread. Every follow-up can therefore create a fresh
+        // execution thread while still seeing all previous turns.
+        // Hydrate missing route slots first so specialists work even for API
+        // clients that do not perform browser-side follow-up context merging.
+        conversationMemoryService.hydrateRequestFromConversation(userId, conversationId, request);
+        String historyContext = conversationMemoryService.buildConversationHistoryContext(userId, conversationId);
         String threadId = travelPlannerAgentService.startTravelPlan(request, historyContext);
         return ResponseEntity.status(HttpStatus.ACCEPTED).body(Map.of(
                 "threadId", threadId,
@@ -177,6 +188,7 @@ public class TravelController {
     public ResponseEntity<?> deleteHistory(
             @RequestParam(defaultValue = "anonymous") String userId,
             @RequestParam(required = false) String sessionId,
+            @RequestParam(required = false) String conversationId,
             @RequestParam(required = false) Long tripId) {
         String owner = userId == null || userId.isBlank() ? "anonymous" : userId;
 
@@ -188,6 +200,10 @@ public class TravelController {
             return ResponseEntity.ok(Map.of("deleted", true, "type", "trip"));
         }
 
+        if (conversationId != null && !conversationId.isBlank()) {
+            long deletedRows = conversationMemoryService.deleteConversation(owner, conversationId);
+            return ResponseEntity.ok(Map.of("deleted", true, "type", "conversation", "memoryRows", deletedRows));
+        }
         if (sessionId == null || sessionId.isBlank()) {
             return ResponseEntity.badRequest().body(Map.of("error", "History session is required"));
         }
@@ -200,6 +216,14 @@ public class TravelController {
                                          @RequestParam(defaultValue = "anonymous") String userId,
                                          @RequestParam(defaultValue = "100") int limit) {
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(conversationMemoryService.getHistoryForSessionUi(userId, sessionId, limit));
+    }
+
+    @GetMapping("/chat/conversation/{conversationId}")
+    public ResponseEntity<?> chatConversation(@PathVariable String conversationId,
+                                              @RequestParam(defaultValue = "anonymous") String userId,
+                                              @RequestParam(defaultValue = "200") int limit) {
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                .body(conversationMemoryService.getHistoryForConversationUi(userId, conversationId, limit));
     }
 
     @GetMapping("/chat/message/{id}")

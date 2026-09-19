@@ -191,6 +191,7 @@ public class TravelPlannerAgentService {
                 "anonymous");
 
         String threadId = userId + "-" + UUID.randomUUID();
+        String conversationId = TravelState.firstNonBlank(request.getConversationId(), threadId);
 
         Map<String, Object> input = TravelState.fromRequest(request, historyContext);
 
@@ -214,7 +215,7 @@ public class TravelPlannerAgentService {
         // trip independently discoverable in the database and avoids races
         // between the async graph and conversation persistence.
         String query = TravelState.firstNonBlank(request.getPrompt(), request.getPreferences());
-        conversationMemoryService.saveMessage(userId, threadId, "user", query);
+        conversationMemoryService.saveMessage(userId, threadId, conversationId, "user", query);
 
         GraphExecutionLogger.runContext(
                 "plan-start",
@@ -225,6 +226,7 @@ public class TravelPlannerAgentService {
                 () -> runStreaming(
                         threadId,
                         userId,
+                        conversationId,
                         policy,
                         input));
 
@@ -234,6 +236,7 @@ public class TravelPlannerAgentService {
     private void runStreaming(
             String threadId,
             String userId,
+            String conversationId,
             String policy,
             Map<String, Object> input) {
 
@@ -310,6 +313,7 @@ public class TravelPlannerAgentService {
             conversationMemoryService.saveUiMessage(
                     userId,
                     threadId,
+                    conversationId,
                     "assistant",
                     plan.getPlan() != null
                             && plan.getPlan().getTrip() != null

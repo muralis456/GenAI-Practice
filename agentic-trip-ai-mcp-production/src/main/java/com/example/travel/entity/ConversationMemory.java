@@ -22,6 +22,10 @@ public class ConversationMemory {
     @Column(nullable = false)
     private String sessionId;
 
+    /** Stable conversation boundary shared by multiple graph threads/follow-up turns. */
+    @Column(length = 120)
+    private String conversationId;
+
     @Column(nullable = false, length = 20)
     private String role;
 
@@ -49,6 +53,14 @@ public class ConversationMemory {
 
     public void setUserId(String userId) {
         this.userId = userId;
+    }
+
+    public String getConversationId() {
+        return conversationId;
+    }
+
+    public void setConversationId(String conversationId) {
+        this.conversationId = conversationId;
     }
 
     public String getSessionId() {

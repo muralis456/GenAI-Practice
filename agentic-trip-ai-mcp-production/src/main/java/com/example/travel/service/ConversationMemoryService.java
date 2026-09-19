@@ -37,9 +37,15 @@ public class ConversationMemoryService {
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void saveMessage(String userId, String sessionId, String role, String content) {
+        saveMessage(userId, sessionId, sessionId, role, content);
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void saveMessage(String userId, String sessionId, String conversationId, String role, String content) {
         ConversationMemory memory = new ConversationMemory();
         memory.setUserId(userId);
         memory.setSessionId(sessionId);
+        memory.setConversationId(conversationId);
         memory.setRole(role);
         memory.setContent(truncate(content, MAX_CONTENT));
         memory.setCreatedAt(Instant.now());
@@ -59,9 +65,15 @@ public class ConversationMemoryService {
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void saveUiMessage(String userId, String sessionId, String role, String content, Object structuredPayload) {
+        saveUiMessage(userId, sessionId, sessionId, role, content, structuredPayload);
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void saveUiMessage(String userId, String sessionId, String conversationId, String role, String content, Object structuredPayload) {
         ConversationMemory memory = new ConversationMemory();
         memory.setUserId(userId);
         memory.setSessionId(sessionId);
+        memory.setConversationId(conversationId);
         memory.setRole(role);
         memory.setContent(truncate(content, UI_CONTENT_MAX));
         memory.setCreatedAt(Instant.now());
@@ -107,6 +119,7 @@ public class ConversationMemoryService {
                 .map(m -> new HistoryItem(
                         m.getId(),
                         m.getSessionId(),
+                        m.getConversationId(),
                         m.getRole(),
                         m.getContent(),
                         m.getStructuredData(),
@@ -114,7 +127,7 @@ public class ConversationMemoryService {
                 .collect(Collectors.toList());
     }
 
-    public record HistoryItem(Long id, String sessionId, String role, String content, String structuredData, String createdAt) {
+    public record HistoryItem(Long id, String sessionId, String conversationId, String role, String content, String structuredData, String createdAt) {
     }
 
     @Transactional(readOnly = true)
@@ -133,6 +146,25 @@ public class ConversationMemoryService {
                 .map(m -> new HistoryItem(
                         m.getId(),
                         m.getSessionId(),
+                        m.getConversationId(),
+                        m.getRole(),
+                        m.getContent(),
+                        m.getStructuredData(),
+                        m.getCreatedAt() == null ? null : m.getCreatedAt().toString()))
+                .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public List<HistoryItem> getHistoryForConversationUi(String userId, String conversationId, int limit) {
+        int size = Math.min(Math.max(limit, 1), 200);
+        PageRequest pageable = PageRequest.of(0, size);
+        return repository.findByUserIdAndConversationIdOrderByCreatedAtDesc(userId, conversationId, pageable)
+                .stream()
+                .sorted((a, b) -> a.getCreatedAt().compareTo(b.getCreatedAt()))
+                .map(m -> new HistoryItem(
+                        m.getId(),
+                        m.getSessionId(),
+                        m.getConversationId(),
                         m.getRole(),
                         m.getContent(),
                         m.getStructuredData(),
@@ -158,6 +190,88 @@ public class ConversationMemoryService {
         return loadRecentHistory(userId, sessionId);
     }
 
+    /**
+     * Loads memory across all graph threads that belong to one stable conversation.
+     * This is the backend source of truth for follow-up turns.
+     */
+    /**
+     * Hydrates missing request slots from the latest structured assistant result.
+     * This makes conversation memory a backend capability rather than a browser-only
+     * convenience: API clients can ask "what is the weather?" after a destination
+     * was established in an earlier turn without resending the destination.
+     */
+    @Transactional(readOnly = true)
+    public void hydrateRequestFromConversation(String userId, String conversationId, com.example.travel.dto.TravelRequest request) {
+        if (request == null || conversationId == null || conversationId.isBlank()) {
+            return;
+        }
+        List<ConversationMemory> history = loadRecentConversationHistory(userId, conversationId);
+        for (int i = history.size() - 1; i >= 0; i--) {
+            ConversationMemory memory = history.get(i);
+            if (!"assistant".equalsIgnoreCase(memory.getRole())
+                    || memory.getStructuredData() == null
+                    || memory.getStructuredData().isBlank()) {
+                continue;
+            }
+            try {
+                com.example.travel.dto.TravelPlanResponse response =
+                        objectMapper.readValue(memory.getStructuredData(), com.example.travel.dto.TravelPlanResponse.class);
+                if (response.getPlan() == null || response.getPlan().getTrip() == null) {
+                    continue;
+                }
+                com.example.travel.dto.TripHeader trip = response.getPlan().getTrip();
+                if (isBlank(request.getDestination())) request.setDestination(trip.getDestination());
+                if (isBlank(request.getDepartureCity())) request.setDepartureCity(trip.getOrigin());
+                if (isBlank(request.getDepartureDate())) request.setDepartureDate(trip.getDepartureDate());
+                if (isBlank(request.getReturnDate())) request.setReturnDate(trip.getReturnDate());
+                if (isBlank(request.getBudget())) request.setBudget(trip.getBudgetLabel());
+                if (isBlank(request.getTravelStyle())) request.setTravelStyle(trip.getTravelStyle());
+                return;
+            } catch (Exception ex) {
+                log.debug("Could not hydrate request from conversation memory conversationId={}", conversationId, ex);
+            }
+        }
+    }
+
+    @Transactional(readOnly = true)
+    public String buildConversationHistoryContext(String userId, String conversationId) {
+        List<ConversationMemory> history = loadRecentConversationHistory(userId, conversationId);
+        if (history.isEmpty()) {
+            return "";
+        }
+        StringBuilder sb = new StringBuilder("Conversation memory (previous turns in this conversation):\n");
+        for (ConversationMemory memory : history) {
+            sb.append(memory.getRole()).append(": ")
+                    .append(truncate(memory.getContent(), MAX_CONTENT))
+                    .append("\n");
+            // Assistant rows contain the exact structured specialist result.
+            // Keep a bounded copy in agent context so follow-ups can remember
+            // destination, weather, RAG answer, hotels, flights, etc. without
+            // requiring the browser to hydrate request fields.
+            if ("assistant".equalsIgnoreCase(memory.getRole())
+                    && memory.getStructuredData() != null
+                    && !memory.getStructuredData().isBlank()) {
+                sb.append("assistant_context: ")
+                        .append(truncate(memory.getStructuredData(), 3500))
+                        .append("\n");
+            }
+        }
+        return sb.toString();
+    }
+
+    @Transactional(readOnly = true)
+    public List<ConversationMemory> getRecentConversationHistory(String userId, String conversationId) {
+        return loadRecentConversationHistory(userId, conversationId);
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public long deleteConversation(String userId, String conversationId) {
+        if (userId == null || userId.isBlank() || conversationId == null || conversationId.isBlank()) {
+            return 0;
+        }
+        return repository.deleteByUserIdAndConversationId(userId, conversationId);
+    }
+
     @Transactional(readOnly = true)
     public List<ConversationMemory> getRecentHistory(String userId) {
         PageRequest pageable = PageRequest.of(0, MAX_HISTORY);
@@ -167,12 +281,26 @@ public class ConversationMemoryService {
                 .collect(Collectors.toList()));
     }
 
+    private List<ConversationMemory> loadRecentConversationHistory(String userId, String conversationId) {
+        if (conversationId == null || conversationId.isBlank()) {
+            return List.of();
+        }
+        PageRequest pageable = PageRequest.of(0, MAX_HISTORY * 3);
+        return repository.findByUserIdAndConversationIdOrderByCreatedAtDesc(userId, conversationId, pageable).stream()
+                .sorted((a, b) -> a.getCreatedAt().compareTo(b.getCreatedAt()))
+                .collect(Collectors.toList());
+    }
+
     private List<ConversationMemory> loadRecentHistory(String userId, String sessionId) {
         PageRequest pageable = PageRequest.of(0, MAX_HISTORY);
         List<ConversationMemory> memories = repository.findByUserIdAndSessionIdOrderByCreatedAtDesc(userId, sessionId, pageable);
         return memories.stream()
                 .sorted((a, b) -> a.getCreatedAt().compareTo(b.getCreatedAt()))
                 .collect(Collectors.toList());
+    }
+
+    private boolean isBlank(String value) {
+        return value == null || value.isBlank();
     }
 
     private String truncate(String content, int max) {

@@ -212,6 +212,7 @@
             }
             kept.push({
                 id: chat.id,
+                conversationId: chat.conversationId || chat.id || '',
                 threadId: chat.threadId || '',
                 title: chat.title,
                 updatedAt: chat.updatedAt,
@@ -246,6 +247,7 @@
             currentChatId = 'chat-' + Date.now();
             chat = {
                 id: currentChatId,
+                conversationId: currentChatId,
                 title: (titleHint || 'New trip').slice(0, 60),
                 updatedAt: Date.now(),
                 messages: []
@@ -294,17 +296,21 @@
             const grouped = new Map();
             items.forEach(item => {
                 const sessionId = String(item.sessionId || '').trim();
-                if (!sessionId) return;
-                if (!grouped.has(sessionId)) {
-                    grouped.set(sessionId, {
-                        id: serverPrefix + sessionId,
+                const conversationId = String(item.conversationId || '').trim();
+                const groupId = conversationId || sessionId;
+                if (!groupId) return;
+                if (!grouped.has(groupId)) {
+                    grouped.set(groupId, {
+                        id: serverPrefix + groupId,
+                        conversationId: conversationId || sessionId,
                         threadId: sessionId,
                         title: 'Previous conversation',
                         updatedAt: 0,
                         messages: []
                     });
                 }
-                const chat = grouped.get(sessionId);
+                const chat = grouped.get(groupId);
+                chat.threadId = sessionId || chat.threadId;
                 const createdAt = item.createdAt ? new Date(item.createdAt).getTime() : Date.now();
                 chat.updatedAt = Math.max(chat.updatedAt, Number.isFinite(createdAt) ? createdAt : Date.now());
                 if (item.role === 'user') {
@@ -333,7 +339,7 @@
             const mergedLocal = existingLocal.map(chat => {
                 const threadId = chatThreadIdForDelete(chat);
                 if (!threadId) return chat;
-                const server = grouped.get(threadId);
+                const server = grouped.get(String(chat.conversationId || threadId));
                 if (!server) return chat;
                 const serverHasStructured = server.messages.some(m => m.role === 'assistant' && m.planData);
                 return {
@@ -528,6 +534,7 @@
         localChats.forEach(chat => entries.push({
             kind: 'chat',
             id: chat.id,
+            conversationId: chat.conversationId || chat.id || '',
             threadId: chatThreadId(chat),
             title: chat.title || 'Recent conversation',
             meta: 'Recent · ' + (chat.updatedAt ? new Date(chat.updatedAt).toLocaleDateString() : ''),
@@ -602,8 +609,8 @@
         historyDeleteItem.textContent = entry.title || 'this history item';
         historyDeleteNote.textContent = entry.kind === 'db' && !entry.legacy
             ? 'This also permanently deletes the saved trip record and its conversation memory.'
-            : entry.threadId
-                ? 'This permanently deletes the saved conversation memory for this session.'
+            : (entry.conversationId || entry.threadId)
+                ? 'This permanently deletes the saved conversation memory for this conversation.'
                 : 'This removes the item from your local Recent History.';
         historyDeleteModal.classList.add('visible');
         historyDeleteModal.setAttribute('aria-hidden', 'false');
@@ -633,13 +640,15 @@
             const params = new URLSearchParams({ userId });
             if (entry.kind === 'db' && !entry.legacy) {
                 params.set('tripId', String(entry.id));
+            } else if (entry.conversationId) {
+                params.set('conversationId', String(entry.conversationId));
             } else if (entry.threadId) {
                 params.set('sessionId', String(entry.threadId));
             }
 
             // A local-only chat has no server session. It is removed from
             // browser history without making a pointless DB request.
-            const hasServerTarget = params.has('tripId') || params.has('sessionId');
+            const hasServerTarget = params.has('tripId') || params.has('sessionId') || params.has('conversationId');
             if (hasServerTarget) {
                 const res = await fetch('/api/history?' + params.toString(), { method: 'DELETE' });
                 const data = await res.json().catch(() => ({}));
@@ -718,17 +727,21 @@
         // render stale/local planData and lose structured Weather/Hotel/RAG/etc.
         // when the user switches chats and comes back.
         const sessionId = chatThreadIdForDelete(chat);
-        const isServerChat = String(chatId).startsWith('server-') || !!sessionId;
+        const conversationId = String(chat.conversationId || '').trim();
+        const isServerChat = String(chatId).startsWith('server-') || !!sessionId || !!conversationId;
 
         // Always refresh a server conversation before rendering it. This makes
         // Recent History independent of stale localStorage and restores the
         // exact structured result saved by the backend.
         let messages = chat.messages || [];
-        if (isServerChat && sessionId) {
+        if (isServerChat && (conversationId || sessionId)) {
             try {
                 const userId = userIdField.value.trim() || 'aaro_hi_user';
-                const res = await fetch('/api/chat/session/' + encodeURIComponent(sessionId)
-                    + '?userId=' + encodeURIComponent(userId) + '&limit=100');
+                const historyUrl = conversationId
+                    ? '/api/chat/conversation/' + encodeURIComponent(conversationId)
+                    : '/api/chat/session/' + encodeURIComponent(sessionId);
+                const res = await fetch(historyUrl
+                    + '?userId=' + encodeURIComponent(userId) + '&limit=200');
                 if (res.ok) {
                     const serverMessages = await res.json();
                     if (Array.isArray(serverMessages) && serverMessages.length) {
@@ -1774,6 +1787,52 @@
         return row;
     };
 
+    const getCurrentConversationContext = () => {
+        const empty = {
+            destination: '',
+            origin: '',
+            departureDate: '',
+            returnDate: '',
+            budgetLabel: '',
+            travelStyle: ''
+        };
+        try {
+            if (!currentChatId) return empty;
+            const store = loadStore();
+            const chat = store.chats.find(c => c.id === currentChatId);
+            if (!chat || !Array.isArray(chat.messages)) return empty;
+
+            // Walk backwards so the immediately preceding structured response
+            // wins over older trips/messages in the same chat.
+            for (let i = chat.messages.length - 1; i >= 0; i--) {
+                const message = chat.messages[i];
+                const data = message?.planData;
+                if (!data) continue;
+
+                const trip = data.plan?.trip || data.trip || {};
+                const destination = String(
+                    data.destination || trip.destination || ''
+                ).trim();
+                const origin = String(
+                    data.origin || trip.origin || ''
+                ).trim();
+                if (destination || origin) {
+                    return {
+                        destination,
+                        origin,
+                        departureDate: String(data.departureDate || trip.departureDate || '').trim(),
+                        returnDate: String(data.returnDate || trip.returnDate || '').trim(),
+                        budgetLabel: String(data.budgetLabel || trip.budgetLabel || '').trim(),
+                        travelStyle: String(data.travelStyle || trip.travelStyle || '').trim()
+                    };
+                }
+            }
+        } catch (e) {
+            console.warn('Could not resolve follow-up travel context', e);
+        }
+        return empty;
+    };
+
     const appendUserMessage = (text) => renderUserMessage(text, true);
     const appendAssistantMessage = (data) => renderAssistantMessage(data, true);
 
@@ -1894,8 +1953,36 @@
 
         const formData = new FormData(form);
         const payload = Object.fromEntries(formData.entries());
+        const currentConversation = ensureCurrentChat(text);
+        payload.conversationId = String(currentConversation.conversationId || currentConversation.id);
         payload.preferences = text;
         payload.prompt = text;
+
+        // Follow-up turns are sent as new graph threads, but they still belong
+        // to the same browser conversation. Carry forward the structured route
+        // context from the latest assistant result when the new prompt omits it.
+        // Without this, a follow-up such as "what is the weather currently"
+        // reaches the Weather specialist with no destination and correctly
+        // pauses for input.
+        const followUpContext = getCurrentConversationContext();
+        if (!payload.destination && followUpContext.destination) {
+            payload.destination = followUpContext.destination;
+        }
+        if (!payload.departureCity && followUpContext.origin) {
+            payload.departureCity = followUpContext.origin;
+        }
+        if (!payload.departureDate && followUpContext.departureDate) {
+            payload.departureDate = followUpContext.departureDate;
+        }
+        if (!payload.returnDate && followUpContext.returnDate) {
+            payload.returnDate = followUpContext.returnDate;
+        }
+        if (!payload.budget && followUpContext.budgetLabel) {
+            payload.budget = followUpContext.budgetLabel;
+        }
+        if (!payload.travelStyle && followUpContext.travelStyle) {
+            payload.travelStyle = followUpContext.travelStyle;
+        }
 
         appendUserMessage(text);
         promptInput.value = '';
