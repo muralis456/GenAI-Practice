@@ -48,7 +48,7 @@ public final class TravelStateSchema {
     static {
         Map<String, Channel<?>> schema = new LinkedHashMap<>();
         schema.put(Request.USER_REQUEST, Channels.base(() -> ""));
-        schema.put(Request.USER_ID, Channels.base(() -> "anonymous"));
+        schema.put(Request.USER_ID, Channels.base(() -> ""));
         schema.put(Request.SELECTED_MODEL, Channels.base(() -> ""));
         schema.put(Request.HISTORY_CONTEXT, Channels.base(() -> ""));
         schema.put(Request.HISTORY_RESULT, Channels.base(() -> ""));

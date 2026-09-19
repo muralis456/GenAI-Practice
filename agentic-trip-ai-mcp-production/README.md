@@ -113,3 +113,11 @@ The groundedness score is a guardrail/smoke metric, not a substitute for an LLM-
 ### Persistent trip-memory retrieval
 
 Requests that semantically ask to recall/reopen a previous trip are classified by the Intent Agent with `needsHistory=true`. The graph routes those requests to the `history` node, which reads the newest saved structured trip from PostgreSQL `trip_history` and falls back to structured `conversation_memory` rows created by older versions. It does not start a new Planner/specialist run and does not use the browser's localStorage as the source of truth.
+
+## P0 production hardening
+
+See `P0-PRODUCTION-SECURITY.md` for the authentication, authorization, Flyway, bounded execution, rate limiting, and durable SSE changes included in this build.
+
+
+### Security configuration
+The application uses the modern Spring Security request-matcher DSL and does not depend on `AntPathRequestMatcher`. See `P0-PRODUCTION-SECURITY.md` for the authentication and production-hardening details.

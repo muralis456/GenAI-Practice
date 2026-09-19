@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 
 public class TravelRequest {
 
+    @JsonIgnore
     private String userId;
     /** Stable browser/application conversation id. Unlike threadId, this survives follow-up turns. */
     private String conversationId;

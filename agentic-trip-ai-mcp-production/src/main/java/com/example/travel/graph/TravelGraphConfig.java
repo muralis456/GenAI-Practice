@@ -24,6 +24,9 @@ import java.sql.SQLException;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import static org.bsc.langgraph4j.StateGraph.END;
 import static org.bsc.langgraph4j.StateGraph.START;
@@ -39,14 +42,36 @@ import static org.bsc.langgraph4j.action.AsyncNodeAction.node_async;
 @Configuration
 public class TravelGraphConfig {
     @Bean(destroyMethod = "shutdown")
-    public ExecutorService travelParallelExecutor() {
-        AtomicInteger n=new AtomicInteger();
-        return Executors.newFixedThreadPool(6,r->{Thread t=new Thread(r);t.setName("travel-agent-"+n.incrementAndGet());t.setDaemon(true);return t;});
+    public ExecutorService travelParallelExecutor(
+            @Value("${travel.runtime.max-concurrent-specialists:12}") int maxSpecialists) {
+        AtomicInteger n = new AtomicInteger();
+        return Executors.newFixedThreadPool(Math.max(2, maxSpecialists), r -> {
+            Thread t = new Thread(r);
+            t.setName("travel-agent-" + n.incrementAndGet());
+            t.setDaemon(true);
+            return t;
+        });
     }
+
     @Bean(destroyMethod = "shutdown")
-    public ExecutorService travelPlanExecutor() {
-        AtomicInteger n=new AtomicInteger();
-        return Executors.newCachedThreadPool(r->{Thread t=new Thread(r);t.setName("travel-plan-"+n.incrementAndGet());t.setDaemon(true);return t;});
+    public ExecutorService travelPlanExecutor(
+            @Value("${travel.runtime.max-concurrent-plans:12}") int maxPlans,
+            @Value("${travel.runtime.plan-queue-capacity:40}") int queueCapacity) {
+        AtomicInteger n = new AtomicInteger();
+        int maximum = Math.max(1, maxPlans);
+        return new ThreadPoolExecutor(
+                maximum,
+                maximum,
+                0L,
+                TimeUnit.MILLISECONDS,
+                new ArrayBlockingQueue<>(Math.max(1, queueCapacity)),
+                r -> {
+                    Thread t = new Thread(r);
+                    t.setName("travel-plan-" + n.incrementAndGet());
+                    t.setDaemon(true);
+                    return t;
+                },
+                new ThreadPoolExecutor.AbortPolicy());
     }
     @Bean public ObjectStreamStateSerializer<TravelState> travelStateSerializer(){return new ObjectStreamStateSerializer<>(TravelState::new);}
     @Bean public PostgresSaver travelCheckpointSaver(DataSource ds,ObjectStreamStateSerializer<TravelState> s) throws SQLException {

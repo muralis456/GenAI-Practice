@@ -1,28 +1,22 @@
 package com.example.travel.controller;
 
+import com.example.travel.agent.TravelPlannerAgentService;
 import com.example.travel.dto.PlanDecisionRequest;
 import com.example.travel.dto.TravelPlanResponse;
 import com.example.travel.dto.TravelRequest;
-import com.example.travel.agent.TravelPlannerAgentService;
 import com.example.travel.service.ConversationMemoryService;
 import com.example.travel.service.GraphProgressHub;
-import com.example.travel.service.TripHistoryService;
 import com.example.travel.service.QueryNormalizationService;
+import com.example.travel.service.TripHistoryService;
 import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.http.CacheControl;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.Map;
@@ -30,7 +24,6 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api")
 public class TravelController {
-
     private static final Logger log = LoggerFactory.getLogger(TravelController.class);
 
     private final TravelPlannerAgentService travelPlannerAgentService;
@@ -52,21 +45,19 @@ public class TravelController {
     }
 
     @PostMapping("/plan")
-    public ResponseEntity<TravelPlanResponse> createPlan(@Valid @RequestBody TravelRequest request) {
-        String userId = request.getUserId() != null ? request.getUserId() : "anonymous";
+    public ResponseEntity<TravelPlanResponse> createPlan(Authentication authentication,
+                                                         @Valid @RequestBody TravelRequest request) {
+        String userId = currentUser(authentication);
+        request.setUserId(userId);
         String sessionId = userId;
         String query = request.getPrompt() != null ? request.getPrompt() : request.getPreferences();
         request.setOriginalPrompt(query);
         QueryNormalizationService.NormalizationResult normalization = queryNormalizationService.normalize(request);
-        if (!normalization.normalizedPrompt().isBlank()) {
-            request.setPrompt(normalization.normalizedPrompt());
-        }
-        log.info("Received travel plan request for destination={}, rawQuery={}, normalizedQuery={}, corrections={}, userId={}",
-                request.getDestination(), query, normalization.normalizedPrompt(), normalization.corrections(), userId);
+        if (!normalization.normalizedPrompt().isBlank()) request.setPrompt(normalization.normalizedPrompt());
+        log.info("Received travel plan request destination={} normalizedQuery={} corrections={}",
+                request.getDestination(), normalization.normalizedPrompt(), normalization.corrections());
 
-        // Persist the original user wording immediately — do not wait for the multi-minute graph.
         conversationMemoryService.saveMessage(userId, sessionId, "user", query);
-
         String historyContext = conversationMemoryService.buildHistoryContext(userId, sessionId);
         try {
             TravelPlanResponse response = travelPlannerAgentService.createTravelPlan(request, historyContext);
@@ -76,64 +67,56 @@ public class TravelController {
             return ResponseEntity.ok(response);
         } catch (RuntimeException ex) {
             conversationMemoryService.saveMessage(userId, sessionId, "assistant",
-                    "Plan failed: " + (ex.getMessage() == null ? ex.getClass().getSimpleName() : ex.getMessage()));
+                    "Plan failed: " + safeError(ex));
             throw ex;
         }
     }
 
     @PostMapping("/plan/start")
-    public ResponseEntity<Map<String, String>> startPlan(@Valid @RequestBody TravelRequest request) {
-        String userId = request.getUserId() != null ? request.getUserId() : "anonymous";
+    public ResponseEntity<Map<String, String>> startPlan(Authentication authentication,
+                                                         @Valid @RequestBody TravelRequest request) {
+        String userId = currentUser(authentication);
+        request.setUserId(userId);
         String conversationId = request.getConversationId();
         if (conversationId == null || conversationId.isBlank()) {
-            // Backward-compatible fallback for API clients that have not adopted
-            // conversationId yet. New browser clients always send a stable id.
-            conversationId = userId;
+            conversationId = userId + "-conversation";
             request.setConversationId(conversationId);
         }
 
-        // IMPORTANT: history is scoped to the stable conversation, not to the
-        // new LangGraph thread. Every follow-up can therefore create a fresh
-        // execution thread while still seeing all previous turns.
-        // Hydrate missing route slots first so specialists work even for API
-        // clients that do not perform browser-side follow-up context merging.
         conversationMemoryService.hydrateRequestFromConversation(userId, conversationId, request);
         String rawPrompt = request.getPrompt();
         request.setOriginalPrompt(rawPrompt);
         QueryNormalizationService.NormalizationResult normalization = queryNormalizationService.normalize(request);
-        if (!normalization.normalizedPrompt().isBlank()) {
-            request.setPrompt(normalization.normalizedPrompt());
-        }
-        log.info("Query normalization conversationId={} raw=[{}] normalized=[{}] corrections={} entities={}",
-                conversationId, rawPrompt, normalization.normalizedPrompt(),
-                normalization.corrections(), normalization.entities());
-        log.info("Follow-up hydrated conversationId={} prompt=[{}] origin={} destination={} departureDate={} returnDate={}",
-                conversationId, request.getPrompt(), request.getDepartureCity(), request.getDestination(),
-                request.getDepartureDate(), request.getReturnDate());
+        if (!normalization.normalizedPrompt().isBlank()) request.setPrompt(normalization.normalizedPrompt());
+        log.info("Query normalization conversationId={} normalizedQuery={} corrections={} entities={}",
+                conversationId, normalization.normalizedPrompt(), normalization.corrections(), normalization.entities());
+
         String historyContext = conversationMemoryService.buildConversationHistoryContext(userId, conversationId);
         String threadId = travelPlannerAgentService.startTravelPlan(request, historyContext);
-        return ResponseEntity.status(HttpStatus.ACCEPTED).body(Map.of(
-                "threadId", threadId,
-                "status", "STARTED"));
+        return ResponseEntity.status(HttpStatus.ACCEPTED).body(Map.of("threadId", threadId, "status", "STARTED"));
     }
 
     @GetMapping(value = "/plan/{threadId}/events", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public SseEmitter planEvents(@PathVariable String threadId) {
+    public SseEmitter planEvents(Authentication authentication, @PathVariable String threadId) {
+        String userId = currentUser(authentication);
+        travelPlannerAgentService.assertOwnedThread(userId, threadId);
         return graphProgressHub.subscribe(threadId);
     }
 
     @GetMapping("/chat/history")
-    public ResponseEntity<?> chatHistory(@RequestParam(defaultValue = "anonymous") String userId,
+    public ResponseEntity<?> chatHistory(Authentication authentication,
                                          @RequestParam(defaultValue = "40") int limit) {
-        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(conversationMemoryService.getHistoryForUi(userId, limit));
+        String userId = currentUser(authentication);
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                .body(conversationMemoryService.getHistoryForUi(userId, limit));
     }
 
     @PostMapping("/plan/approve")
-    public ResponseEntity<TravelPlanResponse> approve(@RequestBody PlanDecisionRequest request) {
-        String userId = request.getUserId() != null ? request.getUserId() : "anonymous";
-        if (request.getThreadId() == null || request.getThreadId().isBlank()) {
-            return ResponseEntity.badRequest().body(null);
-        }
+    public ResponseEntity<TravelPlanResponse> approve(Authentication authentication,
+                                                      @RequestBody PlanDecisionRequest request) {
+        String userId = currentUser(authentication);
+        request.setUserId(userId);
+        requireThread(request.getThreadId());
         TravelPlanResponse response = travelPlannerAgentService.approve(userId, request.getThreadId());
         conversationMemoryService.saveUiMessage(userId, request.getThreadId(), "assistant", responseMessage(response, "Plan approved"), response);
         tripHistoryService.saveOrUpdate(userId, response);
@@ -141,86 +124,72 @@ public class TravelController {
     }
 
     @PostMapping("/plan/modify")
-    public ResponseEntity<TravelPlanResponse> modify(@RequestBody PlanDecisionRequest request) {
-        String userId = request.getUserId() != null ? request.getUserId() : "anonymous";
-        if (request.getThreadId() == null || request.getThreadId().isBlank()) {
-            return ResponseEntity.badRequest().body(null);
-        }
+    public ResponseEntity<TravelPlanResponse> modify(Authentication authentication,
+                                                      @RequestBody PlanDecisionRequest request) {
+        String userId = currentUser(authentication);
+        request.setUserId(userId);
+        requireThread(request.getThreadId());
         conversationMemoryService.saveMessage(userId, request.getThreadId(), "user",
                 "Modify: " + (request.getNotes() == null ? "(no details)" : request.getNotes()));
         String historyContext = conversationMemoryService.buildHistoryContext(userId, request.getThreadId());
         try {
-            TravelPlanResponse response = travelPlannerAgentService.modify(userId,
-                    request.getThreadId(),
-                    request.getNotes() == null ? "Please adjust the plan" : request.getNotes(),
-                    historyContext);
+            TravelPlanResponse response = travelPlannerAgentService.modify(userId, request.getThreadId(),
+                    request.getNotes() == null ? "Please adjust the plan" : request.getNotes(), historyContext);
             conversationMemoryService.saveUiMessage(userId, request.getThreadId(), "assistant",
                     responseMessage(response, "Modified plan ready"), response);
             tripHistoryService.saveOrUpdate(userId, response);
             return ResponseEntity.ok(response);
         } catch (RuntimeException ex) {
-            conversationMemoryService.saveMessage(userId, request.getThreadId(), "assistant",
-                    "Modify failed: " + (ex.getMessage() == null ? ex.getClass().getSimpleName() : ex.getMessage()));
+            conversationMemoryService.saveMessage(userId, request.getThreadId(), "assistant", "Modify failed: " + safeError(ex));
             throw ex;
         }
     }
 
     @PostMapping("/plan/reject")
-    public ResponseEntity<TravelPlanResponse> reject(@RequestBody PlanDecisionRequest request) {
-        String userId = request.getUserId() != null ? request.getUserId() : "anonymous";
-        if (request.getThreadId() == null || request.getThreadId().isBlank()) {
-            return ResponseEntity.badRequest().body(null);
-        }
+    public ResponseEntity<TravelPlanResponse> reject(Authentication authentication,
+                                                      @RequestBody PlanDecisionRequest request) {
+        String userId = currentUser(authentication);
+        request.setUserId(userId);
+        requireThread(request.getThreadId());
         TravelPlanResponse response = travelPlannerAgentService.reject(userId, request.getThreadId());
-        conversationMemoryService.saveUiMessage(userId, request.getThreadId(), "assistant",
-                responseMessage(response, "Plan rejected"), response);
+        conversationMemoryService.saveUiMessage(userId, request.getThreadId(), "assistant", responseMessage(response, "Plan rejected"), response);
         tripHistoryService.saveOrUpdate(userId, response);
         return ResponseEntity.ok(response);
     }
 
     private String responseMessage(TravelPlanResponse response, String fallback) {
-        if (response == null || response.getPlan() == null) {
-            return fallback;
-        }
+        if (response == null || response.getPlan() == null) return fallback;
         String tips = response.getPlan().getTips();
-        if (tips != null && !tips.isBlank()) {
-            return tips;
-        }
-        if (response.getPlan().getItinerary() != null
-                && !response.getPlan().getItinerary().isEmpty()) {
+        if (tips != null && !tips.isBlank()) return tips;
+        if (response.getPlan().getItinerary() != null && !response.getPlan().getItinerary().isEmpty()) {
             return response.getPlan().getItinerary().toDisplay();
         }
         return fallback;
     }
 
     @GetMapping("/trips")
-    public ResponseEntity<?> trips(@RequestParam(defaultValue = "anonymous") String userId,
-                                   @RequestParam(defaultValue = "50") int limit) {
-        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(tripHistoryService.list(userId, limit));
+    public ResponseEntity<?> trips(Authentication authentication, @RequestParam(defaultValue = "50") int limit) {
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                .body(tripHistoryService.list(currentUser(authentication), limit));
     }
 
     @GetMapping("/trips/{id}")
-    public ResponseEntity<?> trip(@PathVariable Long id,
-                                  @RequestParam(defaultValue = "anonymous") String userId) {
-        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(tripHistoryService.getPlan(userId, id));
+    public ResponseEntity<?> trip(Authentication authentication, @PathVariable Long id) {
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                .body(tripHistoryService.getPlan(currentUser(authentication), id));
     }
 
     @DeleteMapping("/history")
-    public ResponseEntity<?> deleteHistory(
-            @RequestParam(defaultValue = "anonymous") String userId,
-            @RequestParam(required = false) String sessionId,
-            @RequestParam(required = false) String conversationId,
-            @RequestParam(required = false) Long tripId) {
-        String owner = userId == null || userId.isBlank() ? "anonymous" : userId;
-
+    public ResponseEntity<?> deleteHistory(Authentication authentication,
+                                           @RequestParam(required = false) String sessionId,
+                                           @RequestParam(required = false) String conversationId,
+                                           @RequestParam(required = false) Long tripId) {
+        String owner = currentUser(authentication);
         if (tripId != null) {
             boolean deleted = tripHistoryService.deleteTripAndMemory(owner, tripId);
-            if (!deleted) {
-                return ResponseEntity.notFound().build();
-            }
+            if (!deleted) return ResponseEntity.notFound().build();
             return ResponseEntity.ok(Map.of("deleted", true, "type", "trip"));
         }
-
         if (conversationId != null && !conversationId.isBlank()) {
             long deletedRows = conversationMemoryService.deleteConversation(owner, conversationId);
             return ResponseEntity.ok(Map.of("deleted", true, "type", "conversation", "memoryRows", deletedRows));
@@ -233,36 +202,48 @@ public class TravelController {
     }
 
     @GetMapping("/chat/session/{sessionId}")
-    public ResponseEntity<?> chatSession(@PathVariable String sessionId,
-                                         @RequestParam(defaultValue = "anonymous") String userId,
+    public ResponseEntity<?> chatSession(Authentication authentication, @PathVariable String sessionId,
                                          @RequestParam(defaultValue = "100") int limit) {
-        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(conversationMemoryService.getHistoryForSessionUi(userId, sessionId, limit));
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                .body(conversationMemoryService.getHistoryForSessionUi(currentUser(authentication), sessionId, limit));
     }
 
     @GetMapping("/chat/conversation/{conversationId}")
-    public ResponseEntity<?> chatConversation(@PathVariable String conversationId,
-                                              @RequestParam(defaultValue = "anonymous") String userId,
+    public ResponseEntity<?> chatConversation(Authentication authentication, @PathVariable String conversationId,
                                               @RequestParam(defaultValue = "200") int limit) {
         return ResponseEntity.ok().cacheControl(CacheControl.noStore())
-                .body(conversationMemoryService.getHistoryForConversationUi(userId, conversationId, limit));
+                .body(conversationMemoryService.getHistoryForConversationUi(currentUser(authentication), conversationId, limit));
     }
 
     @GetMapping("/chat/message/{id}")
-    public ResponseEntity<?> chatMessage(@PathVariable Long id,
-                                         @RequestParam(defaultValue = "anonymous") String userId) {
-        return conversationMemoryService.getMessageForUi(userId, id)
+    public ResponseEntity<?> chatMessage(Authentication authentication, @PathVariable Long id) {
+        return conversationMemoryService.getMessageForUi(currentUser(authentication), id)
                 .map(message -> ResponseEntity.ok(message))
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     @GetMapping("/plan/{threadId}/restore")
-    public ResponseEntity<?> restorePlan(@PathVariable String threadId,
-                                         @RequestParam(defaultValue = "anonymous") String userId) {
-        return ResponseEntity.ok(travelPlannerAgentService.restore(userId, threadId));
+    public ResponseEntity<?> restorePlan(Authentication authentication, @PathVariable String threadId) {
+        return ResponseEntity.ok(travelPlannerAgentService.restore(currentUser(authentication), threadId));
     }
 
     @GetMapping("/plan/{threadId}/history")
-    public ResponseEntity<?> history(@PathVariable String threadId) {
-        return ResponseEntity.ok(travelPlannerAgentService.history(threadId));
+    public ResponseEntity<?> history(Authentication authentication, @PathVariable String threadId) {
+        return ResponseEntity.ok(travelPlannerAgentService.history(currentUser(authentication), threadId));
+    }
+
+    private String currentUser(Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated() || authentication.getName() == null || authentication.getName().isBlank()) {
+            throw new IllegalStateException("Authenticated user is required");
+        }
+        return authentication.getName();
+    }
+
+    private void requireThread(String threadId) {
+        if (threadId == null || threadId.isBlank()) throw new IllegalArgumentException("Thread id is required");
+    }
+
+    private String safeError(RuntimeException ex) {
+        return ex.getMessage() == null ? ex.getClass().getSimpleName() : ex.getMessage();
     }
 }

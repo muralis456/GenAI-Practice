@@ -1,5 +1,4 @@
-
-    const layout = document.querySelector('.layout');
+const layout = document.querySelector('.layout');
     const form = document.getElementById('travelForm');
     const chatThread = document.getElementById('chatThread');
     const messagesPane = document.getElementById('messagesPane');
@@ -22,9 +21,32 @@
     const historyDeleteNote = document.getElementById('historyDeleteNote');
     const historyDeleteCancel = document.getElementById('historyDeleteCancel');
     const historyDeleteConfirm = document.getElementById('historyDeleteConfirm');
+    const signedInUser = document.getElementById('signedInUser');
+    let currentUserId = '';
+
+    const csrfMeta = document.querySelector('meta[name="_csrf"]');
+    const csrfHeaderMeta = document.querySelector('meta[name="_csrf_header"]');
+    const apiFetch = (url, options = {}) => {
+        const opts = { ...options, headers: { ...(options.headers || {}) } };
+        const method = String(opts.method || 'GET').toUpperCase();
+        if (!['GET', 'HEAD', 'OPTIONS'].includes(method) && csrfMeta?.content && csrfHeaderMeta?.content) {
+            opts.headers[csrfHeaderMeta.content] = csrfMeta.content;
+        }
+        return window.fetch(url, opts).then(response => {
+            if (response.status === 401 && !String(url).startsWith('/api/auth/')) {
+                window.location.href = '/login?expired=true';
+            }
+            return response;
+        });
+    };
+
     let dbTrips = [];
     let pendingHistoryDelete = null;
     let modifyContext = null;
+    // Unified selection key for Recent Trips/Chats. DB rows use db:<id>; local
+    // conversations use chat:<id>. This is intentionally separate from
+    // currentChatId because the visible history can contain both kinds.
+    let currentHistoryKey = null;
 
     const showToast = (message) => {
         let toast = document.getElementById('uiToast');
@@ -158,13 +180,12 @@
         });
     }
 
-    const storageKey = () => 'agentic-trip-ai-chats:' + (userIdField.value.trim() || 'aaro_hi_user');
+    const storageKey = () => 'agentic-trip-ai-chats:' + (currentUserId || userIdField.value.trim() || 'authenticated-user');
     let currentChatId = null;
-    let currentHistoryKey = null;
     let startedFreshChat = false;
 
     const syncUserIdField = () => {
-        form.querySelector('input[name="userId"]').value = userIdField.value.trim() || 'aaro_hi_user';
+        form.querySelector('input[name="userId"]').value = currentUserId || userIdField.value.trim() || '';
     };
 
     const syncUserId = () => {
@@ -173,7 +194,7 @@
         loadServerHistoryIntoStore();
     };
 
-    userIdField.addEventListener('input', syncUserId);
+    // Identity is supplied by the authenticated Spring Security session; users cannot edit it.
 
     document.querySelectorAll('.city-card[data-prompt]').forEach(card => {
         card.addEventListener('click', () => {
@@ -212,7 +233,6 @@
             }
             kept.push({
                 id: chat.id,
-                conversationId: chat.conversationId || chat.id || '',
                 threadId: chat.threadId || '',
                 title: chat.title,
                 updatedAt: chat.updatedAt,
@@ -247,7 +267,6 @@
             currentChatId = 'chat-' + Date.now();
             chat = {
                 id: currentChatId,
-                conversationId: currentChatId,
                 title: (titleHint || 'New trip').slice(0, 60),
                 updatedAt: Date.now(),
                 messages: []
@@ -282,9 +301,9 @@
     };
 
     const loadServerHistoryIntoStore = async () => {
-        const userId = userIdField.value.trim() || 'aaro_hi_user';
+        const userId = currentUserId || userIdField.value.trim() || '';
         try {
-            const res = await fetch('/api/chat/history?userId=' + encodeURIComponent(userId) + '&limit=100&_=' + Date.now(), { cache: 'no-store' });
+            const res = await apiFetch('/api/chat/history?userId=' + encodeURIComponent(userId) + '&limit=100&_=' + Date.now(), { cache: 'no-store' });
             if (!res.ok) return;
             const items = await res.json();
             if (!Array.isArray(items) || !items.length) return;
@@ -296,21 +315,17 @@
             const grouped = new Map();
             items.forEach(item => {
                 const sessionId = String(item.sessionId || '').trim();
-                const conversationId = String(item.conversationId || '').trim();
-                const groupId = conversationId || sessionId;
-                if (!groupId) return;
-                if (!grouped.has(groupId)) {
-                    grouped.set(groupId, {
-                        id: serverPrefix + groupId,
-                        conversationId: conversationId || sessionId,
+                if (!sessionId) return;
+                if (!grouped.has(sessionId)) {
+                    grouped.set(sessionId, {
+                        id: serverPrefix + sessionId,
                         threadId: sessionId,
                         title: 'Previous conversation',
                         updatedAt: 0,
                         messages: []
                     });
                 }
-                const chat = grouped.get(groupId);
-                chat.threadId = sessionId || chat.threadId;
+                const chat = grouped.get(sessionId);
                 const createdAt = item.createdAt ? new Date(item.createdAt).getTime() : Date.now();
                 chat.updatedAt = Math.max(chat.updatedAt, Number.isFinite(createdAt) ? createdAt : Date.now());
                 if (item.role === 'user') {
@@ -339,7 +354,7 @@
             const mergedLocal = existingLocal.map(chat => {
                 const threadId = chatThreadIdForDelete(chat);
                 if (!threadId) return chat;
-                const server = grouped.get(String(chat.conversationId || threadId));
+                const server = grouped.get(threadId);
                 if (!server) return chat;
                 const serverHasStructured = server.messages.some(m => m.role === 'assistant' && m.planData);
                 return {
@@ -402,7 +417,7 @@
     };
 
     const loadDbTrips = async (renderView = false) => {
-        const userId = userIdField.value.trim() || 'aaro_hi_user';
+        const userId = currentUserId || userIdField.value.trim() || '';
         const refreshButton = document.getElementById('tripsRefresh');
         const previousLabel = refreshButton ? refreshButton.textContent : '';
         if (refreshButton && renderView) {
@@ -414,7 +429,7 @@
             // Never let browser/proxy caching make My Trips appear stale.
             const url = '/api/trips?userId=' + encodeURIComponent(userId)
                 + '&limit=50&_=' + Date.now();
-            const res = await fetch(url, { cache: 'no-store' });
+            const res = await apiFetch(url, { cache: 'no-store' });
             if (!res.ok) throw new Error('Unable to load trips');
             const items = await res.json();
             dbTrips = Array.isArray(items) ? items : [];
@@ -445,18 +460,18 @@
             currentHistoryKey = 'db:' + String(id);
             renderHistoryList();
             const trip = dbTrips.find(t => String(t.id) === String(id));
-            const userId = userIdField.value.trim() || 'aaro_hi_user';
+            const userId = currentUserId || userIdField.value.trim() || '';
             showHomeView();
             clearThreadDom();
 
             if (trip?.legacy) {
                 const sourceMessageId = Math.abs(Number(id));
-                const messageRes = await fetch('/api/chat/message/' + encodeURIComponent(sourceMessageId)
+                const messageRes = await apiFetch('/api/chat/message/' + encodeURIComponent(sourceMessageId)
                     + '?userId=' + encodeURIComponent(userId));
                 const sourceMessage = await messageRes.json().catch(() => ({}));
                 if (!messageRes.ok || !sourceMessage.sessionId) throw new Error(safeUiErrorMessage());
 
-                const res = await fetch('/api/chat/session/' + encodeURIComponent(sourceMessage.sessionId)
+                const res = await apiFetch('/api/chat/session/' + encodeURIComponent(sourceMessage.sessionId)
                     + '?userId=' + encodeURIComponent(userId) + '&limit=100');
                 const messages = await res.json().catch(() => []);
                 if (!res.ok || !Array.isArray(messages)) throw new Error(safeUiErrorMessage());
@@ -473,7 +488,7 @@
                 return;
             }
 
-            const res = await fetch('/api/trips/' + encodeURIComponent(id) + '?userId=' + encodeURIComponent(userId));
+            const res = await apiFetch('/api/trips/' + encodeURIComponent(id) + '?userId=' + encodeURIComponent(userId));
             const data = await res.json().catch(() => ({}));
             if (!res.ok) throw new Error(data.error || safeUiErrorMessage());
             appendAssistantMessage(data, false);
@@ -534,7 +549,6 @@
         localChats.forEach(chat => entries.push({
             kind: 'chat',
             id: chat.id,
-            conversationId: chat.conversationId || chat.id || '',
             threadId: chatThreadId(chat),
             title: chat.title || 'Recent conversation',
             meta: 'Recent · ' + (chat.updatedAt ? new Date(chat.updatedAt).toLocaleDateString() : ''),
@@ -558,9 +572,15 @@
             const btn = document.createElement('button');
             btn.type = 'button';
             const entryKey = entry.kind + ':' + String(entry.id);
-            btn.className = 'chat-history-item' + (entryKey === currentHistoryKey ? ' active' : '');
-            if (entryKey === currentHistoryKey) btn.setAttribute('aria-current', 'page');
-            else btn.removeAttribute('aria-current');
+            const isSelected = entryKey === currentHistoryKey;
+            btn.className = 'chat-history-item' + (isSelected ? ' active' : '');
+            btn.dataset.historyKey = entryKey;
+            if (isSelected) {
+                btn.setAttribute('aria-current', 'page');
+                wrap.classList.add('selected');
+            } else {
+                btn.removeAttribute('aria-current');
+            }
             const title = document.createElement('span');
             title.textContent = entry.title;
             if (entry.kind === 'db') {
@@ -609,8 +629,8 @@
         historyDeleteItem.textContent = entry.title || 'this history item';
         historyDeleteNote.textContent = entry.kind === 'db' && !entry.legacy
             ? 'This also permanently deletes the saved trip record and its conversation memory.'
-            : (entry.conversationId || entry.threadId)
-                ? 'This permanently deletes the saved conversation memory for this conversation.'
+            : entry.threadId
+                ? 'This permanently deletes the saved conversation memory for this session.'
                 : 'This removes the item from your local Recent History.';
         historyDeleteModal.classList.add('visible');
         historyDeleteModal.setAttribute('aria-hidden', 'false');
@@ -631,7 +651,7 @@
     });
 
     const deleteHistoryEntry = async (entry, rowElement) => {
-        const userId = userIdField.value.trim() || 'aaro_hi_user';
+        const userId = currentUserId || userIdField.value.trim() || '';
         const title = entry.title || 'this history item';
         const confirmed = await askDeleteHistoryConfirmation(entry);
         if (!confirmed) return;
@@ -640,17 +660,15 @@
             const params = new URLSearchParams({ userId });
             if (entry.kind === 'db' && !entry.legacy) {
                 params.set('tripId', String(entry.id));
-            } else if (entry.conversationId) {
-                params.set('conversationId', String(entry.conversationId));
             } else if (entry.threadId) {
                 params.set('sessionId', String(entry.threadId));
             }
 
             // A local-only chat has no server session. It is removed from
             // browser history without making a pointless DB request.
-            const hasServerTarget = params.has('tripId') || params.has('sessionId') || params.has('conversationId');
+            const hasServerTarget = params.has('tripId') || params.has('sessionId');
             if (hasServerTarget) {
-                const res = await fetch('/api/history?' + params.toString(), { method: 'DELETE' });
+                const res = await apiFetch('/api/history?' + params.toString(), { method: 'DELETE' });
                 const data = await res.json().catch(() => ({}));
                 if (!res.ok) throw new Error(data.error || 'Could not delete history');
             }
@@ -727,21 +745,17 @@
         // render stale/local planData and lose structured Weather/Hotel/RAG/etc.
         // when the user switches chats and comes back.
         const sessionId = chatThreadIdForDelete(chat);
-        const conversationId = String(chat.conversationId || '').trim();
-        const isServerChat = String(chatId).startsWith('server-') || !!sessionId || !!conversationId;
+        const isServerChat = String(chatId).startsWith('server-') || !!sessionId;
 
         // Always refresh a server conversation before rendering it. This makes
         // Recent History independent of stale localStorage and restores the
         // exact structured result saved by the backend.
         let messages = chat.messages || [];
-        if (isServerChat && (conversationId || sessionId)) {
+        if (isServerChat && sessionId) {
             try {
-                const userId = userIdField.value.trim() || 'aaro_hi_user';
-                const historyUrl = conversationId
-                    ? '/api/chat/conversation/' + encodeURIComponent(conversationId)
-                    : '/api/chat/session/' + encodeURIComponent(sessionId);
-                const res = await fetch(historyUrl
-                    + '?userId=' + encodeURIComponent(userId) + '&limit=200');
+                const userId = currentUserId || userIdField.value.trim() || '';
+                const res = await apiFetch('/api/chat/session/' + encodeURIComponent(sessionId)
+                    + '?userId=' + encodeURIComponent(userId) + '&limit=100');
                 if (res.ok) {
                     const serverMessages = await res.json();
                     if (Array.isArray(serverMessages) && serverMessages.length) {
@@ -770,8 +784,8 @@
             && messages.some(m => m.role === 'assistant' && !m.planData);
         if (needsRestore) {
             try {
-                const userId = userIdField.value.trim() || 'aaro_hi_user';
-                const restoreRes = await fetch('/api/plan/' + encodeURIComponent(sessionId)
+                const userId = currentUserId || userIdField.value.trim() || '';
+                const restoreRes = await apiFetch('/api/plan/' + encodeURIComponent(sessionId)
                     + '/restore?userId=' + encodeURIComponent(userId));
                 if (restoreRes.ok) {
                     fallbackRestore = await restoreRes.json();
@@ -1117,33 +1131,60 @@
     };
 
     const buildHotelsSection = (hotels) => {
-        // Backend HotelAgentService is the single authoritative validation boundary.
-        // The browser MUST NOT re-validate hotel identity with its own lexical rules:
-        // provider hotel names can legitimately contain punctuation, brands,
-        // locations, languages, or long legal property names. A second UI filter
-        // previously rejected valid backend results and produced a false empty state.
         const usable = (Array.isArray(hotels) ? hotels : [])
             .filter(h => h && String(h.name || '').trim());
         if (!usable.length) return '<div class="specialist-empty">No verified hotel properties were found for this request.</div>';
+
         const visibleCount = 4;
         const cards = usable.map((h, index) => {
-            const meta = [h.area ? '📍 ' + h.area : '', h.priceRange ? '💰 ' + h.priceRange : '', h.rating ? '★ ' + h.rating : ''].filter(Boolean).join(' · ');
-            const fit = cleanHotelText(h.suitableFor);
+            const name = cleanHotelText(h.name);
+            const area = cleanHotelText(h.area);
+            const rating = cleanHotelText(h.rating);
+            const hotelClass = cleanHotelText(h.hotelClass);
+            const price = cleanHotelText(h.priceRange);
+            const total = cleanHotelText(h.totalPrice);
+            const deal = cleanHotelText(h.deal);
             const note = cleanHotelText(h.notes);
+            const amenities = String(h.amenities || '').split(',').map(x => cleanHotelText(x)).filter(Boolean).slice(0, 6);
+            const image = String(h.imageUrl || '').trim();
+            const booking = String(h.bookingUrl || '').trim();
+            const reviews = Number(h.reviews || 0);
             const extraClass = index >= visibleCount ? ' is-extra' : '';
-            return '<div class="hotel-card' + extraClass + '">'
-                + '<div class="hotel-card-main"><div class="item-title">' + escapeHtml(cleanHotelText(h.name)) + '</div>'
-                + (meta ? '<div class="item-meta">' + escapeHtml(meta) + '</div>' : '')
-                + (fit ? '<span class="hotel-fit">' + escapeHtml(fit) + '</span>' : '')
-                + (note ? '<div class="item-note">' + escapeHtml(note) + '</div>' : '')
-                + '</div></div>';
+            const badge = deal ? '<span class="hotel-rich-badge deal">' + escapeHtml(deal.length > 28 ? deal.slice(0,28) + '…' : deal) + '</span>' : (hotelClass ? '<span class="hotel-rich-badge">' + escapeHtml(hotelClass) + '</span>' : '');
+            const media = image
+                ? '<img src="' + escapeHtml(image) + '" alt="' + escapeHtml(name) + '" loading="lazy" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'grid\';"><div class="hotel-rich-media-fallback">🏨</div>'
+                : '<div class="hotel-rich-media-fallback">🏨</div>';
+            const ratingHtml = rating
+                ? '<div class="hotel-rich-rating"><span>★ ' + escapeHtml(rating) + '</span>' + (reviews > 0 ? '<span class="reviews">· ' + escapeHtml(reviews.toLocaleString()) + ' reviews</span>' : '') + (hotelClass ? '<span class="hotel-rich-class">' + escapeHtml(hotelClass) + '</span>' : '') + '</div>'
+                : (reviews > 0 ? '<div class="hotel-rich-rating"><span class="reviews">' + escapeHtml(reviews.toLocaleString()) + ' reviews</span></div>' : '');
+            const amenityHtml = amenities.length ? '<div class="hotel-rich-amenities">' + amenities.map(a => '<span class="hotel-amenity-chip">✓ ' + escapeHtml(a) + '</span>').join('') + '</div>' : '';
+            const dealHtml = deal ? '<div class="hotel-rich-deal">✦ ' + escapeHtml(deal) + '</div>' : '';
+            const bookHtml = booking ? '<a class="hotel-rich-book" href="' + escapeHtml(booking) + '" target="_blank" rel="noopener noreferrer">View deal ↗</a>' : '';
+            const cancelHtml = h.freeCancellation ? '<div class="hotel-rich-cancel">✓ Free cancellation</div>' : '';
+            return '<article class="hotel-rich-card' + extraClass + '">'
+                + '<div class="hotel-rich-media">' + media + badge + '</div>'
+                + '<div class="hotel-rich-main">'
+                + '<div class="hotel-rich-title-row"><div style="min-width:0"><div class="hotel-rich-name">' + escapeHtml(name) + '</div>'
+                + (area ? '<div class="hotel-rich-location">📍 ' + escapeHtml(area) + '</div>' : '') + '</div></div>'
+                + ratingHtml
+                + (note ? '<div class="hotel-rich-note">' + escapeHtml(note) + '</div>' : '')
+                + amenityHtml + dealHtml
+                + '</div>'
+                + '<div class="hotel-rich-price">'
+                + (price ? '<div class="hotel-rich-price-label">FROM / NIGHT</div><div class="hotel-rich-price-main">' + escapeHtml(price) + '</div>' : '<div class="hotel-rich-price-label">PRICE</div><div class="hotel-rich-price-main">Check rates</div>')
+                + (total ? '<div class="hotel-rich-price-total">Total stay ' + escapeHtml(total) + '</div>' : '')
+                + bookHtml + cancelHtml
+                + '</div></article>';
         }).join('');
-        const more = usable.length > visibleCount
-            ? '<button type="button" class="hotel-more-btn" data-hotels-more>＋ ' + (usable.length - visibleCount) + ' more hotel options</button>'
-            : '';
-        return '<div class="hotel-list">' + cards + '</div>' + more;
-    };
 
+        const extraCount = Math.max(0, usable.length - visibleCount);
+        const more = extraCount > 0
+            ? '<button type="button" class="hotel-rich-more" data-hotels-more>＋ ' + extraCount + ' more hotel option' + (extraCount === 1 ? '' : 's') + '</button>'
+            : '';
+        return '<div class="hotel-rich-widget">'
+            + '<div class="hotel-rich-summary"><div class="hotel-rich-summary-main"><div class="hotel-rich-summary-icon">🏨</div><div><div class="hotel-rich-summary-title">Live hotel options</div><div class="hotel-rich-summary-sub">Google Hotels results · prices, ratings, photos, amenities and booking links</div></div></div><span class="hotel-rich-count">' + usable.length + ' option' + (usable.length === 1 ? '' : 's') + '</span></div>'
+            + '<div class="hotel-rich-list">' + cards + '</div>' + more + '</div>';
+    };
     const buildItinerarySection = (itinerary) => {
         const days = itinerary && Array.isArray(itinerary.days) ? itinerary.days : [];
         if (!days.length) return '';
@@ -1168,15 +1209,24 @@
         days.forEach(day => {
             const activities = Array.isArray(day.activities) ? day.activities.filter(a => a && text(a.name)) : [];
             const dayCost = money(day.estimatedCost, day.currency);
+            const foodCount = activities.filter(a => a.foodExperience === true).length;
+            const localCount = activities.filter(a => a.localExperience === true).length;
+            const familyCount = activities.filter(a => a.familyFriendly === true).length;
+            const stats = '<div class="itin-day-stats">'
+                + '<span>📍 ' + activities.length + ' stop' + (activities.length === 1 ? '' : 's') + '</span>'
+                + (foodCount ? '<span>🍜 ' + foodCount + ' food</span>' : '')
+                + (localCount ? '<span>🏘 ' + localCount + ' local</span>' : '')
+                + (familyCount ? '<span>👨‍👩‍👧 family</span>' : '')
+                + '</div>';
             html += '<article class="itin-rich-day"><div class="itin-rich-day-head">'
                 + '<div class="itin-rich-day-number">DAY ' + escapeHtml(String(day.day || '')) + '</div>'
                 + '<div class="itin-rich-day-title-wrap"><h3>' + escapeHtml(text(day.title) || 'Explore') + '</h3>'
-                + (text(day.summary) ? '<p>' + escapeHtml(day.summary) + '</p>' : '') + '</div>'
+                + (text(day.summary) ? '<p>' + escapeHtml(day.summary) + '</p>' : '') + stats + '</div>'
                 + (dayCost ? '<div class="itin-day-cost">' + escapeHtml(dayCost) + '<small>estimated</small></div>' : '')
                 + '</div>';
             if (activities.length) {
                 html += '<div class="itin-rich-activities">';
-                activities.forEach(a => {
+                activities.forEach((a, activityIndex) => {
                     const tags = activityTags(a);
                     const image = safeUrl(a.imageUrl || a.image || a.photoUrl);
                     const booking = safeUrl(a.bookingUrl || a.url || a.link);
@@ -1189,7 +1239,7 @@
                         + (image ? '<img src="' + escapeHtml(image) + '" alt="' + escapeHtml(a.name) + '" loading="lazy" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\';">' : '')
                         + '<div class="itin-rich-activity-placeholder"' + (image ? ' style="display:none"' : '') + '>' + activityIcon(a.type) + '</div>'
                         + '</div><div class="itin-rich-activity-body">'
-                        + '<div class="itin-rich-activity-top"><div><div class="itin-rich-activity-name">' + escapeHtml(a.name) + '</div>'
+                        + '<div class="itin-rich-activity-top"><div><div class="itin-rich-activity-name"><span class="itin-stop-index">' + (activityIndex + 1) + '</span>' + escapeHtml(a.name) + '</div>'
                         + (a.type ? '<span class="itin-rich-type">' + escapeHtml(a.type) + '</span>' : '') + '</div>'
                         + (cost ? '<div class="itin-activity-cost">' + escapeHtml(cost) + '</div>' : '') + '</div>'
                         + (description ? '<div class="itin-rich-description">' + escapeHtml(description) + '</div>' : '')
@@ -1509,30 +1559,25 @@
         return html + '</div>';
     };
 
+    const widgetControls = (key, title) =>
+        '<div class="widget-controls" aria-label="' + escapeHtml(title) + ' widget controls">'
+        + '<button type="button" class="widget-control widget-fold-control" data-widget-action="collapse" data-widget-key="' + escapeHtml(key) + '" title="Fold in ' + escapeHtml(title) + '" aria-label="Fold in ' + escapeHtml(title) + '" aria-expanded="true">⌃</button>'
+        + '<button type="button" class="widget-control" data-widget-action="expand" data-widget-key="' + escapeHtml(key) + '" title="Expand ' + escapeHtml(title) + '" aria-label="Expand ' + escapeHtml(title) + '">⛶</button>'
+        + '<button type="button" class="widget-control close" data-widget-action="close" data-widget-key="' + escapeHtml(key) + '" title="Hide ' + escapeHtml(title) + '" aria-label="Hide ' + escapeHtml(title) + '">×</button>'
+        + '</div>';
+
     const buildSpecialistResponseHtml = (data, userRequest) => {
         const plan = data.plan || data || {};
         const trip = plan.trip || {};
         const type = String(data.requestType || trip.requestType || 'GENERAL').toUpperCase();
         const location = String((plan.weather && plan.weather.location) || trip.destination || data.destination || '').trim();
-        const origin = String(trip.origin || data.origin || '').trim();
-        const destination = String(trip.destination || data.destination || location || '').trim();
-        const flightRouteTitle = origin && destination
-            ? 'Flight options from ' + origin + ' to ' + destination
-            : origin
-                ? 'Flight options from ' + origin
-                : destination
-                    ? 'Flight options for ' + destination
-                    : 'Flight options';
-        const flightRouteFact = origin && destination
-            ? origin + ' → ' + destination
-            : origin || destination;
         const weather = plan.weather || data.weather;
         const flights = Array.isArray(plan.flights) ? plan.flights : (Array.isArray(data.flights) ? data.flights : []);
         const hotels = Array.isArray(plan.hotels) ? plan.hotels : (Array.isArray(data.hotels) ? data.hotels : []);
         const budget = plan.budget;
         const exec = data.execution || {};
         const answer = String(exec.ragAnswer || data.ragAnswer || plan.tips || data.finalPlan || '').trim();
-        const hasWeather = !!(weather && ((weather.current && weather.current.temperature != null) || (Array.isArray(weather.days) && weather.days.some(d => d && (d.high != null || d.low != null || d.condition)))));
+        const hasWeather = !!(weather && (weather.summary || weather.location || (Array.isArray(weather.days) && weather.days.length) || weather.current));
         const hasBudget = !!(budget && Array.isArray(budget.lineItems) && budget.lineItems.length);
         const hasAnswer = !!answer;
         const clarification = String(data.clarificationRequired || data.plan?.clarificationRequired || '').trim();
@@ -1540,7 +1585,7 @@
 
         const meta = {
             WEATHER: ['☀️', location ? 'Weather in ' + location : 'Weather details', 'Current conditions and forecast'],
-            FLIGHT_SEARCH: ['✈️', flightRouteTitle, 'Available schedules and returned fare data'],
+            FLIGHT_SEARCH: ['✈️', location ? 'Flight options for ' + location : 'Flight options', 'Available schedules and returned fare data'],
             HOTEL_SEARCH: ['🏨', location ? 'Hotels in ' + location : 'Hotel options', 'Accommodation recommendations'],
             BUDGET: ['💰', 'Travel budget', 'Estimated cost for your request'],
             RESEARCH: ['🔎', location ? 'Things to do in ' + location : 'Travel research', 'Destination recommendations and current research'],
@@ -1549,27 +1594,28 @@
 
         const isMulti = type === 'MULTI_CAPABILITY' || type === 'MULTI_INTENT';
         const widgets = [];
-        if (hasWeather && (type === 'WEATHER' || isMulti)) { widgets.push({key:'weather', icon:'☀️', title:'Weather', subtitle:'Current conditions and forecast', body:buildWeatherSection(weather, {focused: !isMulti})}); }
-        if (flights.length && (type === 'FLIGHT_SEARCH' || isMulti)) { widgets.push({key:'flights', icon:'✈️', title:'Flights', subtitle:'Available schedules and fare data', body:buildFlightsSection(flights)}); }
-        if (hotels.length && (type === 'HOTEL_SEARCH' || isMulti)) { widgets.push({key:'hotels', icon:'🏨', title:'Hotels', subtitle:'Accommodation recommendations', body:buildHotelsSection(hotels)}); }
-        if (hasBudget && (type === 'BUDGET' || isMulti)) { widgets.push({key:'budget', icon:'💰', title:'Budget', subtitle:'Estimated cost', body:buildBudgetTable(budget)}); }
+        if (isMulti || type === 'WEATHER') { if (hasWeather) widgets.push({key:'weather', icon:'☀️', title:'Weather', subtitle:'Current conditions and forecast', body:buildWeatherSection(weather, {focused: !isMulti})}); }
+        if (isMulti || type === 'FLIGHT_SEARCH') { if (flights.length) widgets.push({key:'flights', icon:'✈️', title:'Flights', subtitle:'Available schedules and fare data', body:buildFlightsSection(flights)}); }
+        if (isMulti || type === 'HOTEL_SEARCH') { if (hotels.length) widgets.push({key:'hotels', icon:'🏨', title:'Hotels', subtitle:'Accommodation recommendations', body:buildHotelsSection(hotels)}); }
+        if (isMulti || type === 'BUDGET') { if (hasBudget) widgets.push({key:'budget', icon:'💰', title:'Budget', subtitle:'Estimated cost', body:buildBudgetTable(budget)}); }
         if ((type === 'RESEARCH' || type === 'HISTORY' || (!isMulti && !widgets.length)) && hasAnswer) widgets.push({key:'answer', icon:meta[0], title:meta[1], subtitle:meta[2], body:'<div class="specialist-answer">' + formatKnowledgeText(answer) + '</div>'});
 
         const nav = widgets.length > 1 ? '<nav class="plan-section-nav">' + widgets.map((w,i) => '<button type="button" class="plan-nav-btn' + (i === 0 ? ' active' : '') + '" data-section-target="' + w.key + '" title="Open ' + escapeHtml(w.title) + '" aria-label="Open ' + escapeHtml(w.title) + '">' + w.icon + ' ' + escapeHtml(w.title) + '</button>').join('') + '</nav>' : '';
         let steps = '';
         widgets.forEach((w, i) => {
-            steps += '<section id="section-' + w.key + '" class="plan-step">'
-                + '<div class="plan-step-rail"><span class="plan-step-number">' + (i + 1) + '</span><span class="plan-step-line"></span></div>'
-                + '<div class="plan-step-card"><div class="plan-step-head"><div class="plan-step-heading"><div class="plan-step-icon">' + w.icon + '</div><div><h3>' + escapeHtml(w.title) + ' <span class="plan-check">✓</span></h3><p>' + escapeHtml(w.subtitle) + '</p></div></div><span class="ready-badge">✓ Complete</span></div>'
+            steps += '<section id="section-' + w.key + '" class="plan-step" data-widget-title="' + escapeHtml(w.title) + '">'
+                + '<div class="plan-step-rail"><span class="plan-step-number" title="Step ' + (i + 1) + '" aria-hidden="true">' + (i + 1) + '</span><span class="plan-step-line"></span></div>'
+                + '<div class="plan-step-card"><div class="plan-step-head"><div class="plan-step-heading"><div class="plan-step-icon">' + w.icon + '</div><div><h3>' + escapeHtml(w.title) + ' <span class="plan-check">✓</span></h3><p>' + escapeHtml(w.subtitle) + '</p></div></div><div class="widget-head-actions"><span class="ready-badge">✓ Complete</span>' + widgetControls(w.key, w.title) + '</div></div>'
                 + w.body + '</div></section>';
         });
         if (!steps) steps = '<div class="specialist-empty">No additional structured details were returned for this request.</div>';
 
         let html = '<div class="plan-workspace specialist-dynamic-workspace">'
             + '<header class="plan-header specialist-dynamic-header"><div class="plan-header-top"><div><div class="trip-eyebrow">AGENTICTRIPAI · ' + escapeHtml(type.replace(/_/g, ' ')) + '</div><h1>' + escapeHtml(meta[1]) + '</h1></div><div class="plan-header-status">' + (needsUserInput ? 'Needs your input' : '✓ Complete') + '</div></div>'
-            + '<div class="plan-header-facts"><span>✦ Requested information</span>' + (type === 'FLIGHT_SEARCH' && flightRouteFact ? '<span>📍 ' + escapeHtml(flightRouteFact) + '</span>' : (location ? '<span>📍 ' + escapeHtml(location) + '</span>' : '')) + (userRequest ? '<span class="specialist-request">' + escapeHtml(String(userRequest).slice(0, 100)) + '</span>' : '') + '</div></header>'
+            + '<div class="plan-header-facts"><span>✦ Requested information</span>' + (location ? '<span>📍 ' + escapeHtml(location) + '</span>' : '') + (userRequest ? '<span class="specialist-request">' + escapeHtml(String(userRequest).slice(0, 100)) + '</span>' : '') + '</div></header>'
             + (needsUserInput && clarification ? '<div class="agent-clarification-banner"><strong>✦ Action needed</strong><span>' + escapeHtml(clarification) + '</span></div>' : '')
             + nav + '<div class="plan-steps">' + steps + '</div>'
+            + '<div class="widget-restore-tray" data-widget-restore-tray style="display:none"><span class="widget-restore-label">Closed widgets</span></div>'
             + '</div>';
         return html;
     };
@@ -1603,7 +1649,7 @@
         const hasHotels = hotels.length > 0;
         const hasItinerary = hasItineraryData;
         const hasBudget = !!(plan.budget && Array.isArray(plan.budget.lineItems) && plan.budget.lineItems.length);
-        const hasWeather = !!(plan.weather && ((plan.weather.current && plan.weather.current.temperature != null) || (Array.isArray(plan.weather.days) && plan.weather.days.some(d => d && (d.high != null || d.low != null || d.condition)))));
+        const hasWeather = !!(plan.weather && ((plan.weather.current && plan.weather.current.temperature != null) || (Array.isArray(plan.weather.days) && plan.weather.days.some(d => d && (d.high != null || d.low != null || d.condition))) || (typeof plan.weather.summary === 'string' && /no weather details found/i.test(plan.weather.summary))));
         const knowledge = plan.knowledge || {};
         const exec = data.execution || {};
         const hasKnowledge = !!(knowledge.available === true || knowledge.answer || exec.ragAnswer || data.ragAnswer);
@@ -1644,12 +1690,14 @@
 
         const section = (number, key, icon, title, subtitle, body, badge, extraClass) => {
             if (!body) return '';
-            return '<section id="section-' + key + '" class="plan-step ' + (extraClass || '') + '">'
-                + '<div class="plan-step-rail"><span class="plan-step-number">' + number + '</span><span class="plan-step-line"></span></div>'
+            return '<section id="section-' + key + '" class="plan-step ' + (extraClass || '') + '" data-widget-title="' + escapeHtml(title) + '">'
+                + '<div class="plan-step-rail"><span class="plan-step-number" title="Step ' + number + '" aria-hidden="true">' + number + '</span><span class="plan-step-line"></span></div>'
                 + '<div class="plan-step-card">'
                 + '<div class="plan-step-head"><div class="plan-step-heading"><div class="plan-step-icon">' + icon + '</div><div><h3>' + title + ' <span class="plan-check">✓</span></h3><p>' + subtitle + '</p></div></div>'
+                + '<div class="widget-head-actions">'
                 + (badge ? '<span class="ready-badge ' + (badge === 'Review' ? 'review-badge' : badge === '✓ Approved' ? 'approved-badge' : badge === '✕ Rejected' ? 'rejected-badge' : '') + '">' + badge + '</span>' : '')
-                + '</div>' + body + '</div></section>';
+                + widgetControls(key, title)
+                + '</div></div>' + body + '</div></section>';
         };
 
         let html = '<div class="plan-workspace">';
@@ -1665,7 +1713,7 @@
             + '</div>'
             + (requirements.length ? '<div class="plan-requirements">' + requirements.map(r => '<span>✓ ' + escapeHtml(r) + '</span>').join('') + '</div>' : '')
             + '</header>'
-            + (String(data.status || '').toUpperCase() === 'NEEDS_USER_INPUT' && String(data.clarificationRequired || '').trim() ? '<div class="agent-clarification-banner"><strong>✦ Action needed</strong><span>' + escapeHtml(String(data.clarificationRequired)) + '</span></div>' : '');
+            + (responseStatus === 'NEEDS_USER_INPUT' && String(data.clarificationRequired || '').trim() ? '<div class="agent-clarification-banner"><strong>✦ Action needed</strong><span>' + escapeHtml(String(data.clarificationRequired)) + '</span></div>' : '');
 
         const nav = [];
         if (hasFlights) nav.push(['flights','✈ Flights']);
@@ -1691,19 +1739,15 @@
             if (knowledgeBody) html += section(step++, 'knowledge', '🧠', 'Travel Knowledge & Tips', 'Useful destination guidance for your trip', knowledgeBody.replace(/^<section[^>]*>|<\/section>$/g, ''), widgetBadge('✓ Grounded'));
         }
         if (tips && !hasKnowledge) html += section(step++, 'tips', '💡', 'Travel Tips', 'Practical trip-specific suggestions', '<div class="knowledge-answer">' + formatKnowledgeText(tips) + '</div>', widgetBadge('✓ Ready'));
+        html += '<div class="widget-restore-tray" data-widget-restore-tray style="display:none"><span class="widget-restore-label">Closed widgets</span></div>';
         html += '</div>';
 
         if (data.validationErrors?.length || data.semanticNotes?.length || data.ragJudge) {
             html += '<div class="plan-validation">' + buildPlanReview(data, userRequest) + '</div>';
         }
 
-        if (awaitingApproval && data.threadId && (data.tripPlanning !== false || responseStatus === 'NEEDS_USER_INPUT')) {
-            const clarification = responseStatus === 'NEEDS_USER_INPUT' || Boolean(data.clarificationRequired);
-            if (clarification) {
-                html += '<section class="plan-final-action" data-decision-panel><div><span class="decision-status pending"><i class="decision-dot"></i> More information needed</span><h3>One detail is missing</h3><p>' + escapeHtml(String(data.clarificationQuestion || data.clarificationRequired || 'Please provide the missing travel detail.')) + '</p></div><div class="final-actions-inline"><button type="button" class="final-modify" data-plan-action="modify" data-thread-id="' + escapeHtml(data.threadId) + '">✎ Provide details</button><button type="button" class="final-reject" data-plan-action="reject" data-thread-id="' + escapeHtml(data.threadId) + '">✕ Cancel</button></div></section>';
-            } else {
-                html += '<section class="plan-final-action" data-decision-panel><div><span class="decision-status pending"><i class="decision-dot"></i> Waiting for your decision</span><h3>Ready to finalize?</h3><p>Review the plan, then approve it, request a change, or reject it.</p><div class="decision-progress" data-decision-progress><span class="decision-spinner"></span><span data-decision-message>Working…</span></div></div><div class="final-actions-inline"><button type="button" class="final-approve" data-plan-action="approve" data-thread-id="' + escapeHtml(data.threadId) + '">✓ Approve</button><button type="button" class="final-modify" data-plan-action="modify" data-thread-id="' + escapeHtml(data.threadId) + '">✎ Modify</button><button type="button" class="final-reject" data-plan-action="reject" data-thread-id="' + escapeHtml(data.threadId) + '">✕ Reject</button></div></section>';
-            }
+        if (awaitingApproval && data.threadId && data.tripPlanning !== false) {
+            html += '<section class="plan-final-action"><div><span class="decision-status pending"><i class="decision-dot"></i> Waiting for your decision</span><h3>Ready to finalize?</h3><p>Review the plan, then approve it, request a change, or reject it.</p></div><div class="final-actions-inline"><button type="button" class="final-approve" data-plan-action="approve" data-thread-id="' + escapeHtml(data.threadId) + '">✓ Approve</button><button type="button" class="final-modify" data-plan-action="modify" data-thread-id="' + escapeHtml(data.threadId) + '">✎ Modify</button><button type="button" class="final-reject" data-plan-action="reject" data-thread-id="' + escapeHtml(data.threadId) + '">✕ Reject</button></div></section>';
         } else if (approvalState === 'APPROVED') {
             html += '<section class="plan-final-action confirmed"><div><span class="decision-status"><i class="decision-dot"></i> Plan approved</span><h3>✓ Trip plan approved</h3><p>This plan has been approved and finalized.</p></div></section>';
         } else if (approvalState === 'REJECTED') {
@@ -1750,12 +1794,35 @@
         }
     };
 
+    const updateWidgetFoldState = (section) => {
+        if (!section) return;
+        const title = section.dataset.widgetTitle || section.id.replace(/^section-/, '');
+        const collapsed = section.classList.contains('widget-collapsed');
+        const collapseControl = section.querySelector('[data-widget-action="collapse"]');
+        if (collapseControl) {
+            collapseControl.textContent = collapsed ? '⌄' : '⌃';
+            collapseControl.title = collapsed ? 'Fold out ' + title : 'Fold in ' + title;
+            collapseControl.setAttribute('aria-label', collapseControl.title);
+            collapseControl.setAttribute('aria-expanded', String(!collapsed));
+            collapseControl.dataset.foldState = collapsed ? 'collapsed' : 'expanded';
+        }
+        const expandControl = section.querySelector('[data-widget-action="expand"]');
+        if (expandControl) {
+            expandControl.textContent = section.classList.contains('widget-expanded') ? '↙' : '⛶';
+            expandControl.title = section.classList.contains('widget-expanded') ? 'Restore ' + title : 'Expand ' + title;
+            expandControl.setAttribute('aria-label', expandControl.title);
+        }
+        const workspace = section.closest('.plan-workspace');
+        const navButton = workspace?.querySelector('[data-section-target="' + CSS.escape(section.id.replace(/^section-/, '')) + '"]');
+        if (navButton) {
+            navButton.classList.toggle('is-folded', collapsed);
+            navButton.title = collapsed ? 'Folded — click to open ' + title : 'Open ' + title;
+            navButton.setAttribute('aria-expanded', String(!collapsed));
+        }
+    };
+
     const renderAssistantBody = (body, data, userRequestHint) => {
         const userRequest = userRequestHint || '';
-        // TravelPlanResponse is also used for specialist responses. Those
-        // responses can legitimately have no plan object while still carrying
-        // requestType, weather/hotels/flights/budget or RAG knowledge. Always
-        // let the structured renderer decide which UI is appropriate.
         const responseType = String(data?.requestType || data?.plan?.trip?.requestType || '').toUpperCase();
         const specialistResponse = data && data.tripPlanning !== true
             && ['WEATHER','FLIGHT_SEARCH','HOTEL_SEARCH','BUDGET','RESEARCH','MULTI_CAPABILITY','MULTI_INTENT','TRAVEL_INFORMATION','HISTORY','GENERAL'].includes(responseType);
@@ -1774,7 +1841,7 @@
             const text = data && (data.finalPlan || data.text) ? (data.finalPlan || data.text) : 'Plan response available.';
             body.innerHTML = '<div class="server-memory-card">' + formatKnowledgeText(text) + '</div>';
         }
-
+        body.querySelectorAll('.plan-step').forEach(section => updateWidgetFoldState(section));
         body.querySelectorAll('[data-section-target]').forEach(tab => {
             tab.addEventListener('click', () => {
                 body.querySelectorAll('.workspace-tab,.plan-nav-btn').forEach(t => t.classList.remove('active'));
@@ -1808,8 +1875,7 @@
             '<div class="chat-actions"></div>' +
             '</div>';
         const userRequest = userRequestHint || findUserRequestForPlan(row);
-        const body = row.querySelector('.chat-body');
-        renderAssistantBody(body, data, userRequest);
+        renderAssistantBody(row.querySelector('.chat-body'), data, userRequest);
         chatThread.appendChild(row);
         scrollChat();
         if (persist) {
@@ -1849,52 +1915,6 @@
         updatePersistedPlanForThread(data?.threadId, data);
         scrollChat();
         return true;
-    };
-
-    const getCurrentConversationContext = () => {
-        const empty = {
-            destination: '',
-            origin: '',
-            departureDate: '',
-            returnDate: '',
-            budgetLabel: '',
-            travelStyle: ''
-        };
-        try {
-            if (!currentChatId) return empty;
-            const store = loadStore();
-            const chat = store.chats.find(c => c.id === currentChatId);
-            if (!chat || !Array.isArray(chat.messages)) return empty;
-
-            // Walk backwards so the immediately preceding structured response
-            // wins over older trips/messages in the same chat.
-            for (let i = chat.messages.length - 1; i >= 0; i--) {
-                const message = chat.messages[i];
-                const data = message?.planData;
-                if (!data) continue;
-
-                const trip = data.plan?.trip || data.trip || {};
-                const destination = String(
-                    data.destination || trip.destination || ''
-                ).trim();
-                const origin = String(
-                    data.origin || trip.origin || ''
-                ).trim();
-                if (destination || origin) {
-                    return {
-                        destination,
-                        origin,
-                        departureDate: String(data.departureDate || trip.departureDate || '').trim(),
-                        returnDate: String(data.returnDate || trip.returnDate || '').trim(),
-                        budgetLabel: String(data.budgetLabel || trip.budgetLabel || '').trim(),
-                        travelStyle: String(data.travelStyle || trip.travelStyle || '').trim()
-                    };
-                }
-            }
-        } catch (e) {
-            console.warn('Could not resolve follow-up travel context', e);
-        }
-        return empty;
     };
 
     const appendUserMessage = (text) => renderUserMessage(text, true);
@@ -1943,52 +1963,122 @@
     const formatPlan = (data) => formatPlanSummary(data);
 
 
+    const LIVE_PHASES = [
+        { id:'intent', label:'Understand' },
+        { id:'plan', label:'Plan' },
+        { id:'execute', label:'Execute' },
+        { id:'evaluate', label:'Evaluate' },
+        { id:'replan', label:'Replan' }
+    ];
+
+    const phaseForNode = (node) => {
+        const n = String(node || '').toLowerCase();
+        if (n === 'intent') return 'intent';
+        if (n === 'plan') return 'plan';
+        if (n === 'execute') return 'execute';
+        if (n === 'evaluate') return 'evaluate';
+        if (n === 'replan') return 'replan';
+        if (n === 'final' || n === 'complete' || n === 'hitl') return 'final';
+        return null;
+    };
+
+    const humanTaskLabel = (id) => ({
+        flights:'Flights', hotels:'Hotels', research:'Attractions', weather:'Weather',
+        knowledge:'Travel knowledge', history:'Travel history', budget:'Budget', itinerary:'Itinerary'
+    }[String(id || '').toLowerCase()] || String(id || '').replace(/[-_]+/g,' ').replace(/\b\w/g,c=>c.toUpperCase()));
+
     const createLiveResponse = () => {
         const row = document.createElement('div');
         row.className = 'live-response';
+        const phases = LIVE_PHASES.map(p =>
+            '<div class="live-phase" data-phase="' + p.id + '">' +
+              '<div class="live-phase-label"><i class="live-phase-dot"></i><span>' + p.label + '</span></div>' +
+              '<div class="live-phase-detail">Waiting</div>' +
+            '</div>'
+        ).join('');
         row.innerHTML = '<div class="chat-avatar">AI</div><div class="live-response-card">'
-            + '<div class="live-head"><div class="live-title">AgenticTripAI <span class="live-dots"><i></i><i></i><i></i></span></div><div class="live-state">Understanding request…</div></div>'
-            + '<div class="live-steps"></div></div>';
+            + '<div class="live-head"><div class="live-title">AgenticTripAI <span class="live-dots"><i></i><i></i><i></i></span></div><div class="live-state">Working</div></div>'
+            + '<div class="live-timeline">' + phases + '</div>'
+            + '<div class="live-activity"><i class="live-activity-dot"></i><span class="live-activity-text">Starting…</span></div>'
+            + '<div class="live-tasks"><div class="live-tasks-head"><span>Live execution</span><span class="live-task-count"></span></div><div class="live-task-list"></div></div>'
+            + '</div>';
         chatThread.appendChild(row);
         scrollChat();
         return {
             row,
             state: row.querySelector('.live-state'),
-            steps: row.querySelector('.live-steps'),
-            seen: new Set()
+            activity: row.querySelector('.live-activity-text'),
+            phases: row.querySelector('.live-timeline'),
+            tasks: row.querySelector('.live-tasks'),
+            taskList: row.querySelector('.live-task-list'),
+            taskCount: row.querySelector('.live-task-count'),
+            taskMap: new Map()
         };
     };
 
-    const updateLiveResponse = (live, node, phase = 'start') => {
+    const setLivePhase = (live, id, status, detail) => {
+        if (!live || !id || id === 'final') return;
+        const el = live.phases.querySelector('[data-phase="' + id + '"]');
+        if (!el) return;
+        el.classList.remove('active','done','failed');
+        if (status === 'RUNNING') el.classList.add('active');
+        if (status === 'SUCCEEDED') el.classList.add('done');
+        if (status === 'FAILED') el.classList.add('failed');
+        const d = el.querySelector('.live-phase-detail');
+        if (d) d.textContent = detail || (status === 'RUNNING' ? 'In progress' : status === 'SUCCEEDED' ? 'Complete' : 'Failed');
+    };
+
+    const setLiveTask = (live, id, status, message) => {
+        if (!live || !id) return;
+        const key = String(id).toLowerCase();
+        let item = live.taskMap.get(key);
+        if (!item) {
+            item = document.createElement('span');
+            item.className = 'live-task';
+            item.innerHTML = '<i class="task-dot"></i><span class="task-name"></span><span class="task-status"></span>';
+            live.taskList.appendChild(item);
+            live.taskMap.set(key, item);
+        }
+        item.classList.remove('running','done','failed');
+        item.classList.add(status === 'RUNNING' ? 'running' : status === 'FAILED' ? 'failed' : 'done');
+        item.querySelector('.task-name').textContent = humanTaskLabel(id);
+        item.querySelector('.task-status').textContent = status === 'RUNNING' ? 'running' : status === 'FAILED' ? 'failed' : 'complete';
+        live.tasks.classList.add('visible');
+        const running = [...live.taskMap.entries()].filter(([,x]) => x.classList.contains('running'));
+        const done = [...live.taskMap.values()].filter(x => x.classList.contains('done')).length;
+        live.taskCount.textContent = running.length ? (running.length + ' active') : (done + ' completed');
+        if (live.activity) {
+            if (status === 'RUNNING') {
+                live.activity.textContent = (message || humanTaskLabel(id)) + '…';
+            } else if (status === 'FAILED') {
+                live.activity.textContent = (message || humanTaskLabel(id)) + ' failed';
+            } else if (running.length) {
+                live.activity.textContent = (running[0][1].querySelector('span')?.textContent || 'Working') + '…';
+            } else {
+                live.activity.textContent = (message || humanTaskLabel(id)) + ' complete';
+            }
+        }
+    };
+
+    const updateLiveResponse = (live, node, phase = 'start', message) => {
         if (!live || !node) return;
         const raw = String(node).replace(/^__+|__+$/g, '').replace(/[-_]+/g, ' ').trim();
-        // START is a graph lifecycle marker, not an actual agent stage.
-        // Never leave the UI showing "Running START…".
-        if (!raw || raw.toUpperCase() === 'START') {
-            if (phase === 'start') {
-                live.state.textContent = 'Understanding request…';
-            }
-            return;
+        const id = String(node).toLowerCase().replace(/\s+/g,'_');
+        const phaseId = phaseForNode(id);
+        if (!phaseId) return;
+        const status = phase === 'start' ? 'RUNNING' : 'SUCCEEDED';
+
+        // Phase cards communicate workflow position only. They deliberately do
+        // not repeat the detailed live activity message.
+        setLivePhase(live, phaseId, status);
+
+        // Keep the header intentionally stable: the exact current operation is
+        // shown in ONE place only, in .live-activity.
+        if (phase === 'start' && live.activity) {
+            live.activity.textContent = message || ('Running ' + raw) + '…';
+        } else if (phase === 'complete' && live.activity && !live.taskMap?.size) {
+            live.activity.textContent = message || (raw + ' complete');
         }
-        const normalized = raw;
-        if (phase === 'start') {
-            live.state.textContent = 'Running ' + normalized + '…';
-        }
-        const key = normalized.toLowerCase();
-        let pill = Array.from(live.steps.querySelectorAll('.live-step'))
-            .find(p => p.dataset.node === key);
-        if (!pill) {
-            pill = document.createElement('span');
-            pill.className = 'live-step';
-            pill.dataset.node = key;
-            live.steps.appendChild(pill);
-        }
-        pill.textContent = '✓ ' + normalized;
-        live.steps.querySelectorAll('.live-step').forEach(p => p.classList.remove('active'));
-        if (phase === 'start') {
-            pill.classList.add('active');
-        }
-        scrollChat();
     };
 
     const removeLiveResponse = (live) => {
@@ -2017,36 +2107,8 @@
 
         const formData = new FormData(form);
         const payload = Object.fromEntries(formData.entries());
-        const currentConversation = ensureCurrentChat(text);
-        payload.conversationId = String(currentConversation.conversationId || currentConversation.id);
         payload.preferences = text;
         payload.prompt = text;
-
-        // Follow-up turns are sent as new graph threads, but they still belong
-        // to the same browser conversation. Carry forward the structured route
-        // context from the latest assistant result when the new prompt omits it.
-        // Without this, a follow-up such as "what is the weather currently"
-        // reaches the Weather specialist with no destination and correctly
-        // pauses for input.
-        const followUpContext = getCurrentConversationContext();
-        if (!payload.destination && followUpContext.destination) {
-            payload.destination = followUpContext.destination;
-        }
-        if (!payload.departureCity && followUpContext.origin) {
-            payload.departureCity = followUpContext.origin;
-        }
-        if (!payload.departureDate && followUpContext.departureDate) {
-            payload.departureDate = followUpContext.departureDate;
-        }
-        if (!payload.returnDate && followUpContext.returnDate) {
-            payload.returnDate = followUpContext.returnDate;
-        }
-        if (!payload.budget && followUpContext.budgetLabel) {
-            payload.budget = followUpContext.budgetLabel;
-        }
-        if (!payload.travelStyle && followUpContext.travelStyle) {
-            payload.travelStyle = followUpContext.travelStyle;
-        }
 
         appendUserMessage(text);
         promptInput.value = '';
@@ -2055,7 +2117,7 @@
         const liveResponse = createLiveResponse();
 
         try {
-            const startRes = await fetch('/api/plan/start', {
+            const startRes = await apiFetch('/api/plan/start', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
@@ -2077,22 +2139,34 @@
                 // finishes, which can take a while when the intent model is
                 // running.
                 es.addEventListener('started', (evt) => {
-                    // Graph accepted. The activity row is the single source of
-                    // truth for the current live action; don't duplicate it in
-                    // the header.
+                    // START only means the asynchronous graph was accepted.
+                    // It is not an agent stage, so keep the neutral state until
+                    // the first real node_start event arrives.
                     try {
                         const data = JSON.parse(evt.data);
-                        if (data.node && String(data.node).toUpperCase() !== 'START') {
-                            updateLiveResponse(liveResponse, data.node, 'start', data.message);
+                        if (!data.node || String(data.node).toUpperCase() === 'START') {
+                            liveResponse.state.textContent = 'Working';
+                            if (liveResponse.activity) liveResponse.activity.textContent = 'Starting…';
                         }
+                    } catch (ignored) {}
+                });
+                es.addEventListener('activity', (evt) => {
+                    try {
+                        const data = JSON.parse(evt.data);
+                        const msg = data.message || '';
+                        if (!msg) return;
+                        if (liveResponse.activity) liveResponse.activity.textContent = msg + '…';
+                        const phaseId = phaseForNode(data.phase || '');
+                        if (phaseId) setLivePhase(liveResponse, phaseId, 'RUNNING');
                     } catch (ignored) {}
                 });
                 es.addEventListener('node_start', (evt) => {
                     try {
                         const data = JSON.parse(evt.data);
                         if (data.node) {
-                            if (statusSpan) statusSpan.textContent = data.message || ('Running ' + data.node + '…');
-                            updateLiveResponse(liveResponse, data.node, 'start', data.message);
+                            const msg = data.message || ('Running ' + data.node);
+                            if (statusSpan) statusSpan.textContent = msg + '…';
+                            updateLiveResponse(liveResponse, data.node, 'start', msg);
                         }
                     } catch (ignored) {}
                 });
@@ -2100,19 +2174,19 @@
                     try {
                         const data = JSON.parse(evt.data);
                         if (data.node) {
-                            updateLiveResponse(liveResponse, data.node, 'complete', data.message);
+                            const msg = data.message || data.node;
+                            if (statusSpan) statusSpan.textContent = msg;
+                            updateLiveResponse(liveResponse, data.node, 'complete', msg);
                         }
                     } catch (ignored) {}
                 });
-                // Specialist-level events are the most useful live signal.
-                // Show them in the activity row while keeping the five phase
-                // timeline clean and non-duplicated.
                 es.addEventListener('task_start', (evt) => {
                     try {
                         const data = JSON.parse(evt.data);
                         if (data.task) {
-                            setLiveTask(liveResponse, data.task, 'RUNNING', data.message);
-                            if (statusSpan) statusSpan.textContent = data.message || humanTaskLabel(data.task) + '…';
+                            const msg = data.message || data.task;
+                            if (statusSpan) statusSpan.textContent = msg + '…';
+                            setLiveTask(liveResponse, data.task, 'RUNNING', msg);
                         }
                     } catch (ignored) {}
                 });
@@ -2120,20 +2194,25 @@
                     try {
                         const data = JSON.parse(evt.data);
                         if (data.task) {
-                            const status = String(data.status || '').toUpperCase() === 'FAILED' ? 'FAILED' : 'SUCCEEDED';
-                            setLiveTask(liveResponse, data.task, status, data.message);
-                            if (statusSpan) statusSpan.textContent = data.message || (humanTaskLabel(data.task) + (status === 'FAILED' ? ' failed' : ' complete'));
+                            const msg = data.message || data.task;
+                            const failed = data.status === 'FAILED';
+                            if (statusSpan) statusSpan.textContent = failed ? msg + ' — failed' : msg;
+                            setLiveTask(liveResponse, data.task, failed ? 'FAILED' : 'SUCCEEDED', msg);
                         }
                     } catch (ignored) {}
                 });
+                // `node` is a legacy compatibility event. Do not render it;
+                // node_start/node_complete already provide the authoritative lifecycle.
+                es.addEventListener('node', () => {});
                 es.addEventListener('complete', async (evt) => {
                     finished = true;
                     es.close();
+                    liveResponse.state.textContent = 'Plan ready';
                     try {
                         const wrapper = JSON.parse(evt.data);
                         const data = wrapper.plan || wrapper;
                         try {
-                            const hist = await fetch('/api/plan/' + encodeURIComponent(threadId) + '/history').then(r => r.json());
+                            const hist = await apiFetch('/api/plan/' + encodeURIComponent(threadId) + '/history').then(r => r.json());
                             if (!data.execution) {
                                 data.execution = {};
                             }
@@ -2165,6 +2244,7 @@
                 es.addEventListener('failed', (evt) => {
                     finished = true;
                     es.close();
+                    liveResponse.state.textContent = 'Plan ready';
                     liveResponse.row.classList.add('live-complete');
                     setTimeout(() => removeLiveResponse(liveResponse), 260);
                     try {
@@ -2198,36 +2278,6 @@
         }
     });
 
-    const setDecisionProgress = (sourceRow, message, state = 'working') => {
-        const panel = sourceRow?.querySelector('[data-decision-panel]');
-        if (!panel) return;
-        const progress = panel.querySelector('[data-decision-progress]');
-        const messageNode = panel.querySelector('[data-decision-message]');
-        if (!progress) return;
-        progress.classList.add('visible');
-        progress.classList.toggle('success', state === 'success');
-        progress.classList.toggle('error', state === 'error');
-        if (messageNode) {
-            messageNode.textContent = message;
-            const spinner = progress.querySelector('.decision-spinner');
-            if (spinner) spinner.style.display = state === 'working' ? '' : 'none';
-        }
-    };
-
-    const setDecisionButtonBusy = (button, busy, label) => {
-        if (!button) return;
-        if (busy) {
-            button.dataset.originalLabel = button.innerHTML;
-            button.classList.add('is-busy');
-            button.disabled = true;
-            button.innerHTML = '<span class="decision-button-spinner"></span>' + label;
-        } else {
-            button.classList.remove('is-busy');
-            button.disabled = false;
-            if (button.dataset.originalLabel) button.innerHTML = button.dataset.originalLabel;
-        }
-    };
-
     // Decision actions are delegated from the chat thread so they keep working
     // after assistant cards are replaced/re-rendered. The button carries the
     // thread id explicitly, avoiding any dependency on a stale closure.
@@ -2245,7 +2295,6 @@
             return;
         }
         if (action === 'modify') {
-            setDecisionProgress(row, 'Modify mode is ready — describe the change below.', 'working');
             enterModifyMode(threadId, row);
             return;
         }
@@ -2255,14 +2304,70 @@
     });
 
     chatThread.addEventListener('click', (event) => {
+        const widgetControl = event.target.closest('[data-widget-action]');
+        if (widgetControl) {
+            const section = widgetControl.closest('.plan-step');
+            if (!section) return;
+            const action = widgetControl.dataset.widgetAction;
+            const key = section.id.replace(/^section-/, '');
+            const title = section.dataset.widgetTitle || key;
+            if (action === 'collapse') {
+                const collapsed = section.classList.toggle('widget-collapsed');
+                if (collapsed) section.classList.remove('widget-expanded');
+                updateWidgetFoldState(section);
+                return;
+            }
+            if (action === 'expand') {
+                // Expanding a folded widget first unfolds it, then toggles the focused view.
+                section.classList.remove('widget-collapsed');
+                section.classList.toggle('widget-expanded');
+                updateWidgetFoldState(section);
+            } else if (action === 'close') {
+                section.classList.remove('widget-expanded');
+                section.classList.add('widget-closed');
+                const workspace = section.closest('.plan-workspace');
+                const tray = workspace?.querySelector('[data-widget-restore-tray]');
+                if (tray) {
+                    let restore = tray.querySelector('[data-restore-key="' + CSS.escape(key) + '"]');
+                    if (!restore) {
+                        restore = document.createElement('button');
+                        restore.type = 'button';
+                        restore.className = 'widget-restore-btn';
+                        restore.dataset.restoreKey = key;
+                        restore.textContent = title;
+                        tray.appendChild(restore);
+                    }
+                    tray.style.display = 'flex';
+                }
+                const navButton = workspace?.querySelector('[data-section-target="' + CSS.escape(key) + '"]');
+                if (navButton) navButton.style.display = 'none';
+            }
+            return;
+        }
+
+        const restoreTrayButton = event.target.closest('[data-restore-key]');
+        if (restoreTrayButton) {
+            const workspace = restoreTrayButton.closest('.plan-workspace');
+            const key = restoreTrayButton.dataset.restoreKey;
+            const section = workspace?.querySelector('#section-' + CSS.escape(key));
+            if (section) { section.classList.remove('widget-closed', 'widget-collapsed', 'widget-expanded'); updateWidgetFoldState(section); }
+            restoreTrayButton.remove();
+            if (!event.currentTarget.querySelector('[data-restore-key]')) {
+                workspace?.querySelector('[data-widget-restore-tray]')?.style.setProperty('display','none');
+            }
+            const navButton = workspace?.querySelector('[data-section-target="' + CSS.escape(key) + '"]');
+            if (navButton) navButton.style.display = '';
+            return;
+        }
+
         const hotelMoreButton = event.target.closest('[data-hotels-more]');
         if (hotelMoreButton) {
             const list = hotelMoreButton.previousElementSibling;
-            if (!list || !list.classList.contains('hotel-list')) return;
+            if (!list || (!list.classList.contains('hotel-list') && !list.classList.contains('hotel-rich-list'))) return;
             const expanded = list.classList.toggle('expanded');
             hotelMoreButton.textContent = expanded
                 ? '− Show fewer hotel options'
-                : '＋ Show more hotel options';
+                : '＋ ' + list.querySelectorAll('.hotel-rich-card.is-extra,.hotel-card.is-extra').length + ' more hotel option' + (list.querySelectorAll('.hotel-rich-card.is-extra,.hotel-card.is-extra').length === 1 ? '' : 's');
             return;
         }
 
@@ -2285,22 +2390,17 @@
         }
         loadingState.classList.add('visible');
         submitButton.disabled = true;
-        const action = url.includes('approve') ? 'approve' : url.includes('reject') ? 'reject' : 'modify';
-        const actionButton = sourceRow?.querySelector('[data-plan-action="' + action + '"]');
-        const busyLabel = action === 'approve' ? 'Approving…' : action === 'reject' ? 'Rejecting…' : 'Updating…';
-        setDecisionProgress(sourceRow, busyLabel + ' please wait…', 'working');
-        setDecisionButtonBusy(actionButton, true, busyLabel);
         if (sourceRow) {
             sourceRow.querySelectorAll('[data-plan-action]').forEach(btn => {
                 btn.disabled = true;
             });
         }
         try {
-            const res = await fetch(url, {
+            const res = await apiFetch(url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    userId: userIdField.value.trim() || 'aaro_hi_user',
+                    userId: currentUserId || userIdField.value.trim() || '',
                     threadId,
                     notes
                 })
@@ -2309,15 +2409,10 @@
             if (!res.ok) {
                 throw new Error(payload.error || safeUiErrorMessage());
             }
-            setDecisionProgress(sourceRow, action === 'approve' ? 'Plan approved successfully.' : action === 'reject' ? 'Plan rejected successfully.' : 'Plan updated successfully.', 'success');
-            if (action === 'modify') {
+            if (url.includes('/plan/modify')) {
                 if (notes) appendUserMessage(notes);
                 appendAssistantMessage(payload);
             } else {
-                // Approve/Reject are lifecycle transitions of the SAME plan.
-                // Replace the existing assistant card instead of appending a
-                // second stale card, so the header, every widget badge and the
-                // final decision panel all reflect the new decision immediately.
                 if (url.includes('reject')) {
                     appendUserMessage('Rejected this plan.');
                 } else {
@@ -2334,10 +2429,7 @@
                     btn.classList.remove('action-unavailable');
                 });
             }
-            const errorMessage = error && error.message ? error.message : safeUiErrorMessage();
-            setDecisionProgress(sourceRow, 'Action failed: ' + errorMessage, 'error');
-            showToast(errorMessage);
-            setDecisionButtonBusy(actionButton, false);
+            showToast(error && error.message ? error.message : safeUiErrorMessage());
             return false;
         } finally {
             submitButton.disabled = false;
@@ -2368,8 +2460,28 @@
     showHomeView();
     clearThreadDom();
     renderHistoryList();
+
     (async () => {
-        await loadDbTrips(false);
-        await loadServerHistoryIntoStore();
-        renderHistoryList();
+        try {
+            const me = await apiFetch('/api/auth/me', { cache: 'no-store' });
+            if (!me.ok) {
+                window.location.href = '/login';
+                return;
+            }
+            const identity = await me.json();
+            currentUserId = String(identity.userId || identity.username || '').trim();
+            if (!currentUserId) {
+                window.location.href = '/login';
+                return;
+            }
+            userIdField.value = currentUserId;
+            if (signedInUser) signedInUser.textContent = currentUserId;
+            syncUserIdField();
+            await loadDbTrips(false);
+            await loadServerHistoryIntoStore();
+            renderHistoryList();
+        } catch (e) {
+            console.error('Authentication bootstrap failed', e);
+            window.location.href = '/login';
+        }
     })();

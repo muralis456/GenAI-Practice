@@ -17,6 +17,10 @@ import com.example.travel.service.GraphRunContext;
 import com.example.travel.service.ModelRoutingContext;
 import com.example.travel.service.TripPlanAssembler;
 import com.example.travel.service.UserPreferenceService;
+import com.example.travel.service.AgentRunAdmissionService;
+import com.example.travel.service.ApiRateLimitService;
+import com.example.travel.exception.TooManyRequestsException;
+import com.example.travel.exception.ResourceNotFoundException;
 import tools.jackson.databind.ObjectMapper;
 
 import org.bsc.langgraph4j.CompiledGraph;
@@ -38,6 +42,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.RejectedExecutionException;
 
 /**
  * Drives the LangGraph travel workflow.
@@ -61,6 +66,8 @@ public class TravelPlannerAgentService {
     private final GraphProgressHub graphProgressHub;
     private final GraphRunContext graphRunContext;
     private final ExecutorService travelPlanExecutor;
+    private final AgentRunAdmissionService runAdmissionService;
+    private final ApiRateLimitService apiRateLimitService;
     private final ConversationMemoryService conversationMemoryService;
     private final TripPlanAssembler tripPlanAssembler;
     private final com.example.travel.service.TripHistoryService tripHistoryService;
@@ -79,6 +86,8 @@ public class TravelPlannerAgentService {
             GraphProgressHub graphProgressHub,
             GraphRunContext graphRunContext,
             @org.springframework.beans.factory.annotation.Qualifier("travelPlanExecutor") ExecutorService travelPlanExecutor,
+            AgentRunAdmissionService runAdmissionService,
+            ApiRateLimitService apiRateLimitService,
             ConversationMemoryService conversationMemoryService,
             TripPlanAssembler tripPlanAssembler,
             com.example.travel.service.TripHistoryService tripHistoryService,
@@ -96,6 +105,8 @@ public class TravelPlannerAgentService {
         this.graphProgressHub = graphProgressHub;
         this.graphRunContext = graphRunContext;
         this.travelPlanExecutor = travelPlanExecutor;
+        this.runAdmissionService = runAdmissionService;
+        this.apiRateLimitService = apiRateLimitService;
         this.conversationMemoryService = conversationMemoryService;
         this.tripPlanAssembler = tripPlanAssembler;
         this.tripHistoryService = tripHistoryService;
@@ -107,16 +118,23 @@ public class TravelPlannerAgentService {
             TravelRequest request,
             String historyContext) {
 
-        String userId = TravelState.firstNonBlank(
-                request.getUserId(),
-                "anonymous");
+        String userId = TravelState.firstNonBlank(request.getUserId());
+        if (userId.isBlank()) {
+            throw new IllegalArgumentException("Authenticated user is required");
+        }
 
         String threadId = userId + "-" + UUID.randomUUID();
 
         log.info(
-                "Starting LangGraph travel orchestration for userId={}, threadId={}",
-                userId,
+                "Starting LangGraph travel orchestration for threadId={}",
                 threadId);
+
+        if (!apiRateLimitService.tryAcquire(userId)) {
+            throw new TooManyRequestsException("Too many planning requests. Please wait a moment and try again.");
+        }
+        if (!runAdmissionService.tryAcquire(userId)) {
+            throw new TooManyRequestsException("Your travel planning capacity is currently busy. Please wait for an active plan to finish.");
+        }
 
         Map<String, Object> input = TravelState.fromRequest(request, historyContext);
 
@@ -158,6 +176,7 @@ public class TravelPlannerAgentService {
             graphRunContext.close(threadId);
             executionBudget.end();
             ModelRoutingContext.clear();
+            runAdmissionService.release(userId);
         }
 
         TravelState state = requireCheckpointState(threadId);
@@ -186,53 +205,55 @@ public class TravelPlannerAgentService {
             TravelRequest request,
             String historyContext) {
 
-        String userId = TravelState.firstNonBlank(
-                request.getUserId(),
-                "anonymous");
+        String userId = TravelState.firstNonBlank(request.getUserId());
+        if (userId.isBlank()) {
+            throw new IllegalArgumentException("Authenticated user is required");
+        }
 
         String threadId = userId + "-" + UUID.randomUUID();
         String conversationId = TravelState.firstNonBlank(request.getConversationId(), threadId);
 
-        Map<String, Object> input = TravelState.fromRequest(request, historyContext);
+        if (!apiRateLimitService.tryAcquire(userId)) {
+            throw new TooManyRequestsException("Too many planning requests. Please wait a moment and try again.");
+        }
+        if (!runAdmissionService.tryAcquire(userId)) {
+            throw new TooManyRequestsException("Your travel planning capacity is currently busy. Please wait for an active plan to finish.");
+        }
 
-        input.put(TravelState.MAX_RETRIES, maxRetries);
-        input.put(TravelState.GRAPH_THREAD_ID, threadId);
+        boolean handedOff = false;
+        try {
+            Map<String, Object> input = TravelState.fromRequest(request, historyContext);
 
-        String policy = ModelRoutingContext.normalize(request.getSelectedModel());
+            input.put(TravelState.MAX_RETRIES, maxRetries);
+            input.put(TravelState.GRAPH_THREAD_ID, threadId);
 
-        input.put(TravelState.SELECTED_MODEL, policy);
-        input.put(TravelState.MODEL_POLICY, policy);
+            String policy = ModelRoutingContext.normalize(request.getSelectedModel());
+            input.put(TravelState.SELECTED_MODEL, policy);
+            input.put(TravelState.MODEL_POLICY, policy);
 
-        userPreferenceService
-                .find(userId)
-                .ifPresent(preference -> applyPreferences(input, preference));
+            userPreferenceService
+                    .find(userId)
+                    .ifPresent(preference -> applyPreferences(input, preference));
 
-        ensureOrigin(input);
+            ensureOrigin(input);
+            graphProgressHub.open(threadId);
 
-        graphProgressHub.open(threadId);
+            String query = TravelState.firstNonBlank(
+                    request.getOriginalPrompt(),
+                    request.getPrompt(),
+                    request.getPreferences());
+            conversationMemoryService.saveMessage(userId, threadId, conversationId, "user", query);
 
-        // Bind the first user message to the new graph thread. This makes each
-        // trip independently discoverable in the database and avoids races
-        // between the async graph and conversation persistence.
-        String query = TravelState.firstNonBlank(
-                request.getOriginalPrompt(),
-                request.getPrompt(),
-                request.getPreferences());
-        conversationMemoryService.saveMessage(userId, threadId, conversationId, "user", query);
+            GraphExecutionLogger.runContext("plan-start", threadId, policy);
 
-        GraphExecutionLogger.runContext(
-                "plan-start",
-                threadId,
-                policy);
-
-        travelPlanExecutor.submit(
-                () -> runStreaming(
-                        threadId,
-                        userId,
-                        conversationId,
-                        policy,
-                        input));
-
+            travelPlanExecutor.submit(() -> runStreaming(
+                    threadId, userId, conversationId, policy, input));
+            handedOff = true;
+        } catch (RejectedExecutionException ex) {
+            throw new TooManyRequestsException("Travel planning is busy right now. Please try again shortly.");
+        } finally {
+            if (!handedOff) runAdmissionService.release(userId);
+        }
         return threadId;
     }
 
@@ -360,6 +381,7 @@ public class TravelPlannerAgentService {
             graphRunContext.close(threadId);
             executionBudget.end();
             ModelRoutingContext.clear();
+            runAdmissionService.release(userId);
         }
     }
 
@@ -749,9 +771,9 @@ public class TravelPlannerAgentService {
     }
 
     public Map<String, Object> history(
-            String threadId) {
+            String userId, String threadId) {
 
-        String key = TravelState.firstNonBlank(threadId);
+        String key = requireOwnedThread(userId, threadId);
 
         StateSnapshot<TravelState> snapshot = travelGraph.getState(
                 configFor(key));
@@ -889,6 +911,10 @@ public class TravelPlannerAgentService {
         return body;
     }
 
+    public void assertOwnedThread(String userId, String threadId) {
+        requireOwnedThread(userId, threadId);
+    }
+
     private String requireOwnedThread(
             String userId,
             String threadId) {
@@ -897,18 +923,15 @@ public class TravelPlannerAgentService {
                 threadId,
                 userId);
 
-        String requester = TravelState.firstNonBlank(
-                userId,
-                "anonymous");
+        String requester = TravelState.firstNonBlank(userId);
+        if (requester.isBlank()) {
+            throw new IllegalArgumentException("Authenticated user is required");
+        }
 
         if (!key.equals(requester)
                 && !key.startsWith(requester + "-")) {
 
-            throw new IllegalArgumentException(
-                    "Thread "
-                            + key
-                            + " is not owned by user "
-                            + requester);
+            throw new ResourceNotFoundException("Travel plan not found");
         }
 
         TravelState state = requireCheckpointState(key);
@@ -919,13 +942,7 @@ public class TravelPlannerAgentService {
 
         if (!owner.equals(requester)) {
 
-            throw new IllegalArgumentException(
-                    "Thread "
-                            + key
-                            + " belongs to "
-                            + owner
-                            + ", not "
-                            + requester);
+            throw new ResourceNotFoundException("Travel plan not found");
         }
 
         return key;

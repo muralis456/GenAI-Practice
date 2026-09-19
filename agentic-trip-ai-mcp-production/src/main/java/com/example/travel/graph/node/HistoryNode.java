@@ -28,7 +28,12 @@ public class HistoryNode implements NodeAction<TravelState> {
     public Map<String, Object> apply(TravelState state) {
         try {
             Map<String, Object> updates = new LinkedHashMap<>();
-            String userId = TravelState.firstNonBlank(state.userId(), "anonymous");
+            String userId = TravelState.firstNonBlank(state.userId());
+            if (userId.isBlank()) {
+                updates.put(TravelState.HISTORY_RESULT, "");
+                updates.put(TravelState.FINAL_TIPS, "I couldn't find a saved trip in your trip history yet.");
+                return updates;
+            }
             String selection = state.historySelection();
             String result = tripHistoryService.findPlanJson(userId, selection);
             updates.put(TravelState.HISTORY_RESULT, result);

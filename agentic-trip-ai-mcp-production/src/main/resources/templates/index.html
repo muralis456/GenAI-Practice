@@ -3,6 +3,8 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="_csrf" th:content="${_csrf.token}" />
+    <meta name="_csrf_header" th:content="${_csrf.headerName}" />
     <title>AgenticTripAI</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="apple-touch-icon" href="/favicon.svg" />
@@ -1870,6 +1872,12 @@
         }
         .server-memory-card p:last-child { margin-bottom:0; }
         .sidebar-session .user-field { margin-top:5px; padding:7px 9px; font-size:11px; background:rgba(255,255,255,.06); color:#c4d5e9; border-color:rgba(255,255,255,.08); }
+        .account-panel { margin-top:18px; padding-top:14px; border-top:1px solid rgba(255,255,255,.08); }
+        .account-label { font-size:11px; color:#7890aa; text-transform:uppercase; letter-spacing:.08em; }
+        .signed-in-user { margin-top:5px; color:#dce9f8; font-size:13px; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .logout-form { margin-top:10px; }
+        .logout-button { width:100%; padding:8px 10px; border-radius:9px; border:1px solid rgba(255,255,255,.09); background:rgba(255,255,255,.04); color:#c6d7ea; cursor:pointer; }
+        .logout-button:hover { background:rgba(255,255,255,.08); color:#fff; }
         .travel-dashboard { grid-template-columns:minmax(0,1fr) 292px; gap:14px; }
         .travel-main { min-width:0; width:100%; }
         .travel-main > .workspace-tabs,
@@ -2291,9 +2299,13 @@
             <div class="chat-history-empty">No saved chats yet</div>
         </div>
 
-        <div class="sidebar-session">
-            <span>Session</span>
-            <input class="user-field" type="text" id="userId" value="aaro_hi_user" aria-label="User ID" />
+        <div class="sidebar-session account-panel">
+            <div class="account-label">Signed in as</div>
+            <div id="signedInUser" class="signed-in-user">Loading…</div>
+            <form method="post" action="/logout" class="logout-form">
+                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+                <button type="submit" class="logout-button">Sign out</button>
+            </form>
         </div>
     </aside>
 
@@ -2360,7 +2372,7 @@
                     </div>
                     <div class="composer-hint">Enter to send · Shift+Enter for a new line</div>
                     <div class="hidden-fields">
-                        <input type="hidden" name="userId" value="aaro_hi_user" />
+                        <input type="hidden" name="userId" id="userId" value="" />
                         <input type="hidden" name="departureCity" value="" />
                         <input type="hidden" name="departureDate" value="" />
                         <input type="hidden" name="returnDate" value="" />
@@ -2422,6 +2434,25 @@
     const historyDeleteNote = document.getElementById('historyDeleteNote');
     const historyDeleteCancel = document.getElementById('historyDeleteCancel');
     const historyDeleteConfirm = document.getElementById('historyDeleteConfirm');
+    const signedInUser = document.getElementById('signedInUser');
+    let currentUserId = '';
+
+    const csrfMeta = document.querySelector('meta[name="_csrf"]');
+    const csrfHeaderMeta = document.querySelector('meta[name="_csrf_header"]');
+    const apiFetch = (url, options = {}) => {
+        const opts = { ...options, headers: { ...(options.headers || {}) } };
+        const method = String(opts.method || 'GET').toUpperCase();
+        if (!['GET', 'HEAD', 'OPTIONS'].includes(method) && csrfMeta?.content && csrfHeaderMeta?.content) {
+            opts.headers[csrfHeaderMeta.content] = csrfMeta.content;
+        }
+        return window.fetch(url, opts).then(response => {
+            if (response.status === 401 && !String(url).startsWith('/api/auth/')) {
+                window.location.href = '/login?expired=true';
+            }
+            return response;
+        });
+    };
+
     let dbTrips = [];
     let pendingHistoryDelete = null;
     let modifyContext = null;
@@ -2562,12 +2593,12 @@
         });
     }
 
-    const storageKey = () => 'agentic-trip-ai-chats:' + (userIdField.value.trim() || 'aaro_hi_user');
+    const storageKey = () => 'agentic-trip-ai-chats:' + (currentUserId || userIdField.value.trim() || 'authenticated-user');
     let currentChatId = null;
     let startedFreshChat = false;
 
     const syncUserIdField = () => {
-        form.querySelector('input[name="userId"]').value = userIdField.value.trim() || 'aaro_hi_user';
+        form.querySelector('input[name="userId"]').value = currentUserId || userIdField.value.trim() || '';
     };
 
     const syncUserId = () => {
@@ -2576,7 +2607,7 @@
         loadServerHistoryIntoStore();
     };
 
-    userIdField.addEventListener('input', syncUserId);
+    // Identity is supplied by the authenticated Spring Security session; users cannot edit it.
 
     document.querySelectorAll('.city-card[data-prompt]').forEach(card => {
         card.addEventListener('click', () => {
@@ -2683,9 +2714,9 @@
     };
 
     const loadServerHistoryIntoStore = async () => {
-        const userId = userIdField.value.trim() || 'aaro_hi_user';
+        const userId = currentUserId || userIdField.value.trim() || '';
         try {
-            const res = await fetch('/api/chat/history?userId=' + encodeURIComponent(userId) + '&limit=100&_=' + Date.now(), { cache: 'no-store' });
+            const res = await apiFetch('/api/chat/history?userId=' + encodeURIComponent(userId) + '&limit=100&_=' + Date.now(), { cache: 'no-store' });
             if (!res.ok) return;
             const items = await res.json();
             if (!Array.isArray(items) || !items.length) return;
@@ -2799,7 +2830,7 @@
     };
 
     const loadDbTrips = async (renderView = false) => {
-        const userId = userIdField.value.trim() || 'aaro_hi_user';
+        const userId = currentUserId || userIdField.value.trim() || '';
         const refreshButton = document.getElementById('tripsRefresh');
         const previousLabel = refreshButton ? refreshButton.textContent : '';
         if (refreshButton && renderView) {
@@ -2811,7 +2842,7 @@
             // Never let browser/proxy caching make My Trips appear stale.
             const url = '/api/trips?userId=' + encodeURIComponent(userId)
                 + '&limit=50&_=' + Date.now();
-            const res = await fetch(url, { cache: 'no-store' });
+            const res = await apiFetch(url, { cache: 'no-store' });
             if (!res.ok) throw new Error('Unable to load trips');
             const items = await res.json();
             dbTrips = Array.isArray(items) ? items : [];
@@ -2842,18 +2873,18 @@
             currentHistoryKey = 'db:' + String(id);
             renderHistoryList();
             const trip = dbTrips.find(t => String(t.id) === String(id));
-            const userId = userIdField.value.trim() || 'aaro_hi_user';
+            const userId = currentUserId || userIdField.value.trim() || '';
             showHomeView();
             clearThreadDom();
 
             if (trip?.legacy) {
                 const sourceMessageId = Math.abs(Number(id));
-                const messageRes = await fetch('/api/chat/message/' + encodeURIComponent(sourceMessageId)
+                const messageRes = await apiFetch('/api/chat/message/' + encodeURIComponent(sourceMessageId)
                     + '?userId=' + encodeURIComponent(userId));
                 const sourceMessage = await messageRes.json().catch(() => ({}));
                 if (!messageRes.ok || !sourceMessage.sessionId) throw new Error(safeUiErrorMessage());
 
-                const res = await fetch('/api/chat/session/' + encodeURIComponent(sourceMessage.sessionId)
+                const res = await apiFetch('/api/chat/session/' + encodeURIComponent(sourceMessage.sessionId)
                     + '?userId=' + encodeURIComponent(userId) + '&limit=100');
                 const messages = await res.json().catch(() => []);
                 if (!res.ok || !Array.isArray(messages)) throw new Error(safeUiErrorMessage());
@@ -2870,7 +2901,7 @@
                 return;
             }
 
-            const res = await fetch('/api/trips/' + encodeURIComponent(id) + '?userId=' + encodeURIComponent(userId));
+            const res = await apiFetch('/api/trips/' + encodeURIComponent(id) + '?userId=' + encodeURIComponent(userId));
             const data = await res.json().catch(() => ({}));
             if (!res.ok) throw new Error(data.error || safeUiErrorMessage());
             appendAssistantMessage(data, false);
@@ -3033,7 +3064,7 @@
     });
 
     const deleteHistoryEntry = async (entry, rowElement) => {
-        const userId = userIdField.value.trim() || 'aaro_hi_user';
+        const userId = currentUserId || userIdField.value.trim() || '';
         const title = entry.title || 'this history item';
         const confirmed = await askDeleteHistoryConfirmation(entry);
         if (!confirmed) return;
@@ -3050,7 +3081,7 @@
             // browser history without making a pointless DB request.
             const hasServerTarget = params.has('tripId') || params.has('sessionId');
             if (hasServerTarget) {
-                const res = await fetch('/api/history?' + params.toString(), { method: 'DELETE' });
+                const res = await apiFetch('/api/history?' + params.toString(), { method: 'DELETE' });
                 const data = await res.json().catch(() => ({}));
                 if (!res.ok) throw new Error(data.error || 'Could not delete history');
             }
@@ -3135,8 +3166,8 @@
         let messages = chat.messages || [];
         if (isServerChat && sessionId) {
             try {
-                const userId = userIdField.value.trim() || 'aaro_hi_user';
-                const res = await fetch('/api/chat/session/' + encodeURIComponent(sessionId)
+                const userId = currentUserId || userIdField.value.trim() || '';
+                const res = await apiFetch('/api/chat/session/' + encodeURIComponent(sessionId)
                     + '?userId=' + encodeURIComponent(userId) + '&limit=100');
                 if (res.ok) {
                     const serverMessages = await res.json();
@@ -3166,8 +3197,8 @@
             && messages.some(m => m.role === 'assistant' && !m.planData);
         if (needsRestore) {
             try {
-                const userId = userIdField.value.trim() || 'aaro_hi_user';
-                const restoreRes = await fetch('/api/plan/' + encodeURIComponent(sessionId)
+                const userId = currentUserId || userIdField.value.trim() || '';
+                const restoreRes = await apiFetch('/api/plan/' + encodeURIComponent(sessionId)
                     + '/restore?userId=' + encodeURIComponent(userId));
                 if (restoreRes.ok) {
                     fallbackRestore = await restoreRes.json();
@@ -4499,7 +4530,7 @@
         const liveResponse = createLiveResponse();
 
         try {
-            const startRes = await fetch('/api/plan/start', {
+            const startRes = await apiFetch('/api/plan/start', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
@@ -4594,7 +4625,7 @@
                         const wrapper = JSON.parse(evt.data);
                         const data = wrapper.plan || wrapper;
                         try {
-                            const hist = await fetch('/api/plan/' + encodeURIComponent(threadId) + '/history').then(r => r.json());
+                            const hist = await apiFetch('/api/plan/' + encodeURIComponent(threadId) + '/history').then(r => r.json());
                             if (!data.execution) {
                                 data.execution = {};
                             }
@@ -4778,11 +4809,11 @@
             });
         }
         try {
-            const res = await fetch(url, {
+            const res = await apiFetch(url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    userId: userIdField.value.trim() || 'aaro_hi_user',
+                    userId: currentUserId || userIdField.value.trim() || '',
                     threadId,
                     notes
                 })
@@ -4842,10 +4873,30 @@
     showHomeView();
     clearThreadDom();
     renderHistoryList();
+
     (async () => {
-        await loadDbTrips(false);
-        await loadServerHistoryIntoStore();
-        renderHistoryList();
+        try {
+            const me = await apiFetch('/api/auth/me', { cache: 'no-store' });
+            if (!me.ok) {
+                window.location.href = '/login';
+                return;
+            }
+            const identity = await me.json();
+            currentUserId = String(identity.userId || identity.username || '').trim();
+            if (!currentUserId) {
+                window.location.href = '/login';
+                return;
+            }
+            userIdField.value = currentUserId;
+            if (signedInUser) signedInUser.textContent = currentUserId;
+            syncUserIdField();
+            await loadDbTrips(false);
+            await loadServerHistoryIntoStore();
+            renderHistoryList();
+        } catch (e) {
+            console.error('Authentication bootstrap failed', e);
+            window.location.href = '/login';
+        }
     })();
 </script>
 

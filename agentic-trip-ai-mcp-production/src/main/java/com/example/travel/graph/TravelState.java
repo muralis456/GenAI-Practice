@@ -158,7 +158,7 @@ public class TravelState extends AgentState {
 
         Map<String, Object> input = new LinkedHashMap<>();
         input.put(USER_REQUEST, prompt);
-        input.put(USER_ID, firstNonBlank(request.getUserId(), "anonymous"));
+        input.put(USER_ID, firstNonBlank(request.getUserId(), ""));
         input.put(SELECTED_MODEL, blankToEmpty(request.getSelectedModel()));
         input.put(HISTORY_CONTEXT, historyContext == null ? "" : historyContext);
         input.put(HISTORY_RESULT, "");
@@ -339,7 +339,7 @@ public class TravelState extends AgentState {
     }
 
     public String userId() {
-        return this.<String>value(USER_ID).orElse("anonymous");
+        return this.<String>value(USER_ID).orElse("");
     }
 
     public String selectedModel() {
