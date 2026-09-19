@@ -97,7 +97,7 @@ public class IntentAgentService {
         // or looks like a possible history-vs-itinerary conflict. This remains
         // semantic-only; no keyword/regex detection is introduced.
         boolean memoryCheckNeeded = primary.isNeedsHistory()
-                || primary.getConfidence() < 0.70d
+                || (!hasAnyCapability(primary) && primary.getConfidence() < 0.70d)
                 || primary.isNeedsItinerary() && !primary.isNeedsFlights()
                     && !primary.isNeedsHotels() && !primary.isNeedsResearch()
                     && !primary.isNeedsWeather() && !primary.isNeedsBudget();
@@ -139,7 +139,10 @@ public class IntentAgentService {
         // The previous architecture caused exactly this regression: the LLM
         // correctly detected flights/budget/itinerary, then embedding similarity
         // returned all false and the request became GENERAL.
-        if (hasAnyCapability(primary) && primary.getConfidence() >= 0.55) {
+        // A coherent capability vector is more useful than a low confidence
+        // scalar from a small local model. Preserve a semantically populated
+        // primary result instead of paying for another full extraction pass.
+        if (hasAnyCapability(primary) && primary.getConfidence() >= 0.45) {
             return finalizeSemanticPlan(request, primary);
         }
 

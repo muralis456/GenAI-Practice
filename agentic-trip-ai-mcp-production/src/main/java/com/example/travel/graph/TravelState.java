@@ -183,14 +183,21 @@ public class TravelState extends AgentState {
                 request.getDestination());
         input.put(ORIGIN, TripSlotHeuristics.normalizePlace(requestedOrigin));
         input.put(DESTINATION, TripSlotHeuristics.normalizePlace(requestedDestination));
-        input.put(DEPARTURE_DATE, parseDate(request.getDepartureDate(), today));
-        input.put(RETURN_DATE, parseDate(request.getReturnDate(), today.plusDays(5)));
+        LocalDate departureDate = parseDate(request.getDepartureDate(), today);
+        LocalDate fallbackReturnDate = departureDate.plusDays(5);
+        LocalDate requestedReturnDate = parseDate(request.getReturnDate(), fallbackReturnDate);
+        if (TripSlotHeuristics.hasDurationHint(prompt)) {
+            requestedReturnDate = TripSlotHeuristics.inferReturnDate(prompt, departureDate, requestedReturnDate);
+        }
+        input.put(DEPARTURE_DATE, departureDate);
+        input.put(RETURN_DATE, requestedReturnDate);
         input.put(DATES_FLEXIBLE, datesFlexible);
         input.put(ROUND_TRIP, roundTrip);
         input.put(TRAVELERS, Math.max(travelers, 1));
-        BigDecimal budget = parseBudget(request.getBudget());
+        String currentTurnBudget = TripSlotHeuristics.extractBudgetLabel(prompt);
+        BigDecimal budget = parseBudget(firstNonBlank(currentTurnBudget, request.getBudget()));
         input.put(BUDGET, budget == null ? UNSET_BUDGET : budget);
-        input.put(BUDGET_LABEL, firstNonBlank(request.getBudget(), "medium"));
+        input.put(BUDGET_LABEL, firstNonBlank(currentTurnBudget, request.getBudget(), "medium"));
         input.put(TRAVEL_STYLE, firstNonBlank(request.getTravelStyle(), "balanced"));
         input.put(RETRY_COUNT, 0);
         input.put(GOAL_EVALUATION, new com.example.travel.model.GoalEvaluation());

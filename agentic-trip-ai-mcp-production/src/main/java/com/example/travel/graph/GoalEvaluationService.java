@@ -62,7 +62,12 @@ public class GoalEvaluationService {
             if (!hard.getUnmetCriteria().isEmpty()) {
                 // A hard missing outcome always dominates an LLM "achieved" claim.
                 llmEvaluation.setStatus(hard.getStatus());
-                llmEvaluation.setRecoverable(hard.isRecoverable() || llmEvaluation.isRecoverable());
+                boolean terminalProviderFailure = state.nodeFailure() != null
+                        && !TravelState.isBlank(state.nodeFailure().getLastFailedNode())
+                        && !state.nodeFailure().isRetryable();
+                llmEvaluation.setRecoverable(terminalProviderFailure
+                        ? false
+                        : hard.isRecoverable() || llmEvaluation.isRecoverable());
             } else if (hard.getStatus() == GoalEvaluation.Status.ACHIEVED
                     && llmEvaluation.getStatus() == GoalEvaluation.Status.NEEDS_USER
                     && llmEvaluation.getUnmetCriteria().isEmpty()
@@ -156,7 +161,23 @@ public class GoalEvaluationService {
             e.setStatus(GoalEvaluation.Status.ACHIEVED); e.setScore(1); e.setReason("All required outcomes are present."); e.setRecoverable(false);
         } else {
             e.setStatus(GoalEvaluation.Status.PARTIAL); e.setScore((double)satisfied.size()/Math.max(1,satisfied.size()+unmet.size()));
-            e.setReason("One or more required outcomes are missing."); e.setRecoverable(true);
+            e.setReason("One or more required outcomes are missing.");
+            // A provider-level terminal failure (for example HTTP 429/quota or an
+            // open circuit) is not a planning defect. Retrying the same capability
+            // without a provider/input change only creates a replan loop.
+            boolean terminalProviderFailure = state.nodeFailure() != null
+                    && !TravelState.isBlank(state.nodeFailure().getLastFailedNode())
+                    && !state.nodeFailure().isRetryable();
+            e.setRecoverable(!terminalProviderFailure);
+            if (terminalProviderFailure) {
+                String failure = state.nodeFailure().getLastError();
+                e.setReason("Partial result: " + (failure == null || failure.isBlank()
+                        ? "a required provider is temporarily unavailable" : failure));
+                if (e.getBlockingIssues() == null || e.getBlockingIssues().isEmpty()) {
+                    e.setBlockingIssues(List.of(failure == null || failure.isBlank()
+                            ? "A required provider is temporarily unavailable." : failure));
+                }
+            }
         }
         return e;
     }

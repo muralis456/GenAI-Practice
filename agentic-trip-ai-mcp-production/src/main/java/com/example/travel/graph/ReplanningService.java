@@ -97,12 +97,16 @@ public class ReplanningService {
         for (AgentTask old : state.agentPlan().getTasks()) {
             if (!old.isRequired() || old.getStatus() == AgentTask.Status.SUCCEEDED) continue;
             if (hasEvidence(state, old.getId())) continue;
+            if (isTerminalProviderFailure(state, old.getId())) continue;
             addTaskIfMissing(plan, ids, old.getId(), old.getAgent(), true);
         }
 
         // A replan is allowed to omit successful independent work, but it may not
         // omit evidence required by an unmet goal. Add only what is actually missing.
-        if (needs(evaluation, "flight") && !state.hasUsableFlights()) addTaskIfMissing(plan, ids, "flights", "flight", true);
+        if (needs(evaluation, "flight") && !state.hasUsableFlights()
+                && !isTerminalProviderFailure(state, "flights")) {
+            addTaskIfMissing(plan, ids, "flights", "flight", true);
+        }
         if (needs(evaluation, "hotel") && !state.hasHotelResults()) addTaskIfMissing(plan, ids, "hotels", "hotel", true);
         if (needs(evaluation, "research") && state.research().isEmpty() && state.attractions().isEmpty()) addTaskIfMissing(plan, ids, "research", "research", true);
         if (needs(evaluation, "weather") && !hasWeather(state)) addTaskIfMissing(plan, ids, "weather", "weather", true);
@@ -136,6 +140,15 @@ public class ReplanningService {
                 if (plan.has(dep)) addDependency(plan.task("itinerary"), dep);
             }
         }
+    }
+
+
+    private boolean isTerminalProviderFailure(TravelState state, String taskId) {
+        if (state == null || state.nodeFailure() == null || state.nodeFailure().isRetryable()) return false;
+        String failed = state.nodeFailure().getLastFailedNode();
+        if (failed == null || failed.isBlank()) return false;
+        return taskId.equalsIgnoreCase(failed)
+                || ("flights".equalsIgnoreCase(taskId) && TravelGraphNodes.FLIGHT.equalsIgnoreCase(failed));
     }
 
     private boolean hasEvidence(TravelState state, String id) {

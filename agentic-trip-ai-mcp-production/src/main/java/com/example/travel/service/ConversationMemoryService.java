@@ -205,6 +205,11 @@ public class ConversationMemoryService {
         if (request == null || conversationId == null || conversationId.isBlank()) {
             return;
         }
+        // Capture explicit route entities from the CURRENT turn before loading memory.
+        // Memory is context, never an override for information the user just supplied.
+        String currentOriginHint = com.example.travel.support.TripSlotHeuristics.extractOriginHint(request.getPrompt());
+        String currentDestinationHint = com.example.travel.support.TripSlotHeuristics.extractDestinationHint(request.getPrompt());
+
         List<ConversationMemory> history = loadRecentConversationHistory(userId, conversationId);
         for (int i = history.size() - 1; i >= 0; i--) {
             ConversationMemory memory = history.get(i);
@@ -226,6 +231,10 @@ public class ConversationMemoryService {
                 if (isBlank(request.getReturnDate())) request.setReturnDate(trip.getReturnDate());
                 if (isBlank(request.getBudget())) request.setBudget(trip.getBudgetLabel());
                 if (isBlank(request.getTravelStyle())) request.setTravelStyle(trip.getTravelStyle());
+
+                // Explicit current-turn route values always win over hydrated memory.
+                if (!isBlank(currentOriginHint)) request.setDepartureCity(currentOriginHint);
+                if (!isBlank(currentDestinationHint)) request.setDestination(currentDestinationHint);
                 return;
             } catch (Exception ex) {
                 log.debug("Could not hydrate request from conversation memory conversationId={}", conversationId, ex);

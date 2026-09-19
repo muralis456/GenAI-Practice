@@ -150,7 +150,16 @@ public class ProductionExecutionNode implements NodeAction<TravelState> {
                 default -> { return new TaskResult(false,u,"Unsupported task: "+id); }
             }
             return new TaskResult(true,u,"");
-        } catch (Exception e) { return new TaskResult(false,new LinkedHashMap<>(),e.getMessage()==null?"execution failed":e.getMessage()); }
+        } catch (Exception e) {
+            Map<String,Object> failureUpdates = new LinkedHashMap<>();
+            boolean retryable = e instanceof com.example.travel.service.McpFlightSearchClient.FlightProviderException providerException
+                    ? providerException.retryable()
+                    : com.example.travel.support.ToolFailureClassifier.fromException(e).isRetryable();
+            failureUpdates.putAll(NodeFailureSupport.record(id, s, e, retryable,
+                    s.nodeFailure().getNodeRetryCount()));
+            return new TaskResult(false, failureUpdates,
+                    e.getMessage() == null ? "execution failed" : e.getMessage());
+        }
     }
 
 

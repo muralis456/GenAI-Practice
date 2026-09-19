@@ -116,6 +116,14 @@ public class QueryNormalizationService {
                             clampConfidence(c.confidence())))
                     .toList();
 
+        // Some local models correctly return the correction list but leave
+        // normalizedPrompt identical to the raw text. In that case, apply the
+        // model-provided corrections mechanically; there is still no hard-coded
+        // typo/alias dictionary in the application.
+        if (normalized.equals(raw) && !corrections.isEmpty()) {
+            normalized = applyModelCorrections(raw, corrections);
+        }
+
         LinkedHashMap<String, ResolvedEntity> entities = new LinkedHashMap<>();
         if (result.entities() != null) {
             for (LlmEntity entity : result.entities()) {
@@ -145,6 +153,19 @@ public class QueryNormalizationService {
         }
 
         return new NormalizationResult(raw, normalized, corrections, List.copyOf(entities.values()));
+    }
+
+    private String applyModelCorrections(String raw, List<Correction> corrections) {
+        String result = raw;
+        for (Correction correction : corrections.stream()
+                .sorted((a, b) -> Integer.compare(b.original().length(), a.original().length()))
+                .toList()) {
+            if (correction.original().equalsIgnoreCase(correction.corrected())) continue;
+            result = result.replaceAll(
+                    "(?i)" + java.util.regex.Pattern.quote(correction.original()),
+                    java.util.regex.Matcher.quoteReplacement(correction.corrected()));
+        }
+        return result;
     }
 
     private ResolvedEntity groundAirportEntity(String value, String code, String country,

@@ -90,9 +90,12 @@ public class McpFlightSearchClient {
     private boolean isNonRetryableProviderError(String errorCode, String message) {
         String code = errorCode == null ? "" : errorCode.toUpperCase(java.util.Locale.ROOT);
         String text = message == null ? "" : message.toLowerCase(java.util.Locale.ROOT);
-        return code.contains("429") || code.contains("RATE_LIMIT") || code.contains("401")
-                || code.contains("403") || code.contains("400") || code.contains("422") || code.contains("404")
-                || text.contains("rate limit") || text.contains("quota") || text.contains("too many requests");
+        return code.contains("429") || code.contains("RATE_LIMIT") || code.contains("PROVIDER_HTTP_429")
+                || code.contains("401") || code.contains("403") || code.contains("400")
+                || code.contains("422") || code.contains("404")
+                || text.contains("rate limit") || text.contains("quota") || text.contains("too many requests")
+                || text.contains("circuit-open") || text.contains("circuit open")
+                || text.contains("provider_http_429");
     }
 
     public static final class FlightProviderException extends RuntimeException {

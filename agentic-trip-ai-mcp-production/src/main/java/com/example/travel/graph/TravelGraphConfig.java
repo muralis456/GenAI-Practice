@@ -98,6 +98,13 @@ public class TravelGraphConfig {
                 .addConditionalEdges("evaluate",edge_async(state -> {
                     var e = state.goalEvaluation();
                     if (e == null) return "FINAL";
+                    // Terminal specialist/provider failures are not planning failures.
+                    // Do not send the graph back through replan for the same provider.
+                    if (state.nodeFailure() != null
+                            && !com.example.travel.graph.TravelState.isBlank(state.nodeFailure().getLastFailedNode())
+                            && !state.nodeFailure().isRetryable()) {
+                        return "FINAL";
+                    }
                     if (e.getStatus() == com.example.travel.model.GoalEvaluation.Status.ACHIEVED
                             || e.getStatus() == com.example.travel.model.GoalEvaluation.Status.NEEDS_USER) {
                         return "FINAL";

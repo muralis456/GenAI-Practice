@@ -103,6 +103,11 @@ public final class TripSlotHeuristics {
         return "";
     }
 
+    public static boolean hasDurationHint(String request) {
+        if (request == null || request.isBlank()) return false;
+        return DAYS.matcher(request).find() || NIGHTS.matcher(request).find();
+    }
+
     public static LocalDate inferReturnDate(String request, LocalDate departure, LocalDate fallbackReturn) {
         LocalDate start = departure == null ? LocalDate.now() : departure;
         Matcher days = DAYS.matcher(request == null ? "" : request);
