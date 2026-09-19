@@ -214,7 +214,10 @@ public class TravelPlannerAgentService {
         // Bind the first user message to the new graph thread. This makes each
         // trip independently discoverable in the database and avoids races
         // between the async graph and conversation persistence.
-        String query = TravelState.firstNonBlank(request.getPrompt(), request.getPreferences());
+        String query = TravelState.firstNonBlank(
+                request.getOriginalPrompt(),
+                request.getPrompt(),
+                request.getPreferences());
         conversationMemoryService.saveMessage(userId, threadId, conversationId, "user", query);
 
         GraphExecutionLogger.runContext(

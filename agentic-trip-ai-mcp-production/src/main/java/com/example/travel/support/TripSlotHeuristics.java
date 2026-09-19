@@ -14,6 +14,10 @@ public final class TripSlotHeuristics {
     private static final Pattern NIGHTS = Pattern.compile("(?i)\\b(\\d{1,2})\\s*-?\\s*night");
     private static final Pattern ROUTE = Pattern.compile(
             "(?i)\\bfrom\\s+(.+?)\\s+to\\s+(.+?)(?=\\s+for\\s+|\\s+on\\s+|\\s+today\\b|[.!?]|$)");
+    private static final Pattern FROM_ONLY = Pattern.compile(
+            "(?i)\\bfrom\\s+(.+?)(?=\\s+(?:for|on|today|tomorrow|within|under|below)\\b|[.!?]|$)");
+    private static final Pattern TO_ONLY = Pattern.compile(
+            "(?i)\\bto\\s+(.+?)(?=\\s+(?:for|on|today|tomorrow|within|under|below)\\b|[.!?]|$)");
     private static final Pattern BUDGET = Pattern.compile(
             "(?i)(?:under|below|within|budget(?:\\s+of)?)\\s*(₹\\s*)?([\\d,.]+\\s*(?:lakh|lac|l)\\b|[\\d,.]+)");
     private static final Pattern BUDGET_INLINE = Pattern.compile("(?i)(₹\\s*[\\d,.]+\\s*(?:lakh|lac|l)?|[\\d,.]+\\s*(?:lakh|lac|l)\\b)");
@@ -21,30 +25,26 @@ public final class TripSlotHeuristics {
     private TripSlotHeuristics() {
     }
 
+    /**
+     * Place canonicalization is performed by QueryNormalizationService using
+     * the LLM plus provider/domain validation. This helper deliberately does
+     * not contain a hard-coded alias or typo dictionary.
+     */
     public static String normalizePlace(String place) {
-        if (place == null || place.isBlank()) {
-            return "";
-        }
-        String value = place.trim();
-        return switch (value.toLowerCase(Locale.ROOT)) {
-            case "japan", "nippon" -> "Tokyo";
-            case "thailand" -> "Bangkok";
-            case "uae", "united arab emirates", "dubaig", "dubia" -> "Dubai";
-            case "uk", "united kingdom", "england" -> "London";
-            case "usa", "united states", "america" -> "New York";
-            case "bangalore" -> "Bengaluru";
-            case "bombay" -> "Mumbai";
-            case "calcutta" -> "Kolkata";
-            case "madras" -> "Chennai";
-            case "new delhi" -> "Delhi";
-            default -> value;
-        };
+        return place == null ? "" : place.trim();
     }
 
     public static String extractOriginHint(String request) {
         if (request == null || request.isBlank()) return "";
         Matcher route = ROUTE.matcher(request);
         if (route.find()) return normalizePlace(route.group(1));
+
+        // Follow-up flight questions often specify only the new origin:
+        // "any flights available from Hyderabad for today".
+        Matcher fromOnly = FROM_ONLY.matcher(request);
+        if (fromOnly.find()) {
+            return normalizePlace(cleanDestination(fromOnly.group(1)));
+        }
         return findKnownPlace(request, false);
     }
 
@@ -53,6 +53,13 @@ public final class TripSlotHeuristics {
         Matcher route = ROUTE.matcher(request);
         if (route.find()) {
             return normalizePlace(cleanDestination(route.group(2)));
+        }
+
+        // Also support "flights to Dubai" / "travel to Bengaluru" when the
+        // origin is inherited from conversation memory.
+        Matcher toOnly = TO_ONLY.matcher(request);
+        if (toOnly.find()) {
+            return normalizePlace(cleanDestination(toOnly.group(1)));
         }
         return findKnownPlace(request, true);
     }
@@ -75,20 +82,10 @@ public final class TripSlotHeuristics {
     }
 
     private static String findKnownPlace(String request, boolean destination) {
-        String lower = request.toLowerCase(Locale.ROOT);
-        String[] places = {
-                "tokyo", "japan", "osaka", "kyoto", "bangkok", "thailand", "dubai", "dubaig", "dubia", "uae",
-                "paris", "london", "singapore", "bali", "beijing", "shanghai", "seoul",
-                "mumbai", "delhi", "bengaluru", "bangalore", "goa", "new york", "rome"
-        };
-        String found = "";
-        for (String place : places) {
-            if (lower.contains(place)) {
-                if (!destination) return normalizePlace(place);
-                found = normalizePlace(place);
-            }
-        }
-        return found;
+        // Deliberately empty. Entity recognition and spelling correction are
+        // performed by QueryNormalizationService rather than a hard-coded
+        // place list.
+        return "";
     }
 
     public static String extractBudgetLabel(String request) {

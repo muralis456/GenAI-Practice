@@ -1,5 +1,7 @@
 package com.example.travel.dto;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
 public class TravelRequest {
 
     private String userId;
@@ -16,6 +18,10 @@ public class TravelRequest {
     private String preferences;
     private String selectedModel;
     private String prompt;
+
+    /** Internal copy of the user's raw prompt before query normalization. */
+    @JsonIgnore
+    private String originalPrompt;
 
     public String getConversationId() {
         return conversationId;
@@ -119,5 +125,13 @@ public class TravelRequest {
 
     public void setPrompt(String prompt) {
         this.prompt = prompt;
+    }
+
+    public String getOriginalPrompt() {
+        return originalPrompt;
+    }
+
+    public void setOriginalPrompt(String originalPrompt) {
+        this.originalPrompt = originalPrompt;
     }
 }

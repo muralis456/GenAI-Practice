@@ -1514,6 +1514,18 @@
         const trip = plan.trip || {};
         const type = String(data.requestType || trip.requestType || 'GENERAL').toUpperCase();
         const location = String((plan.weather && plan.weather.location) || trip.destination || data.destination || '').trim();
+        const origin = String(trip.origin || data.origin || '').trim();
+        const destination = String(trip.destination || data.destination || location || '').trim();
+        const flightRouteTitle = origin && destination
+            ? 'Flight options from ' + origin + ' to ' + destination
+            : origin
+                ? 'Flight options from ' + origin
+                : destination
+                    ? 'Flight options for ' + destination
+                    : 'Flight options';
+        const flightRouteFact = origin && destination
+            ? origin + ' → ' + destination
+            : origin || destination;
         const weather = plan.weather || data.weather;
         const flights = Array.isArray(plan.flights) ? plan.flights : (Array.isArray(data.flights) ? data.flights : []);
         const hotels = Array.isArray(plan.hotels) ? plan.hotels : (Array.isArray(data.hotels) ? data.hotels : []);
@@ -1528,7 +1540,7 @@
 
         const meta = {
             WEATHER: ['☀️', location ? 'Weather in ' + location : 'Weather details', 'Current conditions and forecast'],
-            FLIGHT_SEARCH: ['✈️', location ? 'Flight options for ' + location : 'Flight options', 'Available schedules and returned fare data'],
+            FLIGHT_SEARCH: ['✈️', flightRouteTitle, 'Available schedules and returned fare data'],
             HOTEL_SEARCH: ['🏨', location ? 'Hotels in ' + location : 'Hotel options', 'Accommodation recommendations'],
             BUDGET: ['💰', 'Travel budget', 'Estimated cost for your request'],
             RESEARCH: ['🔎', location ? 'Things to do in ' + location : 'Travel research', 'Destination recommendations and current research'],
@@ -1555,7 +1567,7 @@
 
         let html = '<div class="plan-workspace specialist-dynamic-workspace">'
             + '<header class="plan-header specialist-dynamic-header"><div class="plan-header-top"><div><div class="trip-eyebrow">AGENTICTRIPAI · ' + escapeHtml(type.replace(/_/g, ' ')) + '</div><h1>' + escapeHtml(meta[1]) + '</h1></div><div class="plan-header-status">' + (needsUserInput ? 'Needs your input' : '✓ Complete') + '</div></div>'
-            + '<div class="plan-header-facts"><span>✦ Requested information</span>' + (location ? '<span>📍 ' + escapeHtml(location) + '</span>' : '') + (userRequest ? '<span class="specialist-request">' + escapeHtml(String(userRequest).slice(0, 100)) + '</span>' : '') + '</div></header>'
+            + '<div class="plan-header-facts"><span>✦ Requested information</span>' + (type === 'FLIGHT_SEARCH' && flightRouteFact ? '<span>📍 ' + escapeHtml(flightRouteFact) + '</span>' : (location ? '<span>📍 ' + escapeHtml(location) + '</span>' : '')) + (userRequest ? '<span class="specialist-request">' + escapeHtml(String(userRequest).slice(0, 100)) + '</span>' : '') + '</div></header>'
             + (needsUserInput && clarification ? '<div class="agent-clarification-banner"><strong>✦ Action needed</strong><span>' + escapeHtml(clarification) + '</span></div>' : '')
             + nav + '<div class="plan-steps">' + steps + '</div>'
             + '</div>';

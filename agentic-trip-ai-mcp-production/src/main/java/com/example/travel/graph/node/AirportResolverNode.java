@@ -28,7 +28,8 @@ public class AirportResolverNode implements NodeAction<TravelState> {
         // Prompt-only requests can reach this node without explicit DTO slots.
         // Recover a known destination from the current request before ever calling
         // the MCP resolver with a blank query. This also handles simple typos such
-        // as "dubaig" because the deterministic hint matches the known place "dubai".
+        // The request is expected to be normalized before graph execution;
+        // this node only resolves the resulting canonical route.
         String destinationHint = TripSlotHeuristics.extractDestinationHint(state.userRequest());
         String destinationQuery = TripSlotHeuristics.normalizePlace(
                 resolveDestinationQuery(state.destination(), destinationHint));

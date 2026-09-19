@@ -53,6 +53,17 @@ public class FlightAgentService {
                     "No departure city was provided, so flight options are unavailable.");
         }
 
+        // Never call the provider with the same airport on both sides. This is
+        // especially important for follow-ups: the destination can be inherited
+        // from conversation memory while the current turn supplies a new origin.
+        if (originIata.equalsIgnoreCase(destinationIata)) {
+            log.warn("Skipping invalid same-airport flight route origin={} destination={} prompt={}",
+                    originIata, destinationIata, state.userRequest());
+            return FlightSearchResult.unavailable(originIata, destinationIata,
+                    "Origin and destination are the same airport (" + originIata
+                            + "). Please provide a different departure city.");
+        }
+
         log.info("Flight agent searching roundTrip={} datesFlexible={} {} -> {}",
                 state.roundTrip(), state.datesFlexible(), originIata, destinationIata);
         McpFlightSearchClient mcpClient = mcpFlightSearchClient.getIfAvailable();

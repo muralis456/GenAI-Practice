@@ -7,6 +7,7 @@ import com.example.travel.agent.TravelPlannerAgentService;
 import com.example.travel.service.ConversationMemoryService;
 import com.example.travel.service.GraphProgressHub;
 import com.example.travel.service.TripHistoryService;
+import com.example.travel.service.QueryNormalizationService;
 import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,15 +37,18 @@ public class TravelController {
     private final ConversationMemoryService conversationMemoryService;
     private final GraphProgressHub graphProgressHub;
     private final TripHistoryService tripHistoryService;
+    private final QueryNormalizationService queryNormalizationService;
 
     public TravelController(TravelPlannerAgentService travelPlannerAgentService,
                             ConversationMemoryService conversationMemoryService,
                             GraphProgressHub graphProgressHub,
-                            TripHistoryService tripHistoryService) {
+                            TripHistoryService tripHistoryService,
+                            QueryNormalizationService queryNormalizationService) {
         this.travelPlannerAgentService = travelPlannerAgentService;
         this.conversationMemoryService = conversationMemoryService;
         this.graphProgressHub = graphProgressHub;
         this.tripHistoryService = tripHistoryService;
+        this.queryNormalizationService = queryNormalizationService;
     }
 
     @PostMapping("/plan")
@@ -52,10 +56,15 @@ public class TravelController {
         String userId = request.getUserId() != null ? request.getUserId() : "anonymous";
         String sessionId = userId;
         String query = request.getPrompt() != null ? request.getPrompt() : request.getPreferences();
-        log.info("Received travel plan request for destination={}, query={}, userId={}",
-                request.getDestination(), query, userId);
+        request.setOriginalPrompt(query);
+        QueryNormalizationService.NormalizationResult normalization = queryNormalizationService.normalize(request);
+        if (!normalization.normalizedPrompt().isBlank()) {
+            request.setPrompt(normalization.normalizedPrompt());
+        }
+        log.info("Received travel plan request for destination={}, rawQuery={}, normalizedQuery={}, corrections={}, userId={}",
+                request.getDestination(), query, normalization.normalizedPrompt(), normalization.corrections(), userId);
 
-        // Persist the search immediately — do not wait for the multi-minute graph.
+        // Persist the original user wording immediately — do not wait for the multi-minute graph.
         conversationMemoryService.saveMessage(userId, sessionId, "user", query);
 
         String historyContext = conversationMemoryService.buildHistoryContext(userId, sessionId);
@@ -89,6 +98,18 @@ public class TravelController {
         // Hydrate missing route slots first so specialists work even for API
         // clients that do not perform browser-side follow-up context merging.
         conversationMemoryService.hydrateRequestFromConversation(userId, conversationId, request);
+        String rawPrompt = request.getPrompt();
+        request.setOriginalPrompt(rawPrompt);
+        QueryNormalizationService.NormalizationResult normalization = queryNormalizationService.normalize(request);
+        if (!normalization.normalizedPrompt().isBlank()) {
+            request.setPrompt(normalization.normalizedPrompt());
+        }
+        log.info("Query normalization conversationId={} raw=[{}] normalized=[{}] corrections={} entities={}",
+                conversationId, rawPrompt, normalization.normalizedPrompt(),
+                normalization.corrections(), normalization.entities());
+        log.info("Follow-up hydrated conversationId={} prompt=[{}] origin={} destination={} departureDate={} returnDate={}",
+                conversationId, request.getPrompt(), request.getDepartureCity(), request.getDestination(),
+                request.getDepartureDate(), request.getReturnDate());
         String historyContext = conversationMemoryService.buildConversationHistoryContext(userId, conversationId);
         String threadId = travelPlannerAgentService.startTravelPlan(request, historyContext);
         return ResponseEntity.status(HttpStatus.ACCEPTED).body(Map.of(

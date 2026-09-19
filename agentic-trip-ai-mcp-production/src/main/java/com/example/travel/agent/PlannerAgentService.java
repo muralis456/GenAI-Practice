@@ -66,9 +66,8 @@ public class PlannerAgentService {
                 routeGroup(state.userRequest(), 1),
                 state.origin(),
                 state.preferredAirport());
-        // Deterministic destination hints from the CURRENT request take precedence
-        // over an LLM slot that may contain a typo such as "dubaig". This prevents
-        // downstream flight/hotel agents from receiving an invalid destination.
+        // The current request has already passed through the query normalization
+        // capability, so its destination hint is the canonicalized current-turn value.
         String requestDestinationHint = TripSlotHeuristics.extractDestinationHint(state.userRequest());
         String destinationCandidate = first(requestDestinationHint,
                 extraction == null ? null : extraction.getDestination(),

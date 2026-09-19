@@ -167,12 +167,20 @@ public class TravelState extends AgentState {
         // API clients often send only prompt/preferences and leave DTO slots blank.
         // Every downstream specialist must see the same deterministic route; never
         // let an LLM/tool-selection pass turn a known destination into an empty slot.
+        // CURRENT-TURN explicit route hints always win over hydrated conversation
+        // values. This is critical for follow-ups such as:
+        //   Previous: Bengaluru trip
+        //   Current:  "any flights available from Hyderabad for today"
+        // The conversation provides the destination (Bengaluru), while the
+        // current prompt explicitly changes the origin to Hyderabad.
+        String promptOriginHint = TripSlotHeuristics.extractOriginHint(prompt);
+        String promptDestinationHint = TripSlotHeuristics.extractDestinationHint(prompt);
         String requestedOrigin = firstNonBlank(
-                request.getDepartureCity(),
-                TripSlotHeuristics.extractOriginHint(prompt));
+                promptOriginHint,
+                request.getDepartureCity());
         String requestedDestination = firstNonBlank(
-                request.getDestination(),
-                TripSlotHeuristics.extractDestinationHint(prompt));
+                promptDestinationHint,
+                request.getDestination());
         input.put(ORIGIN, TripSlotHeuristics.normalizePlace(requestedOrigin));
         input.put(DESTINATION, TripSlotHeuristics.normalizePlace(requestedDestination));
         input.put(DEPARTURE_DATE, parseDate(request.getDepartureDate(), today));
