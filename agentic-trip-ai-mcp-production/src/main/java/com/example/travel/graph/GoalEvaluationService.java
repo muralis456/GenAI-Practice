@@ -29,11 +29,16 @@ public class GoalEvaluationService {
             return hard;
         }
 
-        // Java owns hard safety/contract checks. We still run semantic evaluation
-        // when hard checks pass because task completion alone cannot prove user-
-        // specific requirements such as "include Burj Khalifa" or "keep the trip
-        // within 5 days". The LLM may add semantic insight, but can never erase
-        // an objective Java blocker.
+        // Java owns the execution contract. Once the deterministic evaluator has
+        // proved that every required outcome is present, the goal is achieved.
+        // The LLM is allowed to add semantic reasoning for a partial result, but
+        // it must never downgrade a mechanically complete execution. This prevents
+        // stale checkpoint/task text or an LLM hallucination from resurrecting a
+        // failed state after a successful recovery.
+        if (hard.getStatus() == GoalEvaluation.Status.ACHIEVED) {
+            return hard;
+        }
+
         try {
             String system = "You are the Goal Evaluator for a production travel agent. "
                     + "Determine whether the user's actual goal is achieved from the evidence provided. "
@@ -91,7 +96,14 @@ public class GoalEvaluationService {
         List<String> out = new ArrayList<>();
         if (a != null) out.addAll(a);
         if (b != null) out.addAll(b);
-        return out.stream().filter(v -> v != null && !v.isBlank()).distinct().toList();
+        return out.stream()
+                .filter(v -> v != null && !v.isBlank())
+                // Never expose Java object identity strings such as
+                // AgentTask@5d3f... to the UI. They are implementation details,
+                // not user-facing recovery information.
+                .filter(v -> !v.startsWith("AgentTask@"))
+                .distinct()
+                .toList();
     }
 
     private GoalEvaluation hardEvaluation(TravelState state) {

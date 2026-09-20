@@ -49,11 +49,28 @@ public class GraphProgressHub {
     }
 
     public SseEmitter subscribe(String threadId) {
+        return subscribe(threadId, false);
+    }
+
+    /**
+     * Subscribe to progress. When liveOnly is true, ignore all events that
+     * existed before the subscription. This is required for retries on an
+     * existing LangGraph thread: the thread already contains a terminal event
+     * from the previous run, which must not immediately close the new SSE.
+     */
+    public SseEmitter subscribe(String threadId, boolean liveOnly) {
         SseEmitter emitter = new SseEmitter(SSE_TIMEOUT_MS);
         AtomicBoolean closed = new AtomicBoolean(false);
-        long[] lastId = {0L};
+        long initialLastId = liveOnly
+                ? repository.findTop1ByThreadIdOrderByIdDesc(threadId).map(GraphProgressEvent::getId).orElse(0L)
+                : 0L;
+        long[] lastId = {initialLastId};
 
         try {
+            if (liveOnly) {
+                // Do not replay historical events. The poller will deliver only
+                // events emitted after this subscription was established.
+            } else {
             List<GraphProgressEvent> replay = new ArrayList<>(repository.findTop200ByThreadIdOrderByIdDesc(threadId));
             replay.sort(java.util.Comparator.comparing(GraphProgressEvent::getId));
             for (GraphProgressEvent event : replay) {
@@ -64,8 +81,9 @@ public class GraphProgressHub {
                     return emitter;
                 }
             }
+            }
         } catch (Exception ex) {
-            log.warn("Could not replay SSE progress threadId={}", threadId, ex);
+            log.warn("Could not replay SSE progress threadId={} liveOnly={}", threadId, liveOnly, ex);
         }
 
         ScheduledFuture<?> future = poller.scheduleWithFixedDelay(() -> poll(threadId, emitter, lastId, closed),

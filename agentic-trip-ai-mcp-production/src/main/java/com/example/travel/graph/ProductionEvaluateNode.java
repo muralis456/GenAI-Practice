@@ -15,6 +15,14 @@ public class ProductionEvaluateNode implements NodeAction<TravelState> {
         u.put(TravelState.GOAL_EVALUATION,e);
         u.put(TravelState.SUPERVISOR_DECISION,e.getStatus().name());
         u.put(TravelState.REPLAN_NOTES,e.getReason()+" unmet="+e.getUnmetCriteria());
+
+        // A successful recovery consumes the previous failure marker. Keeping
+        // nodeFailure around after the capability has recovered can incorrectly
+        // influence routing and can make a completed plan look recoverable/failed.
+        if (e.getStatus() == GoalEvaluation.Status.ACHIEVED) {
+            u.putAll(NodeFailureSupport.clear());
+            u.put(TravelState.RETRY_TASK, "");
+        }
         u.putAll(TravelState.trace("evaluate",e.getStatus().name().toLowerCase(),e.getReason()));
         return u;
     }

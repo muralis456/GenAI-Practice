@@ -113,10 +113,11 @@ public class TravelController {
     }
 
     @GetMapping(value = "/plan/{threadId}/events", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public SseEmitter planEvents(Authentication authentication, @PathVariable String threadId) {
+    public SseEmitter planEvents(Authentication authentication, @PathVariable String threadId,
+                                 @RequestParam(defaultValue = "false") boolean liveOnly) {
         String userId = currentUser(authentication);
         travelPlannerAgentService.assertOwnedThread(userId, threadId);
-        return graphProgressHub.subscribe(threadId);
+        return graphProgressHub.subscribe(threadId, liveOnly);
     }
 
     @GetMapping("/chat/history")

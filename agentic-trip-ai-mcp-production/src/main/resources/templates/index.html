@@ -4843,6 +4843,177 @@
         }
     });
 
+    const retryWithLiveProgress = async (threadId, task, sourceRow) => {
+        if (!threadId) {
+            showToast('This plan no longer has an active recovery thread. Please create a new plan.');
+            return false;
+        }
+
+        const liveResponse = createLiveResponse();
+        // Keep the live card directly after the plan being retried instead of
+        // sending it to the bottom of a long conversation.
+        if (sourceRow?.parentNode) {
+            sourceRow.parentNode.insertBefore(liveResponse.row, sourceRow.nextSibling);
+        }
+        liveResponse.state.textContent = 'Retrying';
+        liveResponse.activity.textContent = task === 'ALL_FAILED'
+            ? 'Retrying failed tasks…'
+            : 'Retrying ' + humanTaskLabel(task) + '…';
+
+        sourceRow?.querySelectorAll('[data-plan-action]').forEach(btn => {
+            btn.disabled = true;
+            btn.dataset.busy = 'true';
+        });
+        submitButton.disabled = true;
+        loadingState.classList.add('visible');
+
+        let finished = false;
+        let es;
+        let resolveStream;
+        let rejectStream;
+        const streamDone = new Promise((resolve, reject) => {
+            resolveStream = resolve;
+            rejectStream = reject;
+        });
+
+        const finishStream = (ok, error) => {
+            if (finished) return;
+            finished = true;
+            try { es?.close(); } catch (_) {}
+            if (ok) resolveStream();
+            else rejectStream(error || new Error(safeUiErrorMessage()));
+        };
+
+        try {
+            // IMPORTANT: subscribe before POST /retry. The existing thread has
+            // an old terminal event, so liveOnly=true starts after that event.
+            await new Promise((resolveOpen, rejectOpen) => {
+                es = new EventSource('/api/plan/' + encodeURIComponent(threadId) + '/events?liveOnly=true');
+                es.onopen = () => resolveOpen();
+                es.onerror = () => {
+                    if (!es || es.readyState === EventSource.CLOSED) {
+                        rejectOpen(new Error(safeUiErrorMessage()));
+                    }
+                };
+            });
+
+            const statusSpan = loadingState.querySelectorAll('span')[1];
+            es.addEventListener('started', (evt) => {
+                try {
+                    const data = JSON.parse(evt.data);
+                    liveResponse.state.textContent = 'Working';
+                    liveResponse.activity.textContent = data.message || 'Retrying failed tasks…';
+                    if (statusSpan) statusSpan.textContent = (data.message || 'Retrying failed tasks') + '…';
+                } catch (_) {}
+            });
+            es.addEventListener('activity', (evt) => {
+                try {
+                    const data = JSON.parse(evt.data);
+                    if (data.message) liveResponse.activity.textContent = data.message + '…';
+                    const phaseId = phaseForNode(data.phase || '');
+                    if (phaseId) setLivePhase(liveResponse, phaseId, 'RUNNING');
+                } catch (_) {}
+            });
+            es.addEventListener('node_start', (evt) => {
+                try {
+                    const data = JSON.parse(evt.data);
+                    if (!data.node) return;
+                    const msg = data.message || ('Running ' + data.node);
+                    if (statusSpan) statusSpan.textContent = msg + '…';
+                    updateLiveResponse(liveResponse, data.node, 'start', msg);
+                } catch (_) {}
+            });
+            es.addEventListener('node_complete', (evt) => {
+                try {
+                    const data = JSON.parse(evt.data);
+                    if (!data.node) return;
+                    const failed = String(data.status || '').toUpperCase() === 'FAILED';
+                    const msg = data.message || data.node;
+                    if (statusSpan) statusSpan.textContent = failed ? msg + ' — failed' : msg;
+                    updateLiveResponse(liveResponse, data.node, failed ? 'start' : 'complete', msg);
+                    if (failed) setLivePhase(liveResponse, phaseForNode(data.node), 'FAILED', msg);
+                } catch (_) {}
+            });
+            es.addEventListener('task_start', (evt) => {
+                try {
+                    const data = JSON.parse(evt.data);
+                    if (data.task) setLiveTask(liveResponse, data.task, 'RUNNING', data.message || data.task);
+                } catch (_) {}
+            });
+            es.addEventListener('task_complete', (evt) => {
+                try {
+                    const data = JSON.parse(evt.data);
+                    if (data.task) {
+                        const failed = String(data.status || '').toUpperCase() === 'FAILED';
+                        setLiveTask(liveResponse, data.task, failed ? 'FAILED' : 'SUCCEEDED', data.message || data.task);
+                    }
+                } catch (_) {}
+            });
+            es.addEventListener('complete', async (evt) => {
+                try {
+                    const wrapper = JSON.parse(evt.data);
+                    const data = wrapper.plan || wrapper;
+                    liveResponse.state.textContent = 'Retry complete';
+                    liveResponse.activity.textContent = 'Failed tasks processed';
+                    replaceDecisionPlanInPlace(sourceRow, data);
+                    updatePersistedPlanForThread(threadId, data);
+                    loadDbTrips(false);
+                    finishStream(true);
+                } catch (e) {
+                    finishStream(false, e);
+                }
+            });
+            es.addEventListener('failed', (evt) => {
+                liveResponse.state.textContent = 'Retry failed';
+                liveResponse.activity.textContent = 'Retry could not complete';
+                finishStream(false, new Error(safeUiErrorMessage()));
+            });
+
+            // Now that SSE is definitely subscribed, start the actual retry.
+            appendUserMessage(task === 'ALL_FAILED' ? 'Retrying all failed tasks.' : 'Retrying ' + humanTaskLabel(task) + '.');
+            const res = await apiFetch('/api/plan/retry', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    userId: currentUserId || userIdField.value.trim() || '',
+                    threadId,
+                    notes: task
+                })
+            });
+            const payload = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                throw new Error(payload.error || safeUiErrorMessage());
+            }
+            // The HTTP response is authoritative for the final state, but the
+            // UI waits for the terminal SSE event so the user sees the retry in
+            // real time rather than jumping directly from Retry to the result.
+            if (!finished) {
+                await streamDone;
+            }
+            return true;
+        } catch (error) {
+            try { es?.close(); } catch (_) {}
+            if (liveResponse.row?.isConnected) {
+                liveResponse.state.textContent = 'Retry failed';
+                liveResponse.activity.textContent = error?.message || safeUiErrorMessage();
+            }
+            showToast(error?.message || safeUiErrorMessage());
+            return false;
+        } finally {
+            try { es?.close(); } catch (_) {}
+            if (liveResponse.row?.isConnected) {
+                setTimeout(() => removeLiveResponse(liveResponse), 700);
+            }
+            sourceRow?.querySelectorAll('[data-plan-action]').forEach(btn => {
+                btn.disabled = false;
+                btn.dataset.busy = 'false';
+            });
+            submitButton.disabled = false;
+            loadingState.classList.remove('visible');
+            updateComposerState();
+        }
+    };
+
     // Decision actions are delegated from the chat thread so they keep working
     // after assistant cards are replaced/re-rendered. The button carries the
     // thread id explicitly, avoiding any dependency on a stale closure.
@@ -4863,10 +5034,14 @@
             enterModifyMode(threadId, row);
             return;
         }
-        const endpoint = action === 'approve' ? '/api/plan/approve' : action === 'reject' ? '/api/plan/reject' : action === 'retry' ? '/api/plan/retry' : null;
+        if (action === 'retry') {
+            const retryTask = button.getAttribute('data-retry-task') || 'ALL_FAILED';
+            await retryWithLiveProgress(threadId, retryTask, row);
+            return;
+        }
+        const endpoint = action === 'approve' ? '/api/plan/approve' : action === 'reject' ? '/api/plan/reject' : null;
         if (!endpoint) return;
-        const retryTask = button.getAttribute('data-retry-task');
-        await decide(endpoint, threadId, action === 'retry' ? retryTask : null, row);
+        await decide(endpoint, threadId, null, row);
     });
 
     chatThread.addEventListener('click', (event) => {

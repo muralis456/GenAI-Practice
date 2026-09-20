@@ -718,12 +718,7 @@ public class TravelPlannerAgentService {
         // compatibility with older clients, but the default recovery action is
         // always the complete failed-task set.
         String requested = taskId == null ? "" : taskId.trim().toLowerCase();
-        List<String> failedTasks = current.agentPlan().getTasks().stream()
-                .filter(com.example.travel.model.AgentTask::isRequired)
-                .filter(t -> t.getStatus() == com.example.travel.model.AgentTask.Status.FAILED)
-                .map(com.example.travel.model.AgentTask::getId)
-                .distinct()
-                .toList();
+        List<String> failedTasks = current.agentPlan().failedRequiredTaskIds();
 
         List<String> recoveryTasks;
         if (requested.isBlank() || "all_failed".equals(requested) || "all-failed".equals(requested)
@@ -753,18 +748,28 @@ public class TravelPlannerAgentService {
         ModelRoutingContext.set(previousPolicy(key));
         executionBudget.begin();
         graphRunContext.open(key, executionBudget.capture(), previousPolicy(key));
+        graphProgressHub.emit(key, "started", Map.of(
+                "threadId", key,
+                "node", "RETRY",
+                "message", "Retrying failed tasks"));
         try {
             travelGraph.invoke(GraphInput.resume(decision), config);
+            TravelState state = requireCheckpointState(key);
+            boolean pending = isAwaitingHitl(key);
+            TravelPlanResponse response = toResponse(state, key, pending);
+            tripHistoryService.saveOrUpdate(userId, response);
+            graphProgressHub.emit(key, "complete", Map.of("plan", response));
+            return response;
+        } catch (RuntimeException ex) {
+            log.warn("Retry failed threadId={} tasks={}", key, recoveryTasks, ex);
+            graphProgressHub.emit(key, "failed", Map.of(
+                    "error", "Retry could not complete. Please try again."));
+            throw ex;
         } finally {
             graphRunContext.close(key);
             executionBudget.end();
             ModelRoutingContext.clear();
         }
-        TravelState state = requireCheckpointState(key);
-        boolean pending = isAwaitingHitl(key);
-        TravelPlanResponse response = toResponse(state, key, pending);
-        tripHistoryService.saveOrUpdate(userId, response);
-        return response;
     }
 
     public TravelPlanResponse reject(
@@ -1287,9 +1292,19 @@ public class TravelPlannerAgentService {
             response.setUnmetCriteria(state.goalEvaluation().getUnmetCriteria());
             response.setBlockingIssues(state.goalEvaluation().getBlockingIssues());
         }
-        response.setRetryableTasks(state.agentPlan() == null ? List.of() : state.agentPlan().getTasks().stream()
+        List<String> failedTasks = state.agentPlan() == null ? List.of() : state.agentPlan().getTasks().stream()
                 .filter(t -> t.isRequired() && t.getStatus() == com.example.travel.model.AgentTask.Status.FAILED)
-                .map(com.example.travel.model.AgentTask::getId).distinct().toList());
+                .map(com.example.travel.model.AgentTask::getId)
+                .filter(java.util.Objects::nonNull)
+                .distinct()
+                .toList();
+        // The goal status is authoritative. A stale failed-task marker must never
+        // keep the retry CTA alive after deterministic goal evaluation succeeded.
+        response.setRetryableTasks(
+                state.goalEvaluation() != null
+                        && state.goalEvaluation().getStatus() == com.example.travel.model.GoalEvaluation.Status.ACHIEVED
+                        ? List.of()
+                        : failedTasks);
         response.setClarificationRequired(state.userInputRequired());
         response.setClarificationQuestion(state.userInputQuestion());
 

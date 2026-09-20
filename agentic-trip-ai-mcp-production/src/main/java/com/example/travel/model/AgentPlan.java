@@ -122,14 +122,30 @@ public class AgentPlan implements Serializable {
         // exposing stale derived results as executable.
         tasks.forEach(task -> {
             if (selected.contains(task.getId())) {
+                // The failed capability is the recovery root. Re-open it so the
+                // execution engine can make a fresh attempt.
                 task.setStatus(AgentTask.Status.READY);
-            } else if (task.getStatus() == AgentTask.Status.SUCCEEDED) {
-                task.setStatus(AgentTask.Status.SUCCEEDED);
-            } else if (dependsTransitivelyOn(task.getId(), selected)) {
-                task.setStatus(AgentTask.Status.PENDING);
-            } else {
-                task.setStatus(AgentTask.Status.SKIPPED);
+                return;
             }
+
+            // IMPORTANT: dependency invalidation must happen BEFORE the
+            // "already succeeded" preservation check. A successful downstream
+            // task is no longer trustworthy when one of its prerequisites is
+            // being re-executed. Re-open it automatically. This keeps recovery
+            // dynamic instead of hard-coding flights -> budget -> itinerary,
+            // etc.
+            if (dependsTransitivelyOn(task.getId(), selected)) {
+                task.setStatus(AgentTask.Status.PENDING);
+                return;
+            }
+
+            if (task.getStatus() == AgentTask.Status.SUCCEEDED) {
+                // Preserve successful work that is independent of the recovery
+                // root.
+                return;
+            }
+
+            task.setStatus(AgentTask.Status.SKIPPED);
         });
         version++;
     }
@@ -221,6 +237,24 @@ public class AgentPlan implements Serializable {
                 && t.getStatus() == AgentTask.Status.FAILED
                 && t.getAttempts() < maxAttempts);
     }
+    /** All required failures currently eligible for an explicit recovery pass. */
+    public List<String> failedRequiredTaskIds() {
+        return tasks.stream()
+                .filter(AgentTask::isRequired)
+                .filter(t -> t.getStatus() == AgentTask.Status.FAILED)
+                .map(AgentTask::getId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+    }
+
+    /** True when every required capability has a terminal successful outcome. */
+    public boolean allRequiredTasksSucceeded() {
+        return tasks.stream()
+                .filter(AgentTask::isRequired)
+                .allMatch(t -> t.getStatus() == AgentTask.Status.SUCCEEDED);
+    }
+
 
     @Override public String toString() {
         return "AgentPlan{goal='" + goal + "', version=" + version + ", tasks=" + tasks + '}';
