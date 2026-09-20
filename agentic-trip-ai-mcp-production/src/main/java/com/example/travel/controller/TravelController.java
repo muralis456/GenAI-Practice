@@ -83,8 +83,24 @@ public class TravelController {
             request.setConversationId(conversationId);
         }
 
-        conversationMemoryService.hydrateRequestFromConversation(userId, conversationId, request);
+        // Keep the RAW current-turn prompt as the authority for dates. A stale
+        // hidden date from the UI must not be mistaken for a user-entered date.
+        // In particular, do not allow yesterday's date to survive into a live
+        // flight search when the current prompt contains no explicit date.
         String rawPrompt = request.getPrompt();
+        if (request.getDepartureDate() != null && !request.getDepartureDate().isBlank()
+                && !com.example.travel.support.TripSlotHeuristics.hasDateHint(rawPrompt)
+                && isPastDate(request.getDepartureDate())) {
+            log.warn("Clearing stale past departureDate={} because current prompt has no explicit date",
+                    request.getDepartureDate());
+            request.setDepartureDate("");
+        }
+        if (request.getReturnDate() != null && !request.getReturnDate().isBlank()
+                && !com.example.travel.support.TripSlotHeuristics.hasDateHint(rawPrompt)
+                && isPastDate(request.getReturnDate())) {
+            request.setReturnDate("");
+        }
+        conversationMemoryService.hydrateRequestFromConversation(userId, conversationId, request);
         request.setOriginalPrompt(rawPrompt);
         QueryNormalizationService.NormalizationResult normalization = queryNormalizationService.normalize(request);
         if (!normalization.normalizedPrompt().isBlank()) request.setPrompt(normalization.normalizedPrompt());
@@ -245,6 +261,14 @@ public class TravelController {
     @GetMapping("/plan/{threadId}/history")
     public ResponseEntity<?> history(Authentication authentication, @PathVariable String threadId) {
         return ResponseEntity.ok(travelPlannerAgentService.history(currentUser(authentication), threadId));
+    }
+
+    private boolean isPastDate(String value) {
+        try {
+            return java.time.LocalDate.parse(value.trim()).isBefore(java.time.LocalDate.now());
+        } catch (Exception ignored) {
+            return false;
+        }
     }
 
     private String currentUser(Authentication authentication) {

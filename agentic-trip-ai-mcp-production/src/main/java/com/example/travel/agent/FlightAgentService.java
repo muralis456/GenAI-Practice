@@ -68,6 +68,19 @@ public class FlightAgentService {
                 state.roundTrip(), state.datesFlexible(), originIata, destinationIata);
         McpFlightSearchClient mcpClient = mcpFlightSearchClient.getIfAvailable();
         java.time.LocalDate outboundDate = state.datesFlexible() ? null : state.departureDate();
+        // FINAL LIVE-PROVIDER GUARD: a live flight provider cannot search a past
+        // departure date. Do not trust planner/LLM output, conversation memory,
+        // normalized text, or checkpoint state at this boundary. Any past date
+        // is stale state and is corrected to today before MCP is invoked.
+        // Explicit past-date requests are still rejected by the MCP server, but
+        // they must never be allowed to poison a normal live search with an old
+        // date copied from conversation history.
+        if (outboundDate != null && outboundDate.isBefore(java.time.LocalDate.now())) {
+            java.time.LocalDate correctedDate = java.time.LocalDate.now();
+            log.warn("flight.date.guard corrected stale departureDate={} to today={} origin={} destination={} userRequest={}",
+                    outboundDate, correctedDate, originIata, destinationIata, state.userRequest());
+            outboundDate = correctedDate;
+        }
         List<FlightOption> flights = mcpClient == null
                 ? flightSearchTool.search(originIata, destinationIata, outboundDate)
                 : mcpClient.search(originIata, destinationIata, outboundDate, state.travelers(), state.userRequest());
@@ -75,6 +88,13 @@ public class FlightAgentService {
 
         if (state.roundTrip()) {
             java.time.LocalDate returnDate = state.datesFlexible() ? null : state.returnDate();
+            if (returnDate != null
+                    && outboundDate != null
+                    && returnDate.isBefore(outboundDate)
+                    && !TripSlotHeuristics.hasDateHint(state.userRequest())
+                    && !TripSlotHeuristics.hasDurationHint(state.userRequest())) {
+                returnDate = outboundDate.plusDays(5);
+            }
             List<FlightOption> returns = mcpClient == null
                     ? flightSearchTool.search(destinationIata, originIata, returnDate)
                     : mcpClient.search(destinationIata, originIata, returnDate, state.travelers(),

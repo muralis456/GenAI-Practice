@@ -36,6 +36,15 @@ public class McpFlightSearchClient {
     }
 
     public List<FlightOption> search(String origin, String destination, LocalDate departureDate, int passengers, String userInput) {
+        // Absolute last line of defence: this is the exact boundary where the
+        // request is serialized and sent to the MCP server. A past date must
+        // never leave the client, regardless of how it entered graph state.
+        if (departureDate != null && departureDate.isBefore(LocalDate.now())) {
+            LocalDate correctedDate = LocalDate.now();
+            log.warn("mcp.client.date.guard corrected departureDate={} to today={} origin={} destination={}",
+                    departureDate, correctedDate, origin, destination);
+            departureDate = correctedDate;
+        }
         try {
                 Map<String, Object> input = Map.of(
                     "origin", origin,

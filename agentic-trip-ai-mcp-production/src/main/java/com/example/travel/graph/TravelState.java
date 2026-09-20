@@ -152,7 +152,7 @@ public class TravelState extends AgentState {
         LocalDate today = LocalDate.now();
         // Never invent a travel objective when the API request contains no prompt.
         // An empty turn is classified as GENERAL and can be clarified safely.
-        String prompt = firstNonBlank(request.getPrompt(), request.getPreferences(), "");
+        String prompt = firstNonBlank(request.getOriginalPrompt(), request.getPrompt(), request.getPreferences(), "");
         boolean datesFlexible = isBlank(request.getDepartureDate()) && isBlank(request.getReturnDate())
                 && !containsRelativeDate(prompt);
         boolean roundTrip = !containsOneWayIntent(prompt);
@@ -205,6 +205,22 @@ public class TravelState extends AgentState {
         if (TripSlotHeuristics.hasDurationHint(prompt)) {
             requestedReturnDate = TripSlotHeuristics.inferReturnDate(prompt, departureDate, requestedReturnDate);
         }
+
+        // Never allow a stale date supplied by the UI/request hydration layer to
+        // reach live providers. A historical date is valid only when the CURRENT
+        // turn explicitly asks for that calendar date (the server will then
+        // reject genuinely past searches). Otherwise, treat it as stale context
+        // and use today for a live flight search.
+        boolean currentTurnHasDateHint = TripSlotHeuristics.hasDateHint(prompt)
+                || TripSlotHeuristics.hasDurationHint(prompt);
+        if (departureDate.isBefore(today) && !currentTurnHasDateHint) {
+            departureDate = today;
+            requestedReturnDate = TripSlotHeuristics.inferReturnDate(prompt, departureDate, requestedReturnDate);
+        }
+        if (requestedReturnDate.isBefore(departureDate) && !currentTurnHasDateHint) {
+            requestedReturnDate = departureDate.plusDays(5);
+        }
+
         input.put(DEPARTURE_DATE, departureDate);
         input.put(RETURN_DATE, requestedReturnDate);
         input.put(DATES_FLEXIBLE, datesFlexible);
