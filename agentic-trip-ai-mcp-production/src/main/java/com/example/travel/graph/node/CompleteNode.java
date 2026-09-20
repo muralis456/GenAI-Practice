@@ -16,9 +16,14 @@ public class CompleteNode implements NodeAction<TravelState> {
 
     @Override
     public Map<String, Object> apply(TravelState state) {
+        if (state == null
+                || state.goalEvaluation() == null
+                || state.goalEvaluation().getStatus() != com.example.travel.model.GoalEvaluation.Status.ACHIEVED
+                || !"approve".equalsIgnoreCase(state.hitlDecision())) {
+            throw new IllegalStateException("Cannot complete a trip plan before the goal is achieved and explicitly approved.");
+        }
         Map<String, Object> updates = new LinkedHashMap<>();
         updates.put(TravelState.AWAITING_APPROVAL, Boolean.FALSE);
-        updates.put(TravelState.HITL_DECISION, "approve");
         updates.putAll(TravelState.trace(TravelGraphNodes.COMPLETE, "ok", "plan approved"));
         return updates;
     }

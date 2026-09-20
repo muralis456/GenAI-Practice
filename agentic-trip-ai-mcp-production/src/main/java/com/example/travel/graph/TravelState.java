@@ -118,6 +118,7 @@ public class TravelState extends AgentState {
     public static final String SEMANTIC_VALIDATION = TravelStateKeys.Validation.SEMANTIC_VALIDATION;
     public static final String SUPERVISOR_ASSESSMENT = TravelStateKeys.Control.SUPERVISOR_ASSESSMENT;
     public static final String NODE_FAILURE = TravelStateKeys.Control.NODE_FAILURE;
+    public static final String RETRY_TASK = TravelStateKeys.Control.RETRY_TASK;
     public static final String USER_INPUT_REQUIRED = TravelStateKeys.Control.USER_INPUT_REQUIRED;
     public static final String USER_INPUT_QUESTION = TravelStateKeys.Control.USER_INPUT_QUESTION;
     public static final String HOTEL_FALLBACK_EXHAUSTED = TravelStateKeys.Control.HOTEL_FALLBACK_EXHAUSTED;
@@ -827,6 +828,10 @@ public class TravelState extends AgentState {
 
     public NodeFailureInfo nodeFailure() {
         return this.<NodeFailureInfo>value(NODE_FAILURE).orElseGet(NodeFailureInfo::new);
+    }
+
+    public String retryTask() {
+        return this.<String>value(RETRY_TASK).orElse("");
     }
 
     public boolean shouldReplan() {

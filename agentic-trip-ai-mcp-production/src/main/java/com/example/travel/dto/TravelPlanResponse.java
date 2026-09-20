@@ -1,6 +1,8 @@
 package com.example.travel.dto;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 
 
 /**
@@ -31,6 +33,10 @@ public class TravelPlanResponse {
 
     /** Explicit human-decision lifecycle: NOT_REQUIRED, PENDING, APPROVED, or REJECTED. */
     private String approvalState = "NOT_REQUIRED";
+    private String goalStatus = "PARTIAL";
+    private List<String> unmetCriteria = new ArrayList<>();
+    private List<String> blockingIssues = new ArrayList<>();
+    private List<String> retryableTasks = new ArrayList<>();
 
     /** True when execution is paused because a required user detail is missing. */
     private boolean clarificationRequired;
@@ -126,6 +132,15 @@ public class TravelPlanResponse {
     public void setApprovalState(String approvalState) {
         this.approvalState = approvalState == null || approvalState.isBlank() ? "NOT_REQUIRED" : approvalState;
     }
+
+    public String getGoalStatus() { return goalStatus; }
+    public void setGoalStatus(String goalStatus) { this.goalStatus = goalStatus == null || goalStatus.isBlank() ? "PARTIAL" : goalStatus; }
+    public List<String> getUnmetCriteria() { return unmetCriteria; }
+    public void setUnmetCriteria(List<String> v) { unmetCriteria = v == null ? new ArrayList<>() : new ArrayList<>(v); }
+    public List<String> getBlockingIssues() { return blockingIssues; }
+    public void setBlockingIssues(List<String> v) { blockingIssues = v == null ? new ArrayList<>() : new ArrayList<>(v); }
+    public List<String> getRetryableTasks() { return retryableTasks; }
+    public void setRetryableTasks(List<String> v) { retryableTasks = v == null ? new ArrayList<>() : new ArrayList<>(v); }
 
     public boolean isClarificationRequired() { return clarificationRequired; }
     public void setClarificationRequired(boolean clarificationRequired) { this.clarificationRequired = clarificationRequired; }

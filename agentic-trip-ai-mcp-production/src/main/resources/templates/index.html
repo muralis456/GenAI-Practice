@@ -1592,6 +1592,15 @@
         .plan-step-itinerary .plan-step-card{padding-bottom:17px}.plan-step-itinerary .itin-compact{grid-template-columns:repeat(auto-fit,minmax(190px,1fr))}
         .plan-validation{margin:8px 0 12px;padding-left:48px}.plan-validation .validation-banner{margin:0}
         .plan-final-action{margin:12px 0 0 48px;border:1px solid rgba(82,160,255,.2);border-radius:16px;padding:16px;background:linear-gradient(180deg,rgba(17,39,66,.97),rgba(8,22,39,.98));display:flex;align-items:center;justify-content:space-between;gap:18px}.plan-final-action h3{margin:7px 0 3px;font-size:16px}.plan-final-action p{margin:0;color:#8fa9c5;font-size:12px}.plan-final-action.confirmed{border-color:rgba(45,202,123,.2)}.final-actions-inline{display:flex;gap:8px;flex:0 0 auto}.final-actions-inline button{border:0;border-radius:10px;padding:11px 16px;color:#fff;font-weight:850;cursor:pointer;transition:opacity .15s,transform .15s}.final-actions-inline button:disabled{cursor:wait;opacity:.65}.final-actions-inline button.is-busy{position:relative;pointer-events:none}.decision-progress{display:none;align-items:center;gap:8px;margin-top:10px;padding:8px 10px;border-radius:10px;background:rgba(76,157,255,.08);border:1px solid rgba(76,157,255,.16);color:#bcdcff;font-size:11px;font-weight:750}.decision-progress.visible{display:flex}.decision-progress.success{background:rgba(45,202,123,.08);border-color:rgba(45,202,123,.18);color:#a9efc7}.decision-progress.error{background:rgba(255,93,93,.08);border-color:rgba(255,93,93,.18);color:#ffc0c0}.decision-spinner{width:13px;height:13px;border:2px solid rgba(190,220,255,.28);border-top-color:#8bc2ff;border-radius:50%;animation:decisionSpin .75s linear infinite;flex:0 0 auto}.decision-progress.success .decision-spinner,.decision-progress.error .decision-spinner{display:none}@keyframes decisionSpin{to{transform:rotate(360deg)}}.decision-button-spinner{display:inline-block;width:12px;height:12px;border:2px solid rgba(255,255,255,.35);border-top-color:#fff;border-radius:50%;vertical-align:-2px;margin-right:7px;animation:decisionSpin .7s linear infinite}.decision-progress-icon{font-size:13px}.final-actions-inline button.final-approve{background:linear-gradient(135deg,#199c65,#25c77d)}.final-actions-inline button.final-modify{background:linear-gradient(135deg,#226fd2,#3b8ff5)}.final-actions-inline button.final-reject{background:linear-gradient(135deg,#a9404c,#d45b65)}
+.recovery-action{margin:12px 0 0 48px;border:1px solid rgba(255,173,76,.22);border-radius:16px;padding:16px;background:linear-gradient(180deg,rgba(66,43,17,.35),rgba(28,24,16,.45));}
+.recovery-action .recovery-title{font-size:15px;font-weight:900;color:#ffe0b0;margin:0 0 5px}
+.recovery-action .recovery-copy{font-size:11px;color:#aebfd1;line-height:1.5;margin:0 0 10px}
+.recovery-issues{margin:8px 0 0;padding-left:18px;color:#d2ddec;font-size:11px;line-height:1.55}
+.recovery-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.recovery-actions button{border:0;border-radius:10px;padding:10px 14px;background:linear-gradient(135deg,#c87520,#e69b3e);color:#fff;font-weight:850;cursor:pointer}
+.recovery-actions button:disabled{opacity:.6;cursor:wait}
+.plan-header-status.partial-status{color:#ffd39b;background:rgba(221,143,44,.12);border-color:rgba(221,143,44,.25)}
+
         .specialist-request{max-width:520px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.specialist-dynamic-header .plan-header-facts{margin-top:2px}
         .plan-workspace .flight-rich-widget,.plan-workspace .weather-dashboard-card{width:100%}.plan-workspace .rich-flight-card{grid-template-columns:minmax(145px,.75fr) minmax(320px,1.7fr) minmax(130px,.6fr)}
         @media(max-width:850px){.plan-step-rail{left:10px}.plan-header,.plan-workspace > .plan-section-nav{margin-left:38px;width:calc(100% - 38px)}.plan-step-card{width:calc(100% - 38px);margin-left:38px}.plan-final-action{margin-left:38px;flex-direction:column;align-items:stretch}.final-actions-inline{display:grid;grid-template-columns:repeat(3,1fr)}.final-actions-inline button{padding:10px 6px}.plan-header{padding:18px}.plan-header-top{flex-direction:column;gap:8px}.plan-header-status{align-self:flex-start}}
@@ -4196,9 +4205,13 @@
         const quality = trip.qualityScore != null ? trip.qualityScore : (plan.validation && plan.validation.quality && plan.validation.quality.overall > 0 ? Math.round(plan.validation.quality.overall * 100) : null);
         const responseStatus = String(data.status || '').toUpperCase();
         const tripStatus = String(trip.status || '').toUpperCase();
+        const goalStatus = String(data.goalStatus || '').toUpperCase();
         const awaitingApproval = Boolean(data.awaitingApproval === true || trip.awaitingApproval === true || responseStatus === 'PENDING_APPROVAL' || tripStatus === 'PENDING_APPROVAL');
         const approvalState = String(data.approvalState || trip.approvalState || '').toUpperCase();
-        const complete = !awaitingApproval && (!isTripPlan || approvalState === 'APPROVED');
+        const retryableTasks = Array.isArray(data.retryableTasks) ? data.retryableTasks.filter(Boolean) : [];
+        const unmetCriteria = Array.isArray(data.unmetCriteria) ? data.unmetCriteria.filter(Boolean) : [];
+        const blockingIssues = Array.isArray(data.blockingIssues) ? data.blockingIssues.filter(Boolean) : [];
+        const complete = goalStatus === 'ACHIEVED' && !awaitingApproval && (!isTripPlan || approvalState === 'APPROVED');
         const flightDateUnconfirmed = hasFlights && flights.some(f => /not independently confirmed/i.test(String(f.notes || '')));
         const origin = trip.origin || data.origin || '';
         const destination = trip.destination || data.destination || '';
@@ -4208,15 +4221,17 @@
         const budgetLabel = trip.budgetLabel || data.budgetLabel || '';
         const requirements = Array.isArray(trip.requirements) ? trip.requirements : [];
         const imageUrl = trip.imageUrl || trip.heroImageUrl || data.destinationImageUrl || '';
-        const statusText = approvalState === 'APPROVED'
+        const statusText = approvalState === 'APPROVED' && goalStatus === 'ACHIEVED'
             ? 'Plan Approved'
             : approvalState === 'REJECTED'
                 ? 'Plan Rejected'
-                : complete
-                    ? 'Plan Ready'
-                    : (awaitingApproval || (isTripPlan && approvalState !== 'APPROVED'))
-                        ? 'Ready for review'
-                        : 'Planning in progress';
+                : goalStatus === 'PARTIAL' || goalStatus === 'FAILED'
+                    ? 'Action Required'
+                    : complete
+                        ? 'Plan Ready'
+                        : (awaitingApproval || (isTripPlan && approvalState !== 'APPROVED'))
+                            ? 'Ready for review'
+                            : 'Planning in progress';
         const widgetBadge = (badge) => {
             if (approvalState === 'APPROVED') return '✓ Approved';
             if (approvalState === 'REJECTED') return '✕ Rejected';
@@ -4242,7 +4257,7 @@
 
         let html = '<div class="plan-workspace">';
         html += '<header class="plan-header">'
-            + '<div class="plan-header-top"><div><div class="trip-eyebrow">AI TRAVEL PLAN</div><h1>' + escapeHtml(route) + '</h1></div><div class="plan-header-status">' + escapeHtml(statusText) + '</div></div>'
+            + '<div class="plan-header-top"><div><div class="trip-eyebrow">AI TRAVEL PLAN</div><h1>' + escapeHtml(route) + '</h1></div><div class="plan-header-status' + ((goalStatus === 'PARTIAL' || goalStatus === 'FAILED') ? ' partial-status' : '') + '">' + escapeHtml(statusText) + '</div></div>'
             + '<div class="plan-header-facts">'
             + '<span>📅 ' + escapeHtml(trip.datesFlexible === true || (!trip.departureDate && !trip.returnDate) ? 'Dates flexible' : formatDateRange(trip.departureDate, trip.returnDate)) + (nights ? ' · ' + escapeHtml(String(nights)) + ' nights' : '') + '</span>'
             + '<span>👤 ' + escapeHtml(String(travelers)) + ' traveler' + (Number(travelers) === 1 ? '' : 's') + '</span>'
@@ -4253,6 +4268,7 @@
             + '</div>'
             + (requirements.length ? '<div class="plan-requirements">' + requirements.map(r => '<span>✓ ' + escapeHtml(r) + '</span>').join('') + '</div>' : '')
             + '</header>'
+            + ((goalStatus === 'PARTIAL' || goalStatus === 'FAILED') ? '<div class="recovery-action"><div class="recovery-title">⚠ Your complete trip goal is not achieved yet</div><p class="recovery-copy">The successful parts are preserved. Retry only the failed capability below. We will rebuild dependent details only after that capability succeeds.</p>' + ((unmetCriteria.length || blockingIssues.length) ? '<ul class="recovery-issues">' + [...unmetCriteria, ...blockingIssues].slice(0,6).map(x => '<li>' + escapeHtml(String(x)) + '</li>').join('') + '</ul>' : '') + '</div>' : '');
             + (responseStatus === 'NEEDS_USER_INPUT' && String(data.clarificationRequired || '').trim() ? '<div class="agent-clarification-banner"><strong>✦ Action needed</strong><span>' + escapeHtml(String(data.clarificationRequired)) + '</span></div>' : '');
 
         const nav = [];
@@ -4286,9 +4302,18 @@
             html += '<div class="plan-validation">' + buildPlanReview(data, userRequest) + '</div>';
         }
 
-        if (awaitingApproval && data.threadId && data.tripPlanning !== false) {
-            html += '<section class="plan-final-action"><div><span class="decision-status pending"><i class="decision-dot"></i> Waiting for your decision</span><h3>Ready to finalize?</h3><p>Review the plan, then approve it, request a change, or reject it.</p></div><div class="final-actions-inline"><button type="button" class="final-approve" data-plan-action="approve" data-thread-id="' + escapeHtml(data.threadId) + '">✓ Approve</button><button type="button" class="final-modify" data-plan-action="modify" data-thread-id="' + escapeHtml(data.threadId) + '">✎ Modify</button><button type="button" class="final-reject" data-plan-action="reject" data-thread-id="' + escapeHtml(data.threadId) + '">✕ Reject</button></div></section>';
-        } else if (approvalState === 'APPROVED') {
+        if (awaitingApproval && data.threadId && data.tripPlanning !== false && (goalStatus === 'PARTIAL' || goalStatus === 'FAILED')) {
+            const failedLabels = retryableTasks.map(task => humanTaskLabel(task));
+            const failedSummary = failedLabels.length
+                ? failedLabels.join(', ')
+                : 'failed tasks';
+            const retryButton = retryableTasks.length
+                ? '<button type="button" data-plan-action="retry" data-retry-task="ALL_FAILED" data-thread-id="' + escapeHtml(data.threadId) + '">↻ Retry Failed Tasks</button>'
+                : '';
+            html += '<section class="plan-final-action"><div><span class="decision-status pending"><i class="decision-dot"></i> Action required</span><h3>Retry the failed tasks</h3><p>The goal is not complete yet. Failed tasks: <strong>' + escapeHtml(failedSummary) + '</strong>. Successful work will be preserved, and dependent tasks will run again only when their prerequisites succeed.</p></div><div class="final-actions-inline">' + retryButton + '</div></section>';
+        } else if (awaitingApproval && data.threadId && data.tripPlanning !== false) {
+            html += '<section class="plan-final-action"><div><span class="decision-status pending"><i class="decision-dot"></i> Waiting for your decision</span><h3>Ready to finalize?</h3><p>The goal is achieved. Review the complete plan, then approve it, request a change, or reject it.</p></div><div class="final-actions-inline"><button type="button" class="final-approve" data-plan-action="approve" data-thread-id="' + escapeHtml(data.threadId) + '">✓ Approve</button><button type="button" class="final-modify" data-plan-action="modify" data-thread-id="' + escapeHtml(data.threadId) + '">✎ Modify</button><button type="button" class="final-reject" data-plan-action="reject" data-thread-id="' + escapeHtml(data.threadId) + '">✕ Reject</button></div></section>';
+        } else if (approvalState === 'APPROVED' && goalStatus === 'ACHIEVED') {
             html += '<section class="plan-final-action confirmed"><div><span class="decision-status"><i class="decision-dot"></i> Plan approved</span><h3>✓ Trip plan approved</h3><p>This plan has been approved and finalized.</p></div></section>';
         } else if (approvalState === 'REJECTED') {
             html += '<section class="plan-final-action rejected"><div><span class="decision-status"><i class="decision-dot"></i> Plan rejected</span><h3>✕ Trip plan rejected</h3><p>This plan was rejected and is no longer awaiting a decision.</p></div></section>';
@@ -4838,9 +4863,10 @@
             enterModifyMode(threadId, row);
             return;
         }
-        const endpoint = action === 'approve' ? '/api/plan/approve' : action === 'reject' ? '/api/plan/reject' : null;
+        const endpoint = action === 'approve' ? '/api/plan/approve' : action === 'reject' ? '/api/plan/reject' : action === 'retry' ? '/api/plan/retry' : null;
         if (!endpoint) return;
-        await decide(endpoint, threadId, null, row);
+        const retryTask = button.getAttribute('data-retry-task');
+        await decide(endpoint, threadId, action === 'retry' ? retryTask : null, row);
     });
 
     chatThread.addEventListener('click', (event) => {
@@ -4953,7 +4979,9 @@
                 if (notes) appendUserMessage(notes);
                 appendAssistantMessage(payload);
             } else {
-                if (url.includes('reject')) {
+                if (url.includes('/plan/retry')) {
+                    appendUserMessage(notes === 'ALL_FAILED' ? 'Retrying all failed tasks.' : 'Retrying ' + humanTaskLabel(notes) + '.');
+                } else if (url.includes('reject')) {
                     appendUserMessage('Rejected this plan.');
                 } else {
                     appendUserMessage('Approved this plan.');

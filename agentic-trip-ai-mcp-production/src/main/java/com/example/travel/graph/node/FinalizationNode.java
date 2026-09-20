@@ -39,7 +39,7 @@ public class FinalizationNode implements NodeAction<TravelState> {
         // In that case the UI must still ask the human to approve/modify/reject
         // the generated plan instead of silently treating it as confirmed.
         boolean clarificationRequired = state != null && state.userInputRequired();
-        boolean requiresApproval = clarificationRequired || (tripPlanning && hasCompletedItinerary);
+        boolean requiresApproval = clarificationRequired || (tripPlanning && !clarificationRequired);
 
         log.info(
                 "[HITL] finalization tripPlanning={} goalStatus={} itineraryDays={} clarificationRequired={} requiresApproval={} ",

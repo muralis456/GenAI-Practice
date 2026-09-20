@@ -121,6 +121,7 @@ public final class TravelStateSchema {
         schema.put(Validation.SEMANTIC_VALIDATION, Channels.base(SemanticValidationResult::new));
         schema.put(Control.SUPERVISOR_ASSESSMENT, Channels.base(SupervisorAssessment::new));
         schema.put(Control.NODE_FAILURE, Channels.base(NodeFailureInfo::new));
+        schema.put(Control.RETRY_TASK, Channels.base(() -> ""));
         schema.put(Control.USER_INPUT_REQUIRED, Channels.base(() -> Boolean.FALSE));
         schema.put(Control.USER_INPUT_QUESTION, Channels.base(() -> ""));
         schema.put(Control.HOTEL_FALLBACK_EXHAUSTED, Channels.base(() -> Boolean.FALSE));

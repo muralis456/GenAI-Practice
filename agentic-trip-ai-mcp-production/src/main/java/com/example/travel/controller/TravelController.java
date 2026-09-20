@@ -145,6 +145,21 @@ public class TravelController {
         }
     }
 
+    @PostMapping("/plan/retry")
+    public ResponseEntity<TravelPlanResponse> retry(Authentication authentication,
+                                                    @RequestBody PlanDecisionRequest request) {
+        String userId = currentUser(authentication);
+        request.setUserId(userId);
+        requireThread(request.getThreadId());
+        if (request.getNotes() == null || request.getNotes().isBlank()) {
+            throw new IllegalArgumentException("Retry task is required");
+        }
+        TravelPlanResponse response = travelPlannerAgentService.retryTask(userId, request.getThreadId(), request.getNotes());
+        conversationMemoryService.saveUiMessage(userId, request.getThreadId(), "assistant",
+                responseMessage(response, "Retry completed"), response);
+        return ResponseEntity.ok(response);
+    }
+
     @PostMapping("/plan/reject")
     public ResponseEntity<TravelPlanResponse> reject(Authentication authentication,
                                                       @RequestBody PlanDecisionRequest request) {

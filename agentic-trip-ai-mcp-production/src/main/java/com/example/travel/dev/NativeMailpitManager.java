@@ -8,6 +8,8 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.concurrent.TimeUnit;
 
+import jakarta.annotation.PreDestroy;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -36,9 +38,12 @@ public class NativeMailpitManager {
     private final int smtpPort;
     private final int uiPort;
 
+    /** The Mailpit process started by this application, if any. */
+    private volatile Process managedProcess;
+
     public NativeMailpitManager(
             @Value("${travel.mailpit.enabled:true}") boolean enabled,
-            @Value("${travel.mailpit.executable:C:/softwares/mailpit-windows-amd64/mailpit.exe}") String executable,
+            @Value("${MAILPIT_EXE:C:/softwares/mailpit-windows-amd64/mailpit.exe}") String executable,
             @Value("${travel.mailpit.host:localhost}") String host,
             @Value("${travel.mailpit.smtp-port:1025}") int smtpPort,
             @Value("${travel.mailpit.ui-port:8025}") int uiPort) {
@@ -77,6 +82,11 @@ public class NativeMailpitManager {
                     .redirectOutput(ProcessBuilder.Redirect.INHERIT)
                     .start();
 
+            // Only this process is owned by the application. If Mailpit was already
+            // running before startup, managedProcess remains null and shutdown will
+            // not touch the existing process.
+            managedProcess = process;
+
             if (waitForPort(smtpPort, STARTUP_TIMEOUT)) {
                 log.info("Native Mailpit started successfully. SMTP: {}:{}, Inbox: http://{}:{}",
                         host, smtpPort, host, uiPort);
@@ -91,6 +101,44 @@ public class NativeMailpitManager {
         } catch (IOException ex) {
             log.warn("Unable to start native Mailpit from '{}'. Start it manually or set MAILPIT_EXE.",
                     executablePath, ex);
+        }
+    }
+
+    /**
+     * Stops only the Mailpit process that this application started.
+     *
+     * This is invoked during a normal Spring application shutdown, for example
+     * when Spring Boot Dashboard stops the application. A Mailpit process that
+     * was started manually is deliberately left running.
+     */
+    @PreDestroy
+    public void stopManagedMailpit() {
+        Process process = managedProcess;
+        managedProcess = null;
+
+        if (process == null) {
+            return;
+        }
+
+        if (!process.isAlive()) {
+            log.info("Native Mailpit process has already stopped.");
+            return;
+        }
+
+        log.info("Stopping native Mailpit process started by AgenticTripAI...");
+        process.destroy();
+
+        try {
+            if (!process.waitFor(5, TimeUnit.SECONDS) && process.isAlive()) {
+                log.warn("Mailpit did not stop gracefully within 5 seconds; forcing termination.");
+                process.destroyForcibly();
+                process.waitFor(2, TimeUnit.SECONDS);
+            }
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+            if (process.isAlive()) {
+                process.destroyForcibly();
+            }
         }
     }
 

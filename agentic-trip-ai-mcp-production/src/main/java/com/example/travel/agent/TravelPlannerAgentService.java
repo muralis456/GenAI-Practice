@@ -405,6 +405,10 @@ public class TravelPlannerAgentService {
                 threadId);
 
         TravelState current = requireCheckpointState(key);
+        if (current.goalEvaluation() == null
+                || current.goalEvaluation().getStatus() != com.example.travel.model.GoalEvaluation.Status.ACHIEVED) {
+            throw new IllegalStateException("This trip goal has not been achieved yet. Retry the failed capability before approving the plan.");
+        }
         if (current.userInputRequired()) {
             throw new IllegalStateException("This plan is waiting for the missing travel details. Use Modify to provide them.");
         }
@@ -691,6 +695,74 @@ public class TravelPlannerAgentService {
                 state,
                 key,
                 pending);
+        tripHistoryService.saveOrUpdate(userId, response);
+        return response;
+    }
+
+    /**
+     * Human-triggered recovery of every currently failed required task on the
+     * existing checkpoint. Successful work is preserved and dependency-aware
+     * downstream work is reopened automatically by the recovery plan.
+     */
+    public TravelPlanResponse retryTask(String userId, String threadId, String taskId) {
+        String key = requireOwnedThread(userId, threadId);
+        TravelState current = requireCheckpointState(key);
+        if (current.agentPlan() == null) {
+            throw new IllegalStateException("This plan has no executable recovery plan.");
+        }
+        if (!current.awaitingApproval()) {
+            throw new IllegalStateException("This plan is not waiting for a recovery decision.");
+        }
+
+        // The UI sends ALL_FAILED. Keep accepting a single task id for backward
+        // compatibility with older clients, but the default recovery action is
+        // always the complete failed-task set.
+        String requested = taskId == null ? "" : taskId.trim().toLowerCase();
+        List<String> failedTasks = current.agentPlan().getTasks().stream()
+                .filter(com.example.travel.model.AgentTask::isRequired)
+                .filter(t -> t.getStatus() == com.example.travel.model.AgentTask.Status.FAILED)
+                .map(com.example.travel.model.AgentTask::getId)
+                .distinct()
+                .toList();
+
+        List<String> recoveryTasks;
+        if (requested.isBlank() || "all_failed".equals(requested) || "all-failed".equals(requested)
+                || "all".equals(requested)) {
+            recoveryTasks = failedTasks;
+        } else {
+            // Backward compatibility: an explicit task can still be retried, but
+            // the normal UI path never uses this branch.
+            com.example.travel.model.AgentTask target = current.agentPlan().task(requested);
+            if (target == null || !target.isRequired()
+                    || target.getStatus() != com.example.travel.model.AgentTask.Status.FAILED) {
+                throw new IllegalArgumentException("Unknown or non-failed retry task: " + taskId);
+            }
+            recoveryTasks = List.of(requested);
+        }
+
+        if (recoveryTasks.isEmpty()) {
+            throw new IllegalStateException("There are no failed tasks to retry.");
+        }
+
+        RunnableConfig config = configFor(key);
+        Map<String,Object> decision = new LinkedHashMap<>();
+        decision.put(TravelState.HITL_DECISION, "modify");
+        decision.put(TravelState.AWAITING_APPROVAL, Boolean.FALSE);
+        decision.put(TravelState.RETRY_TASK, String.join(",", recoveryTasks));
+        decision.put(TravelState.REPLAN_NOTES, "Manual recovery requested for failed tasks: " + recoveryTasks);
+        ModelRoutingContext.set(previousPolicy(key));
+        executionBudget.begin();
+        graphRunContext.open(key, executionBudget.capture(), previousPolicy(key));
+        try {
+            travelGraph.invoke(GraphInput.resume(decision), config);
+        } finally {
+            graphRunContext.close(key);
+            executionBudget.end();
+            ModelRoutingContext.clear();
+        }
+        TravelState state = requireCheckpointState(key);
+        boolean pending = isAwaitingHitl(key);
+        TravelPlanResponse response = toResponse(state, key, pending);
         tripHistoryService.saveOrUpdate(userId, response);
         return response;
     }
@@ -1138,9 +1210,20 @@ public class TravelPlannerAgentService {
             boolean awaitingApproval,
             String executionHistory) {
 
-        String status = state.userInputRequired()
-                ? "NEEDS_USER_INPUT"
-                : (awaitingApproval ? "PENDING_APPROVAL" : "COMPLETE");
+        String status;
+        if (state.userInputRequired()) {
+            status = "NEEDS_USER_INPUT";
+        } else if (state.goalEvaluation() != null
+                && state.goalEvaluation().getStatus() == com.example.travel.model.GoalEvaluation.Status.PARTIAL) {
+            status = "PARTIAL";
+        } else if (state.goalEvaluation() != null
+                && state.goalEvaluation().getStatus() == com.example.travel.model.GoalEvaluation.Status.FAILED) {
+            status = "FAILED";
+        } else if (awaitingApproval) {
+            status = "PENDING_APPROVAL";
+        } else {
+            status = "COMPLETE";
+        }
 
         // A HISTORY request is a read from persistent trip memory. Return the
         // exact saved structured plan instead of running Planner/specialists again.
@@ -1199,6 +1282,14 @@ public class TravelPlannerAgentService {
         response.setAwaitingApproval(
                 awaitingApproval);
         response.setApprovalState(approvalState(state, awaitingApproval));
+        if (state.goalEvaluation() != null) {
+            response.setGoalStatus(state.goalEvaluation().getStatus().name());
+            response.setUnmetCriteria(state.goalEvaluation().getUnmetCriteria());
+            response.setBlockingIssues(state.goalEvaluation().getBlockingIssues());
+        }
+        response.setRetryableTasks(state.agentPlan() == null ? List.of() : state.agentPlan().getTasks().stream()
+                .filter(t -> t.isRequired() && t.getStatus() == com.example.travel.model.AgentTask.Status.FAILED)
+                .map(com.example.travel.model.AgentTask::getId).distinct().toList());
         response.setClarificationRequired(state.userInputRequired());
         response.setClarificationQuestion(state.userInputQuestion());
 
@@ -1228,11 +1319,17 @@ public class TravelPlannerAgentService {
     private String approvalState(TravelState state, boolean awaitingApproval) {
         if (state == null) return "NOT_REQUIRED";
         if (state.userInputRequired()) return "PENDING";
-        if (awaitingApproval || state.awaitingApproval()) return "PENDING";
+        if (awaitingApproval || state.awaitingApproval()) {
+            return state.goalEvaluation() != null
+                    && state.goalEvaluation().getStatus() == com.example.travel.model.GoalEvaluation.Status.ACHIEVED
+                    ? "PENDING" : "ACTION_REQUIRED";
+        }
         String decision = state.hitlDecision();
-        if ("approve".equalsIgnoreCase(decision)) return "APPROVED";
+        if ("approve".equalsIgnoreCase(decision)
+                && state.goalEvaluation() != null
+                && state.goalEvaluation().getStatus() == com.example.travel.model.GoalEvaluation.Status.ACHIEVED) return "APPROVED";
         if ("reject".equalsIgnoreCase(decision)) return "REJECTED";
-        return requiresTripPlanning(state) ? "PENDING" : "NOT_REQUIRED";
+        return requiresTripPlanning(state) ? "ACTION_REQUIRED" : "NOT_REQUIRED";
     }
 
     private String configuredModelsLabel() {

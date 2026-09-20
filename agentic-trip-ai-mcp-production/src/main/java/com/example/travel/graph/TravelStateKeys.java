@@ -167,6 +167,8 @@ public final class TravelStateKeys {
         public static final String SUPERVISOR_DECISION = "supervisorDecision";
         public static final String SUPERVISOR_ASSESSMENT = "supervisorAssessment";
         public static final String NODE_FAILURE = "nodeFailure";
+        /** User explicitly requested a manual recovery of one failed task. */
+        public static final String RETRY_TASK = "retryTask";
         public static final String USER_INPUT_REQUIRED = "userInputRequired";
         public static final String USER_INPUT_QUESTION = "userInputQuestion";
 
