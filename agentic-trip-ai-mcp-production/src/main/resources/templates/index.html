@@ -1462,8 +1462,6 @@
         .live-phase.active .live-phase-dot { background:#69a9ff; box-shadow:0 0 9px rgba(105,169,255,.65); }
         .live-phase.done { color:#8ebba5; border-color:rgba(63,201,130,.14); background:rgba(45,202,123,.035); }
         .live-phase.done .live-phase-dot { background:#45d38b; }
-        .live-phase.preserved { color:#9aabc1; border-color:rgba(140,164,195,.16); background:rgba(140,164,195,.035); }
-        .live-phase.preserved .live-phase-dot { background:#8ea4c1; }
         .live-phase.failed { color:#f0a2a2; border-color:rgba(255,90,90,.2); background:rgba(255,90,90,.045); }
         .live-phase.failed .live-phase-dot { background:#ff7777; }
         .live-activity { display:flex; align-items:center; gap:9px; margin-top:11px; padding:9px 11px; border:1px solid rgba(76,145,255,.16); border-radius:11px; background:rgba(59,139,255,.055); color:#d9e9ff; min-height:34px; }
@@ -4372,6 +4370,7 @@
             ensureCurrentChat(text);
             persistMessage('user', text, null);
         }
+        return row;
     };
 
     const updateWidgetFoldState = (section) => {
@@ -4600,22 +4599,12 @@
         if (!live || !id || id === 'final') return;
         const el = live.phases.querySelector('[data-phase="' + id + '"]');
         if (!el) return;
-        el.classList.remove('active','done','failed','preserved');
+        el.classList.remove('active','done','failed');
         if (status === 'RUNNING') el.classList.add('active');
         if (status === 'SUCCEEDED') el.classList.add('done');
         if (status === 'FAILED') el.classList.add('failed');
-        if (status === 'PRESERVED') el.classList.add('preserved');
         const d = el.querySelector('.live-phase-detail');
-        if (d) d.textContent = detail || (status === 'RUNNING' ? 'In progress' : status === 'SUCCEEDED' ? 'Complete' : status === 'PRESERVED' ? 'Preserved' : 'Failed');
-    };
-
-    const initializeRetryProgress = (live) => {
-        if (!live) return;
-        // Recovery resumes from the persisted checkpoint. Understand and Plan
-        // are intentionally not re-executed, so showing "Waiting" is misleading.
-        setLivePhase(live, 'intent', 'PRESERVED', 'Preserved');
-        setLivePhase(live, 'plan', 'PRESERVED', 'Preserved');
-        setLivePhase(live, 'execute', 'RUNNING', 'In progress');
+        if (d) d.textContent = detail || (status === 'RUNNING' ? 'In progress' : status === 'SUCCEEDED' ? 'Complete' : 'Failed');
     };
 
     const setLiveTask = (live, id, status, message) => {
@@ -4881,7 +4870,6 @@
             sourceRow.parentNode.insertBefore(liveResponse.row, sourceRow.nextSibling);
         }
         liveResponse.state.textContent = 'Retrying';
-        initializeRetryProgress(liveResponse);
         liveResponse.activity.textContent = task === 'ALL_FAILED'
             ? 'Retrying failed tasks…'
             : 'Retrying ' + humanTaskLabel(task) + '…';
@@ -4984,6 +4972,10 @@
                     replaceDecisionPlanInPlace(sourceRow, data);
                     updatePersistedPlanForThread(threadId, data);
                     loadDbTrips(false);
+                    // Recovery is complete. The retry action is transient and
+                    // should not remain as the latest chat message once the plan
+                    // is ready for the user's decision.
+                    if (retryUserRow?.isConnected) retryUserRow.remove();
                     finishStream(true);
                 } catch (e) {
                     finishStream(false, e);
@@ -4996,7 +4988,15 @@
             });
 
             // Now that SSE is definitely subscribed, start the actual retry.
-            appendUserMessage(task === 'ALL_FAILED' ? 'Retrying all failed tasks.' : 'Retrying ' + humanTaskLabel(task) + '.');
+            // This is a transient UI action, not a conversational user request.
+            // Do not persist it into chat history; the retry progress card and the
+            // updated plan already represent the recovery action.  Remove the
+            // transient bubble after successful recovery so it cannot remain above
+            // the final Approve / Modify / Reject state.
+            const retryUserRow = renderUserMessage(
+                task === 'ALL_FAILED' ? 'Retrying all failed tasks.' : 'Retrying ' + humanTaskLabel(task) + '.',
+                false
+            );
             const res = await apiFetch('/api/plan/retry', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
