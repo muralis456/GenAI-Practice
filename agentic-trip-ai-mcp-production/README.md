@@ -141,13 +141,15 @@ C:\softwares\mailpit-windows-amd64\mailpit.exe
 
 If Mailpit is installed somewhere else, set the environment variable `MAILPIT_EXE` to the full path of `mailpit.exe`.
 
-When the application runs with the `dev` profile, `NativeMailpitManager` automatically starts Mailpit if SMTP port `1025` is not already in use. If Mailpit is already running, it is reused.
+When the application runs with the `dev` profile, `NativeMailpitManager` automatically starts Mailpit if SMTP port `1025` is not already in use. If Mailpit is already running, it is reused. When the application starts Mailpit itself, it uses a persistent SQLite database at `data/mailpit/mailpit.db`, so the inbox survives a normal application restart.
 
 You can also start it manually with:
 
 ```text
 scripts\start-mailpit.bat
 ```
+
+The helper script uses the same persistent database (`data\mailpit\mailpit.db`) and `--max 0`, so messages are not removed just because Mailpit restarts. If you start `mailpit.exe` yourself, start it with the same `--database` path to preserve the same inbox.
 
 Then open the inbox at `http://localhost:8025`.
 
@@ -178,4 +180,13 @@ To change the executable location, set:
 ```text
 MAILPIT_EXE=C:\path\to\mailpit.exe
 ```
+
+Optional persistence settings:
+
+```text
+MAILPIT_DATABASE=./data/mailpit/mailpit.db
+MAILPIT_MAX_MESSAGES=0
+```
+
+`MAILPIT_MAX_MESSAGES=0` disables count-based pruning. The SQLite database file is local development state and is ignored by Git.
 

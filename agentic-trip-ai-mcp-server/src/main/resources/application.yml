@@ -16,6 +16,7 @@ spring:
 
 travel:
   aviation:
+    enabled: ${AVIATIONSTACK_ENABLED:true}
     api-url: ${AVIATIONSTACK_API_URL:https://api.aviationstack.com/v1}
     api-key: ${AVIATIONSTACK_API_KEY:}
     include-flight-date: ${AVIATIONSTACK_INCLUDE_FLIGHT_DATE:false}

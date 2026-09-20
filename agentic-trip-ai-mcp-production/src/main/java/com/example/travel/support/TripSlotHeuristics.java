@@ -103,6 +103,19 @@ public final class TripSlotHeuristics {
         return "";
     }
 
+    /**
+     * Detects relative/calendar date language in the CURRENT turn. Conversation
+     * memory must not overwrite these values with an older trip date.
+     */
+    public static boolean hasDateHint(String request) {
+        if (request == null || request.isBlank()) return false;
+        String text = request.toLowerCase(Locale.ROOT);
+        if (text.matches(".*\\b(today|tomorrow|day after tomorrow|tonight)\\b.*")) return true;
+        // Common explicit calendar-date forms: 2026-09-20, 20/09/2026, 20-09-2026.
+        return text.matches(".*\\b\\d{4}-\\d{1,2}-\\d{1,2}\\b.*")
+                || text.matches(".*\\b\\d{1,2}[/-]\\d{1,2}[/-]\\d{2,4}\\b.*");
+    }
+
     public static boolean hasDurationHint(String request) {
         if (request == null || request.isBlank()) return false;
         return DAYS.matcher(request).find() || NIGHTS.matcher(request).find();

@@ -153,7 +153,8 @@ public class TravelState extends AgentState {
         // Never invent a travel objective when the API request contains no prompt.
         // An empty turn is classified as GENERAL and can be clarified safely.
         String prompt = firstNonBlank(request.getPrompt(), request.getPreferences(), "");
-        boolean datesFlexible = isBlank(request.getDepartureDate()) && isBlank(request.getReturnDate());
+        boolean datesFlexible = isBlank(request.getDepartureDate()) && isBlank(request.getReturnDate())
+                && !containsRelativeDate(prompt);
         boolean roundTrip = !containsOneWayIntent(prompt);
         int travelers = defaultInt(request.getAdults(), 1) + defaultInt(request.getChildren(), 0);
 
@@ -184,9 +185,23 @@ public class TravelState extends AgentState {
                 request.getDestination());
         input.put(ORIGIN, TripSlotHeuristics.normalizePlace(requestedOrigin));
         input.put(DESTINATION, TripSlotHeuristics.normalizePlace(requestedDestination));
-        LocalDate departureDate = parseDate(request.getDepartureDate(), today);
+        // Relative dates belong to the CURRENT turn and must never be inherited
+        // from conversation memory (e.g. an old trip on 2026-09-19 followed by
+        // "show flights for today" on 2026-09-20).
+        LocalDate departureDate;
+        if (containsRelativeDate(prompt)) {
+            departureDate = resolveRelativeDepartureDate(prompt, today);
+        } else {
+            departureDate = parseDate(request.getDepartureDate(), today);
+        }
         LocalDate fallbackReturnDate = departureDate.plusDays(5);
-        LocalDate requestedReturnDate = parseDate(request.getReturnDate(), fallbackReturnDate);
+        LocalDate requestedReturnDate;
+        if (containsRelativeDate(prompt)) {
+            requestedReturnDate = parseDate(request.getReturnDate(), fallbackReturnDate);
+            requestedReturnDate = TripSlotHeuristics.inferReturnDate(prompt, departureDate, requestedReturnDate);
+        } else {
+            requestedReturnDate = parseDate(request.getReturnDate(), fallbackReturnDate);
+        }
         if (TripSlotHeuristics.hasDurationHint(prompt)) {
             requestedReturnDate = TripSlotHeuristics.inferReturnDate(prompt, departureDate, requestedReturnDate);
         }
@@ -885,6 +900,19 @@ public class TravelState extends AgentState {
 
     public static String blankToEmpty(String value) {
         return isBlank(value) ? "" : value.trim();
+    }
+
+    private static boolean containsRelativeDate(String prompt) {
+        if (prompt == null || prompt.isBlank()) return false;
+        String text = prompt.toLowerCase(java.util.Locale.ROOT);
+        return text.matches(".*\\b(today|tomorrow|day after tomorrow)\\b.*");
+    }
+
+    private static LocalDate resolveRelativeDepartureDate(String prompt, LocalDate today) {
+        String text = prompt == null ? "" : prompt.toLowerCase(java.util.Locale.ROOT);
+        if (text.matches(".*\\bday after tomorrow\\b.*")) return today.plusDays(2);
+        if (text.matches(".*\\btomorrow\\b.*")) return today.plusDays(1);
+        return today;
     }
 
     public static LocalDate parseDate(String value, LocalDate fallback) {

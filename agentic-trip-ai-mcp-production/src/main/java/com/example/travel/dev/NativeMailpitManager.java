@@ -37,6 +37,8 @@ public class NativeMailpitManager {
     private final String host;
     private final int smtpPort;
     private final int uiPort;
+    private final Path database;
+    private final int maxMessages;
 
     /** The Mailpit process started by this application, if any. */
     private volatile Process managedProcess;
@@ -46,12 +48,16 @@ public class NativeMailpitManager {
             @Value("${MAILPIT_EXE:C:/softwares/mailpit-windows-amd64/mailpit.exe}") String executable,
             @Value("${travel.mailpit.host:localhost}") String host,
             @Value("${travel.mailpit.smtp-port:1025}") int smtpPort,
-            @Value("${travel.mailpit.ui-port:8025}") int uiPort) {
+            @Value("${travel.mailpit.ui-port:8025}") int uiPort,
+            @Value("${travel.mailpit.database:./data/mailpit/mailpit.db}") String database,
+            @Value("${travel.mailpit.max-messages:0}") int maxMessages) {
         this.enabled = enabled;
         this.executable = executable;
         this.host = host;
         this.smtpPort = smtpPort;
         this.uiPort = uiPort;
+        this.database = Path.of(database).toAbsolutePath().normalize();
+        this.maxMessages = maxMessages;
     }
 
     @EventListener(ApplicationReadyEvent.class)
@@ -76,11 +82,24 @@ public class NativeMailpitManager {
         }
 
         try {
-            Process process = new ProcessBuilder(executablePath.toString())
+            Path databaseParent = database.getParent();
+            if (databaseParent != null) {
+                Files.createDirectories(databaseParent);
+            }
+
+            ProcessBuilder processBuilder = new ProcessBuilder(
+                    executablePath.toString(),
+                    "--database", database.toString(),
+                    "--max", Integer.toString(maxMessages));
+            processBuilder
                     .directory(executablePath.getParent().toFile())
                     .redirectErrorStream(true)
-                    .redirectOutput(ProcessBuilder.Redirect.INHERIT)
-                    .start();
+                    .redirectOutput(ProcessBuilder.Redirect.INHERIT);
+
+            log.info("Starting native Mailpit with persistent database '{}' and max-messages={}",
+                    database, maxMessages == 0 ? "unlimited" : maxMessages);
+
+            Process process = processBuilder.start();
 
             // Only this process is owned by the application. If Mailpit was already
             // running before startup, managedProcess remains null and shutdown will
@@ -99,8 +118,9 @@ public class NativeMailpitManager {
                         exitCode, executablePath);
             }
         } catch (IOException ex) {
-            log.warn("Unable to start native Mailpit from '{}'. Start it manually or set MAILPIT_EXE.",
-                    executablePath, ex);
+            log.warn("Unable to start native Mailpit from '{}'. Start it manually or set MAILPIT_EXE. "
+                    + "Persistent database path: {}",
+                    executablePath, database, ex);
         }
     }
 

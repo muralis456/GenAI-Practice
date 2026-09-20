@@ -90,9 +90,18 @@ public class McpFlightSearchClient {
     private boolean isNonRetryableProviderError(String errorCode, String message) {
         String code = errorCode == null ? "" : errorCode.toUpperCase(java.util.Locale.ROOT);
         String text = message == null ? "" : message.toLowerCase(java.util.Locale.ROOT);
-        return code.contains("429") || code.contains("RATE_LIMIT") || code.contains("PROVIDER_HTTP_429")
-                || code.contains("401") || code.contains("403") || code.contains("400")
-                || code.contains("422") || code.contains("404")
+        // Provider-specific 4xx errors are not all equivalent. A combined MCP
+        // response such as FLIGHT_PROVIDERS_UNAVAILABLE may contain one transient
+        // provider failure (429) and one request-specific failure (400). Do not
+        // classify the aggregate solely by searching the human-readable message.
+        // The server is responsible for provider fallback; the client should retry
+        // only when the aggregate itself is retryable.
+        if (code.contains("INVALID_") || code.contains("IGNAV_HTTP_400")
+                || code.contains("IGNAV_HTTP_422") || code.contains("PROVIDER_CONFIGURATION")) {
+            return true; // non-retryable
+        }
+        return code.contains("AUTH") || code.contains("401") || code.contains("403")
+                || code.contains("NOT_FOUND") || code.contains("404")
                 || text.contains("rate limit") || text.contains("quota") || text.contains("too many requests")
                 || text.contains("circuit-open") || text.contains("circuit open")
                 || text.contains("provider_http_429");

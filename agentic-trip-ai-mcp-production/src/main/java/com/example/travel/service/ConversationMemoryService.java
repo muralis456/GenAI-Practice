@@ -227,8 +227,25 @@ public class ConversationMemoryService {
                 com.example.travel.dto.TripHeader trip = response.getPlan().getTrip();
                 if (isBlank(request.getDestination())) request.setDestination(trip.getDestination());
                 if (isBlank(request.getDepartureCity())) request.setDepartureCity(trip.getOrigin());
-                if (isBlank(request.getDepartureDate())) request.setDepartureDate(trip.getDepartureDate());
-                if (isBlank(request.getReturnDate())) request.setReturnDate(trip.getReturnDate());
+
+                // Dates are special: current-turn date language must win, and a
+                // stale date from a previous trip must never be sent to providers.
+                // Only inherit a historical date when the current turn contains
+                // no date hint and the historical departure is today or future.
+                boolean currentTurnHasDateHint =
+                        com.example.travel.support.TripSlotHeuristics.hasDateHint(request.getPrompt())
+                        || com.example.travel.support.TripSlotHeuristics.hasDurationHint(request.getPrompt());
+                java.time.LocalDate today = java.time.LocalDate.now();
+                java.time.LocalDate historicalDeparture = parseDate(trip.getDepartureDate());
+                if (isBlank(request.getDepartureDate()) && !currentTurnHasDateHint
+                        && historicalDeparture != null && !historicalDeparture.isBefore(today)) {
+                    request.setDepartureDate(trip.getDepartureDate());
+                }
+                java.time.LocalDate historicalReturn = parseDate(trip.getReturnDate());
+                if (isBlank(request.getReturnDate()) && !currentTurnHasDateHint
+                        && historicalReturn != null && !historicalReturn.isBefore(today)) {
+                    request.setReturnDate(trip.getReturnDate());
+                }
                 if (isBlank(request.getBudget())) request.setBudget(trip.getBudgetLabel());
                 if (isBlank(request.getTravelStyle())) request.setTravelStyle(trip.getTravelStyle());
 
@@ -240,6 +257,12 @@ public class ConversationMemoryService {
                 log.debug("Could not hydrate request from conversation memory conversationId={}", conversationId, ex);
             }
         }
+    }
+
+    private java.time.LocalDate parseDate(String value) {
+        if (isBlank(value)) return null;
+        try { return java.time.LocalDate.parse(value.trim()); }
+        catch (Exception ignored) { return null; }
     }
 
     @Transactional(readOnly = true)

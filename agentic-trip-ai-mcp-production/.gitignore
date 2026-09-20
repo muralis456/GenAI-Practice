@@ -8,3 +8,6 @@ logs/
 .vscode/
 # Local environment configuration
 src/main/resources/application-local.yml
+
+# Local Mailpit message database
+data/mailpit/

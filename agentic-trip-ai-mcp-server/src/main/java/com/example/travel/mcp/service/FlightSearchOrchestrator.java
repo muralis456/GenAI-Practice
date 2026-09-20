@@ -50,6 +50,7 @@ public class FlightSearchOrchestrator {
         for (FlightProvider provider : providers) {
             if (!provider.enabled()) {
                 diagnostics.add(provider.name() + " disabled/unconfigured");
+                log.info("flight.provider.skip provider={} reason=disabled-or-unconfigured", provider.name());
                 continue;
             }
             FlightProviderHealth state = health.get(provider.name());

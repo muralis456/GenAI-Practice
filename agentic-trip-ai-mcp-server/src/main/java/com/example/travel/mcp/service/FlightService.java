@@ -33,6 +33,11 @@ public class FlightService {
         if (present(request.returnDate()) && !validDate(request.returnDate())) {
             return SearchFlightsResponse.failure("INVALID_RETURN_DATE", "returnDate must use yyyy-MM-dd format.");
         }
+        if (present(request.departureDate())
+                && LocalDate.parse(request.departureDate().trim()).isBefore(LocalDate.now())) {
+            return SearchFlightsResponse.failure("INVALID_DEPARTURE_DATE_PAST",
+                    "departureDate cannot be earlier than today at the origin airport.");
+        }
         if (present(request.departureDate()) && present(request.returnDate())
                 && LocalDate.parse(request.returnDate().trim()).isBefore(LocalDate.parse(request.departureDate().trim()))) {
             return SearchFlightsResponse.failure("INVALID_DATE_RANGE", "returnDate cannot be before departureDate.");

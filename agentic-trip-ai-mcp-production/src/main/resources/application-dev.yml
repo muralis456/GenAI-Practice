@@ -27,3 +27,7 @@ travel:
     host: ${MAILPIT_HOST:localhost}
     smtp-port: ${MAILPIT_SMTP_PORT:1025}
     ui-port: ${MAILPIT_UI_PORT:8025}
+    # Keep the Mailpit SQLite database across application restarts.
+    database: ${MAILPIT_DATABASE:./data/mailpit/mailpit.db}
+    # 0 disables count-based message pruning.
+    max-messages: ${MAILPIT_MAX_MESSAGES:0}

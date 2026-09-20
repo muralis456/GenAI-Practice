@@ -31,6 +31,7 @@ public class AviationStackClient {
     private final String apiUrl;
     private final String apiKey;
     private final boolean includeFlightDate;
+    private final boolean enabled;
 
     public AviationStackClient(
             RestClient.Builder restClientBuilder,
@@ -38,6 +39,7 @@ public class AviationStackClient {
             @Value("${travel.aviation.api-url}") String apiUrl,
             @Value("${travel.aviation.api-key}") String apiKey,
             @Value("${travel.aviation.include-flight-date:false}") boolean includeFlightDate,
+            @Value("${travel.aviation.enabled:true}") boolean enabled,
             @Value("${travel.aviation.connect-timeout:5s}") Duration connectTimeout,
             @Value("${travel.aviation.read-timeout:15s}") Duration readTimeout) {
         SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
@@ -48,13 +50,17 @@ public class AviationStackClient {
         this.apiUrl = apiUrl;
         this.apiKey = apiKey;
         this.includeFlightDate = includeFlightDate;
+        this.enabled = enabled;
     }
 
     public boolean enabled() {
-        return apiKey != null && !apiKey.isBlank();
+        return enabled && apiKey != null && !apiKey.isBlank();
     }
 
     public SearchFlightsResponse search(SearchFlightsRequest request) {
+        if (!enabled) {
+            return SearchFlightsResponse.failure("PROVIDER_DISABLED", "AviationStack is disabled by configuration.");
+        }
         if (apiKey == null || apiKey.isBlank()) {
             return SearchFlightsResponse.failure("PROVIDER_CONFIGURATION", "AviationStack is not configured.");
         }
