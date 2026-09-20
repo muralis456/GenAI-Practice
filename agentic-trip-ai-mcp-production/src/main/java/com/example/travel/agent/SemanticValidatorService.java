@@ -81,6 +81,7 @@ public class SemanticValidatorService {
                             + "\nItinerary:\n" + state.itinerary().toDisplay());
             jsonSupport.readTree(content).ifPresent(tree -> mergeLlmResult(result, tree));
         } catch (Exception exception) {
+            if (exception instanceof com.example.travel.exception.GraphStopRequestedException stop) throw stop;
             log.warn("Semantic validator LLM failed; using structured heuristics only", exception);
             if (!result.getIssues().isEmpty()) {
                 result.setStatus(ValidationStatus.WARN);

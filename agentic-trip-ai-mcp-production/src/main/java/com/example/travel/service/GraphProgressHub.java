@@ -167,7 +167,7 @@ public class GraphProgressHub {
     }
 
     private boolean isTerminal(String type) {
-        return "complete".equals(type) || "failed".equals(type);
+        return "complete".equals(type) || "failed".equals(type) || "stopped".equals(type);
     }
 
     private void completeQuietly(SseEmitter emitter, AtomicBoolean closed) {

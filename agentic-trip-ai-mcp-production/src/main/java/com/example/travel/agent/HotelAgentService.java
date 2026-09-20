@@ -91,7 +91,7 @@ public class HotelAgentService {
                     .map(this::scrubPlaceholders)
                     .filter(hotel -> {
                         boolean valid = isValidHotelOption(hotel);
-                        if (!valid) {
+            if (!valid) {
                             log.warn("Hotel provider record rejected as non-property destination={} name={} area={}",
                                     destination, safe(hotel == null ? null : hotel.getName()), safe(hotel == null ? null : hotel.getArea()));
                         }
@@ -99,7 +99,7 @@ public class HotelAgentService {
                     })
                     .filter(hotel -> {
                         boolean relevant = isRelevantToDestination(hotel, destination);
-                        if (!relevant) {
+            if (!relevant) {
                             log.warn("Hotel provider record rejected for destination mismatch destination={} name={} area={}",
                                     destination, safe(hotel.getName()), safe(hotel.getArea()));
                         }

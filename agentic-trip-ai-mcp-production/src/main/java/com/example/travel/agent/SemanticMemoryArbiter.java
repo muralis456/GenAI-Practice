@@ -81,6 +81,7 @@ public class SemanticMemoryArbiter {
 
             return new MemoryIntentDecision(history, only, confidence);
         } catch (Exception ex) {
+            if (ex instanceof com.example.travel.exception.GraphStopRequestedException stop) throw stop;
             log.warn("Semantic memory embedding recovery failed", ex);
             return new MemoryIntentDecision(false, false, 0.0);
         }

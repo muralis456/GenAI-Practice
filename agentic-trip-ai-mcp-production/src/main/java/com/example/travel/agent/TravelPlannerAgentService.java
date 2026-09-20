@@ -18,6 +18,7 @@ import com.example.travel.service.ModelRoutingContext;
 import com.example.travel.service.TripPlanAssembler;
 import com.example.travel.service.UserPreferenceService;
 import com.example.travel.service.AgentRunAdmissionService;
+import com.example.travel.service.AgentRunControlService;
 import com.example.travel.service.ApiRateLimitService;
 import com.example.travel.exception.TooManyRequestsException;
 import com.example.travel.exception.ResourceNotFoundException;
@@ -42,6 +43,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
 
 /**
@@ -67,6 +69,7 @@ public class TravelPlannerAgentService {
     private final GraphRunContext graphRunContext;
     private final ExecutorService travelPlanExecutor;
     private final AgentRunAdmissionService runAdmissionService;
+    private final AgentRunControlService runControlService;
     private final ApiRateLimitService apiRateLimitService;
     private final ConversationMemoryService conversationMemoryService;
     private final TripPlanAssembler tripPlanAssembler;
@@ -87,6 +90,7 @@ public class TravelPlannerAgentService {
             GraphRunContext graphRunContext,
             @org.springframework.beans.factory.annotation.Qualifier("travelPlanExecutor") ExecutorService travelPlanExecutor,
             AgentRunAdmissionService runAdmissionService,
+            AgentRunControlService runControlService,
             ApiRateLimitService apiRateLimitService,
             ConversationMemoryService conversationMemoryService,
             TripPlanAssembler tripPlanAssembler,
@@ -106,6 +110,7 @@ public class TravelPlannerAgentService {
         this.graphRunContext = graphRunContext;
         this.travelPlanExecutor = travelPlanExecutor;
         this.runAdmissionService = runAdmissionService;
+        this.runControlService = runControlService;
         this.apiRateLimitService = apiRateLimitService;
         this.conversationMemoryService = conversationMemoryService;
         this.tripPlanAssembler = tripPlanAssembler;
@@ -245,11 +250,14 @@ public class TravelPlannerAgentService {
             conversationMemoryService.saveMessage(userId, threadId, conversationId, "user", query);
 
             GraphExecutionLogger.runContext("plan-start", threadId, policy);
+            runControlService.start(userId, conversationId, threadId, query, policy);
 
-            travelPlanExecutor.submit(() -> runStreaming(
+            Future<?> future = travelPlanExecutor.submit(() -> runStreaming(
                     threadId, userId, conversationId, policy, input));
+            runControlService.registerFuture(threadId, future);
             handedOff = true;
         } catch (RejectedExecutionException ex) {
+            runControlService.markFailed(threadId);
             throw new TooManyRequestsException("Travel planning is busy right now. Please try again shortly.");
         } finally {
             if (!handedOff) runAdmissionService.release(userId);
@@ -358,10 +366,23 @@ public class TravelPlannerAgentService {
                     threadId,
                     "complete",
                     done);
+            runControlService.markCompleted(threadId);
 
         } catch (Exception ex) {
 
-            GraphExecutionLogger.runFailed(threadId, System.currentTimeMillis() - runStarted, ex);
+            if (runControlService.isStopRequested(threadId)) {
+                TravelState checkpoint = null;
+                try { checkpoint = requireCheckpointState(threadId); } catch (Exception ignored) {}
+                Map<String, Object> stopped = new LinkedHashMap<>();
+                stopped.put("threadId", threadId);
+                stopped.put("message", "Stopped. Your current checkpoint is saved. Say Continue to resume this request.");
+                if (checkpoint != null) stopped.put("pipeline", checkpoint.pipeline());
+                graphProgressHub.emit(threadId, "stopped", stopped);
+                runControlService.markStopped(threadId);
+                log.info("Graph stopped threadId={} at persisted checkpoint", threadId);
+            } else {
+                GraphExecutionLogger.runFailed(threadId, System.currentTimeMillis() - runStarted, ex);
+                runControlService.markFailed(threadId);
             log.warn(
                     "Streaming plan failed threadId={}",
                     threadId,
@@ -369,15 +390,134 @@ public class TravelPlannerAgentService {
 
             // Never send exception messages, class names, or stack-trace details
             // to the browser. Full diagnostics stay in server logs only.
-            graphProgressHub.emit(
-                    threadId,
-                    "failed",
-                    Map.of(
-                            "error",
-                            "We couldn't complete your travel plan. Please try again."));
+                graphProgressHub.emit(
+                        threadId,
+                        "failed",
+                        Map.of(
+                                "error",
+                                "We couldn't complete your travel plan. Please try again."));
+            }
 
         } finally {
 
+            graphRunContext.close(threadId);
+            executionBudget.end();
+            ModelRoutingContext.clear();
+            runAdmissionService.release(userId);
+        }
+    }
+
+    /**
+     * Requests a running graph to stop. The durable LangGraph checkpoint is the
+     * source of truth; cancellation stops the orchestration thread and the next
+     * Continue resumes the same threadId instead of creating a new requirement.
+     */
+    public boolean stop(String userId, String threadId) {
+        String key = requireOwnedThread(userId, threadId);
+        boolean requested = runControlService.requestStop(userId, key);
+        if (requested) {
+            try {
+                TravelState checkpoint = requireCheckpointState(key);
+                graphProgressHub.emit(key, "stop_requested", Map.of(
+                        "threadId", key,
+                        "message", "Stopping safely. The latest saved checkpoint will be resumed by Continue.",
+                        "pipeline", checkpoint.pipeline()));
+            } catch (Exception ignored) {
+                graphProgressHub.emit(key, "stop_requested", Map.of(
+                        "threadId", key,
+                        "message", "Stopping safely. The latest saved checkpoint will be resumed by Continue."));
+            }
+        }
+        return requested;
+    }
+
+    public java.util.Optional<String> tryResumeLatestStopped(String userId, String conversationId, String prompt) {
+        if (!isContinuationPrompt(prompt)) return java.util.Optional.empty();
+        if (conversationId == null || conversationId.isBlank()) return java.util.Optional.empty();
+        if (runControlService.latestStopped(userId, conversationId).isEmpty()) return java.util.Optional.empty();
+        return java.util.Optional.of(resumeLatestStopped(userId, conversationId));
+    }
+
+    private boolean isContinuationPrompt(String prompt) {
+        if (prompt == null) return false;
+        String normalized = prompt.trim().toLowerCase(java.util.Locale.ROOT)
+                .replaceAll("[.!?]+$", "")
+                .replaceAll("\\s+", " ");
+        return java.util.Set.of(
+                "continue", "continue please", "proceed", "proceed please",
+                "go ahead", "go ahead please", "resume", "resume please",
+                "continue where you stopped", "continue from where you stopped",
+                "continue from where we stopped", "keep going", "carry on")
+                .contains(normalized);
+    }
+
+    /**
+     * Resumes the latest user-visible stopped run for this conversation. The
+     * original USER_REQUEST lives inside the LangGraph checkpoint, so Continue
+     * never becomes a new planning requirement.
+     */
+    public String resumeLatestStopped(String userId, String conversationId) {
+        var stopped = runControlService.latestStopped(userId, conversationId)
+                .orElseThrow(() -> new IllegalStateException("There is no stopped request to continue."));
+        String threadId = stopped.getThreadId();
+        if (!runAdmissionService.tryAcquire(userId)) {
+            throw new TooManyRequestsException("Your travel planning capacity is currently busy. Please wait for the active run to finish.");
+        }
+        boolean handedOff = false;
+        try {
+            String policy = previousPolicy(threadId);
+            runControlService.start(userId, conversationId, threadId, stopped.getOriginalRequest(), policy);
+            graphProgressHub.open(threadId);
+            Future<?> future = travelPlanExecutor.submit(() -> runResumedStreaming(threadId, userId, conversationId, policy));
+            runControlService.registerFuture(threadId, future);
+            handedOff = true;
+            return threadId;
+        } catch (RejectedExecutionException ex) {
+            throw new TooManyRequestsException("Travel planning is busy right now. Please try again shortly.");
+        } finally {
+            if (!handedOff) runAdmissionService.release(userId);
+        }
+    }
+
+    private void runResumedStreaming(String threadId, String userId, String conversationId, String policy) {
+        RunnableConfig config = configFor(threadId);
+        ModelRoutingContext.set(policy);
+        executionBudget.begin();
+        graphRunContext.open(threadId, executionBudget.capture(), policy);
+        long runStarted = System.currentTimeMillis();
+        try {
+            graphProgressHub.emit(threadId, "started", Map.of("threadId", threadId, "node", "RESUME", "message", "Continuing your saved request…"));
+            for (NodeOutput<TravelState> output : travelGraph.stream(GraphInput.resume(Map.of()), config)) {
+                if (runControlService.isStopRequested(threadId)) {
+                    throw new java.util.concurrent.CancellationException("User requested stop");
+                }
+                Map<String, Object> payload = new LinkedHashMap<>();
+                payload.put("node", output.node());
+                payload.put("end", output.isEND());
+                if (output.state() != null) payload.put("pipeline", output.state().pipeline());
+                graphProgressHub.emit(threadId, "node", payload);
+            }
+            TravelState state = requireCheckpointState(threadId);
+            boolean pending = isAwaitingHitl(threadId);
+            TravelPlanResponse plan = toResponse(state, threadId, pending, "");
+            conversationMemoryService.saveUiMessage(userId, threadId, conversationId, "assistant",
+                    plan.getPlan() != null && plan.getPlan().getTrip() != null
+                            ? TravelState.firstNonBlank(plan.getPlan().getTrip().getTitle(), "Plan ready")
+                            : "Plan ready", plan);
+            tripHistoryService.saveOrUpdate(userId, plan);
+            graphProgressHub.emit(threadId, "complete", Map.of("plan", plan));
+            runControlService.markCompleted(threadId);
+            GraphExecutionLogger.runComplete(state, System.currentTimeMillis() - runStarted, pending);
+        } catch (Exception ex) {
+            if (runControlService.isStopRequested(threadId)) {
+                runControlService.markStopped(threadId);
+                graphProgressHub.emit(threadId, "stopped", Map.of("threadId", threadId, "message", "Stopped. Your saved request is ready to continue."));
+            } else {
+                runControlService.markFailed(threadId);
+                GraphExecutionLogger.runFailed(threadId, System.currentTimeMillis() - runStarted, ex);
+                graphProgressHub.emit(threadId, "failed", Map.of("error", "We couldn't continue your saved request. Please try again."));
+            }
+        } finally {
             graphRunContext.close(threadId);
             executionBudget.end();
             ModelRoutingContext.clear();

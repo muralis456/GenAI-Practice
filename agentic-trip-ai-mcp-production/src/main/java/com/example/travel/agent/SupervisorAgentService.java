@@ -256,6 +256,7 @@ public class SupervisorAgentService {
                             + (state.itinerary() == null ? 0 : state.itinerary().getDays().size()));
             return jsonSupport.readTree(content).map(this::parseAssessment).orElse(fallback);
         } catch (Exception ex) {
+            if (ex instanceof com.example.travel.exception.GraphStopRequestedException stop) throw stop;
             log.debug("Supervisor LLM assessment skipped: {}", ex.getMessage());
             return fallback;
         }

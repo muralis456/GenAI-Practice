@@ -17,6 +17,8 @@ import org.bsc.langgraph4j.serializer.std.ObjectStreamStateSerializer;
 import org.bsc.langgraph4j.utils.EdgeMappings;
 import org.springframework.beans.factory.annotation.Value;
 import com.example.travel.service.GraphProgressHub;
+import com.example.travel.service.AgentRunControlService;
+import com.example.travel.exception.GraphStopRequestedException;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import javax.sql.DataSource;
@@ -91,18 +93,19 @@ public class TravelGraphConfig {
             CompleteNode completeNode,
             CancelNode cancelNode,
             ObjectStreamStateSerializer<TravelState> serializer,
-            GraphProgressHub graphProgressHub) throws GraphStateException {
+            GraphProgressHub graphProgressHub,
+            AgentRunControlService runControlService) throws GraphStateException {
 
         return new StateGraph<>(TravelState.SCHEMA,serializer)
-                .addNode("intent", async("intent",intentNode, graphProgressHub))
-                .addNode("plan", async("plan",planNode, graphProgressHub))
-                .addNode("execute", async("execute",executeNode, graphProgressHub))
-                .addNode("evaluate", async("evaluate",evaluateNode, graphProgressHub))
-                .addNode("replan", async("replan",replanNode, graphProgressHub))
-                .addNode("final", async("final",finalNode, graphProgressHub))
-                .addNode("hitl", async("hitl",hitlNode, graphProgressHub))
-                .addNode("complete", async("complete",completeNode, graphProgressHub))
-                .addNode("cancel", async("cancel",cancelNode, graphProgressHub))
+                .addNode("intent", async("intent",intentNode, graphProgressHub, runControlService))
+                .addNode("plan", async("plan",planNode, graphProgressHub, runControlService))
+                .addNode("execute", async("execute",executeNode, graphProgressHub, runControlService))
+                .addNode("evaluate", async("evaluate",evaluateNode, graphProgressHub, runControlService))
+                .addNode("replan", async("replan",replanNode, graphProgressHub, runControlService))
+                .addNode("final", async("final",finalNode, graphProgressHub, runControlService))
+                .addNode("hitl", async("hitl",hitlNode, graphProgressHub, runControlService))
+                .addNode("complete", async("complete",completeNode, graphProgressHub, runControlService))
+                .addNode("cancel", async("cancel",cancelNode, graphProgressHub, runControlService))
                 .addEdge(START,"intent")
                 .addEdge("intent","plan")
                 .addEdge("plan","execute")
@@ -161,7 +164,7 @@ public class TravelGraphConfig {
 
     @Bean public RunnableConfig travelRunnableConfig(){return RunnableConfig.builder().build();}
 
-    private AsyncNodeAction<TravelState> async(String name, NodeAction<TravelState> node, GraphProgressHub progressHub){
+    private AsyncNodeAction<TravelState> async(String name, NodeAction<TravelState> node, GraphProgressHub progressHub, AgentRunControlService runControlService){
         return node_async(state->{
             long start=System.nanoTime();
             String threadId = state.graphThreadId();
@@ -172,7 +175,13 @@ public class TravelGraphConfig {
                         "message", humanNodeMessage(name)));
             }
             try {
+                if (threadId != null && !threadId.isBlank() && runControlService.isStopRequested(threadId)) {
+                    throw new GraphStopRequestedException();
+                }
                 Map<String,Object> result = node.apply(state);
+                if (threadId != null && !threadId.isBlank() && runControlService.isStopRequested(threadId)) {
+                    throw new GraphStopRequestedException();
+                }
                 if (threadId != null && !threadId.isBlank()) {
                     progressHub.emit(threadId, "node_complete", Map.of(
                             "node", name,
@@ -181,6 +190,27 @@ public class TravelGraphConfig {
                 }
                 return result;
             } catch(Exception e){
+                boolean stopRequested = threadId != null && !threadId.isBlank()
+                        && runControlService.isStopRequested(threadId);
+                boolean interrupted = Thread.currentThread().isInterrupted();
+                boolean stopped = e instanceof GraphStopRequestedException || stopRequested || interrupted;
+                if (stopped) {
+                    // A user stop is control flow, not an application failure.
+                    // Clear the executor thread's interrupt flag before handing
+                    // the control exception back to LangGraph so the pooled
+                    // worker is reusable for a later Continue.
+                    Thread.interrupted();
+                    if (threadId != null && !threadId.isBlank()) {
+                        progressHub.emit(threadId, "node_complete", Map.of(
+                                "node", name,
+                                "status", "STOPPED",
+                                "message", "Stopped. Latest saved checkpoint is preserved."));
+                    }
+                    if (e instanceof GraphStopRequestedException stop) {
+                        throw stop;
+                    }
+                    throw new GraphStopRequestedException(e);
+                }
                 if (threadId != null && !threadId.isBlank()) {
                     progressHub.emit(threadId, "node_complete", Map.of(
                             "node", name,

@@ -60,7 +60,8 @@ public class TravelResearchAgentService {
                         + (state.weather() == null ? "n/a" : state.weather().toDisplay());
                 content = routedLlm.complete(AgentRole.EXTRACT, system, user, tavilySearchTool, currencyTool);
             } catch (Exception exception) {
-                log.warn("Research LLM failed for destination={}", destination, exception);
+                    if (exception instanceof com.example.travel.exception.GraphStopRequestedException stop) throw stop;
+            log.warn("Research LLM failed for destination={}", destination, exception);
             }
         }
 

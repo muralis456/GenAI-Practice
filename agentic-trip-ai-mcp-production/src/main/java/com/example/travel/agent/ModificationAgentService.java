@@ -96,6 +96,7 @@ public class ModificationAgentService {
                     "CURRENT PLAN CONTEXT:\n" + context + "\n\nLATEST MODIFICATION:\n" + notes);
             return jsonSupport.read(content, ModificationRequest.class).orElseGet(ModificationRequest::new);
         } catch (Exception exception) {
+            if (exception instanceof com.example.travel.exception.GraphStopRequestedException stop) throw stop;
             log.warn("Modification semantic pass failed adjudication={}", adjudication, exception);
             return new ModificationRequest();
         }

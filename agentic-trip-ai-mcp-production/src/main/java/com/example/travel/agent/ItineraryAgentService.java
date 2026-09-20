@@ -60,7 +60,8 @@ public class ItineraryAgentService {
                     return normalized;
                 }
             } catch (Exception exception) {
-                log.warn("Jettova itinerary unavailable; falling back to local Ollama itinerary destination={} reason={}",
+                    if (exception instanceof com.example.travel.exception.GraphStopRequestedException stop) throw stop;
+            log.warn("Jettova itinerary unavailable; falling back to local Ollama itinerary destination={} reason={}",
                         state.destination(), exception.getMessage());
             }
         }
@@ -89,6 +90,7 @@ public class ItineraryAgentService {
                             + "Do not invent flight numbers.",
                     stateSnapshot(state, departure, returning, expectedDays));
         } catch (Exception exception) {
+            if (exception instanceof com.example.travel.exception.GraphStopRequestedException stop) throw stop;
             log.warn("Itinerary LLM failed for destination={}", state.destination(), exception);
             return ItinerarySupport.skeleton(nights, state.destination(), state.attractions());
         }

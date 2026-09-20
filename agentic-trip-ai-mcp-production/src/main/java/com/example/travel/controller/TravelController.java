@@ -88,6 +88,23 @@ public class TravelController {
         // In particular, do not allow yesterday's date to survive into a live
         // flight search when the current prompt contains no explicit date.
         String rawPrompt = request.getPrompt();
+
+        // A stopped run is a durable continuation point. For an explicit
+        // continuation command, resume that same LangGraph thread instead of
+        // creating a new thread and asking the intent/planner agents to guess
+        // what the user meant. The original requirement remains in the
+        // checkpoint's USER_REQUEST.
+        java.util.Optional<String> resumedThread = travelPlannerAgentService
+                .tryResumeLatestStopped(userId, conversationId, rawPrompt);
+        if (resumedThread.isPresent()) {
+            String threadId = resumedThread.get();
+            conversationMemoryService.saveMessage(userId, threadId, conversationId, "user", rawPrompt);
+            log.info("Continuing stopped graph threadId={} conversationId={} prompt={}",
+                    threadId, conversationId, rawPrompt);
+            return ResponseEntity.status(HttpStatus.ACCEPTED)
+                    .body(Map.of("threadId", threadId, "status", "RESUMED"));
+        }
+
         if (request.getDepartureDate() != null && !request.getDepartureDate().isBlank()
                 && !com.example.travel.support.TripSlotHeuristics.hasDateHint(rawPrompt)
                 && isPastDate(request.getDepartureDate())) {
@@ -160,6 +177,18 @@ public class TravelController {
             conversationMemoryService.saveMessage(userId, request.getThreadId(), "assistant", "Modify failed: " + safeError(ex));
             throw ex;
         }
+    }
+
+    @PostMapping("/plan/{threadId}/stop")
+    public ResponseEntity<Map<String, Object>> stop(Authentication authentication, @PathVariable String threadId) {
+        String userId = currentUser(authentication);
+        boolean stopped = travelPlannerAgentService.stop(userId, threadId);
+        return ResponseEntity.ok(Map.of(
+                "threadId", threadId,
+                "status", stopped ? "STOP_REQUESTED" : "NOT_RUNNING",
+                "message", stopped
+                        ? "Stopping safely. The latest saved checkpoint will be available to Continue."
+                        : "This run is no longer running."));
     }
 
     @PostMapping("/plan/retry")

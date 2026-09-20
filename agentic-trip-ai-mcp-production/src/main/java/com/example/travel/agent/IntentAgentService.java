@@ -345,6 +345,7 @@ public class IntentAgentService {
                     "USER REQUEST:\n" + request + "\n\nCONVERSATION CONTEXT (use only to resolve conversational follow-ups; do not invent new objectives):\n" + boundedHistoryContext(historyContext) + "\n\nReturn the semantic capability plan now.");
             return jsonSupport.read(content, IntentPlan.class).orElseGet(this::emptyPlan);
         } catch (Exception ex) {
+            if (ex instanceof com.example.travel.exception.GraphStopRequestedException stop) throw stop;
             log.warn("Semantic intent pass failed adjudication={}", adjudication, ex);
             return emptyPlan();
         }
@@ -440,6 +441,7 @@ public class IntentAgentService {
             decision.setSelection(normalizeHistorySelection(decision.getSelection()));
             return decision;
         } catch (Exception ex) {
+            if (ex instanceof com.example.travel.exception.GraphStopRequestedException stop) throw stop;
             log.warn("Semantic memory intent pass failed", ex);
             return new MemoryIntentDecision(false, false, 0.0);
         }
@@ -979,6 +981,7 @@ public class IntentAgentService {
             return parsed;
 
         } catch (Exception exception) {
+            if (exception instanceof com.example.travel.exception.GraphStopRequestedException stop) throw stop;
 
             log.warn(
                     "Latest intent LLM classification failed",
@@ -1136,7 +1139,7 @@ public class IntentAgentService {
                     .read(content, IntentPlan.class)
                     .map(parsed -> {
 
-                        if (parsed.getConfidence() <= 0) {
+            if (parsed.getConfidence() <= 0) {
                             parsed.setConfidence(0.8);
                         }
 
@@ -1147,6 +1150,7 @@ public class IntentAgentService {
                     .orElse(fallback);
 
         } catch (Exception exception) {
+            if (exception instanceof com.example.travel.exception.GraphStopRequestedException stop) throw stop;
 
             log.warn(
                     "Intent LLM fallback failed; using deterministic plan",

@@ -180,6 +180,7 @@ public class FinalPlannerAgentService {
                 log.warn("Final tips response rejected because it contains an internal/error or oversized response");
             }
         } catch (Exception exception) {
+            if (exception instanceof com.example.travel.exception.GraphStopRequestedException stop) throw stop;
             log.warn("Final tips LLM failed; using default tips", exception);
         }
         return defaultTips(state);

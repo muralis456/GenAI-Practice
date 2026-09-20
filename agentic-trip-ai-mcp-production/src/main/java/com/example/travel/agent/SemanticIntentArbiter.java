@@ -171,6 +171,7 @@ public class SemanticIntentArbiter {
             return result;
 
         } catch (Exception ex) {
+            if (ex instanceof com.example.travel.exception.GraphStopRequestedException stop) throw stop;
             log.warn("Semantic intent embedding recovery failed", ex);
             return empty();
         }

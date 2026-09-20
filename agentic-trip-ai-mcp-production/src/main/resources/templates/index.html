@@ -1447,6 +1447,10 @@
         .live-head { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:13px; }
         .live-title { color:#edf5ff; font-size:14px; font-weight:750; letter-spacing:.01em; }
         .live-state { color:#a9bfd9; font-size:12px; font-weight:650; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .live-head-actions { display:flex; align-items:center; gap:9px; min-width:0; }
+        .live-stop-button { border:1px solid rgba(255,255,255,.11); background:rgba(255,255,255,.045); color:#dce6f3; border-radius:9px; padding:6px 9px; font-size:10px; font-weight:850; cursor:pointer; white-space:nowrap; transition:.16s ease; }
+        .live-stop-button:hover:not(:disabled) { background:rgba(255,95,95,.11); border-color:rgba(255,110,110,.3); color:#ffd0d0; }
+        .live-stop-button:disabled { opacity:.48; cursor:default; }
         .live-dots { display:inline-flex; gap:3px; margin-left:4px; vertical-align:middle; }
         .live-dots i { width:4px; height:4px; border-radius:50%; background:#8fb9ef; animation:live-dot 1.1s infinite ease-in-out; }
         .live-dots i:nth-child(2){animation-delay:.14s}.live-dots i:nth-child(3){animation-delay:.28s}
@@ -4576,7 +4580,7 @@
             '</div>'
         ).join('');
         row.innerHTML = '<div class="chat-avatar">AI</div><div class="live-response-card">'
-            + '<div class="live-head"><div class="live-title">AgenticTripAI <span class="live-dots"><i></i><i></i><i></i></span></div><div class="live-state">Working</div></div>'
+            + '<div class="live-head"><div class="live-title">AgenticTripAI <span class="live-dots"><i></i><i></i><i></i></span></div><div class="live-head-actions"><div class="live-state">Working</div><button type="button" class="live-stop-button" data-stop-run="true">■ Stop</button></div></div>'
             + '<div class="live-timeline">' + phases + '</div>'
             + '<div class="live-activity"><i class="live-activity-dot"></i><span class="live-activity-text">Starting…</span></div>'
             + '<div class="live-tasks"><div class="live-tasks-head"><span>Live execution</span><span class="live-task-count"></span></div><div class="live-task-list"></div></div>'
@@ -4586,6 +4590,7 @@
         return {
             row,
             state: row.querySelector('.live-state'),
+            stopButton: row.querySelector('[data-stop-run]'),
             activity: row.querySelector('.live-activity-text'),
             phases: row.querySelector('.live-timeline'),
             tasks: row.querySelector('.live-tasks'),
@@ -4660,6 +4665,32 @@
         }
     };
 
+    const requestStopForLive = async (live, threadId) => {
+        if (!live || !threadId) return false;
+        const button = live.stopButton;
+        if (button) {
+            button.disabled = true;
+            button.textContent = 'Stopping…';
+            button.dataset.stopPending = 'false';
+        }
+        try {
+            const res = await apiFetch('/api/plan/' + encodeURIComponent(threadId) + '/stop', { method: 'POST' });
+            const payload = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(payload.error || safeUiErrorMessage());
+            if (live.state) live.state.textContent = 'Stopping';
+            if (live.activity) live.activity.textContent = payload.message || 'Saving your current checkpoint…';
+            return true;
+        } catch (error) {
+            if (button) {
+                button.disabled = false;
+                button.textContent = '■ Stop';
+            }
+            if (live.state) live.state.textContent = 'Working';
+            showToast(error?.message || safeUiErrorMessage());
+            return false;
+        }
+    };
+
     const removeLiveResponse = (live) => {
         if (live && live.row && live.row.isConnected) live.row.remove();
     };
@@ -4707,10 +4738,28 @@
             }
             const started = JSON.parse(startedBody);
             const threadId = started.threadId;
+            liveResponse.row.dataset.threadId = threadId;
+            const stopWasQueued = liveResponse.stopButton?.dataset.stopPending === 'true';
+            if (liveResponse.stopButton) {
+                liveResponse.stopButton.dataset.threadId = threadId;
+                if (!stopWasQueued) {
+                    liveResponse.stopButton.disabled = false;
+                    liveResponse.stopButton.textContent = '■ Stop';
+                }
+            }
+            if (started.status === 'RESUMED') {
+                liveResponse.state.textContent = 'Continuing';
+                liveResponse.activity.textContent = 'Resuming your saved request…';
+            }
             const statusSpan = loadingState.querySelectorAll('span')[1];
             await new Promise((resolve, reject) => {
                 let finished = false;
                 const es = new EventSource('/api/plan/' + encodeURIComponent(threadId) + '/events');
+                // If the user clicked Stop while /start was still allocating the
+                // thread id, deliver that intent now that the target exists.
+                if (stopWasQueued) {
+                    void requestStopForLive(liveResponse, threadId);
+                }
                 // The backend emits a `started` event immediately after the
                 // async graph begins.  Listen to it as well as `node`; without
                 // this handler the live card stays on its initial
@@ -4783,10 +4832,36 @@
                 // `node` is a legacy compatibility event. Do not render it;
                 // node_start/node_complete already provide the authoritative lifecycle.
                 es.addEventListener('node', () => {});
+                es.addEventListener('stop_requested', (evt) => {
+                    try {
+                        const data = JSON.parse(evt.data);
+                        liveResponse.state.textContent = 'Stopping';
+                        liveResponse.activity.textContent = data.message || 'Saving your current checkpoint…';
+                        if (liveResponse.stopButton) {
+                            liveResponse.stopButton.disabled = true;
+                            liveResponse.stopButton.textContent = 'Stopping…';
+                        }
+                    } catch (ignored) {}
+                });
+                es.addEventListener('stopped', (evt) => {
+                    finished = true;
+                    es.close();
+                    liveResponse.state.textContent = 'Stopped';
+                    liveResponse.activity.textContent = 'Checkpoint saved. Say Continue to resume this request.';
+                    if (liveResponse.stopButton) {
+                        liveResponse.stopButton.disabled = true;
+                        liveResponse.stopButton.textContent = 'Stopped';
+                    }
+                    submitButton.disabled = false;
+                    loadingState.classList.remove('visible');
+                    updateComposerState();
+                    resolve();
+                });
                 es.addEventListener('complete', async (evt) => {
                     finished = true;
                     es.close();
                     liveResponse.state.textContent = 'Plan ready';
+                    if (liveResponse.stopButton) { liveResponse.stopButton.disabled = true; liveResponse.stopButton.textContent = 'Done'; }
                     try {
                         const wrapper = JSON.parse(evt.data);
                         const data = wrapper.plan || wrapper;
@@ -4823,7 +4898,8 @@
                 es.addEventListener('failed', (evt) => {
                     finished = true;
                     es.close();
-                    liveResponse.state.textContent = 'Plan ready';
+                    liveResponse.state.textContent = 'Plan failed';
+                    if (liveResponse.stopButton) { liveResponse.stopButton.disabled = true; liveResponse.stopButton.textContent = 'Done'; }
                     liveResponse.row.classList.add('live-complete');
                     setTimeout(() => removeLiveResponse(liveResponse), 260);
                     try {
@@ -4873,6 +4949,8 @@
         liveResponse.activity.textContent = task === 'ALL_FAILED'
             ? 'Retrying failed tasks…'
             : 'Retrying ' + humanTaskLabel(task) + '…';
+        liveResponse.row.dataset.threadId = threadId;
+        if (liveResponse.stopButton) { liveResponse.stopButton.disabled = false; liveResponse.stopButton.dataset.threadId = threadId; }
 
         sourceRow?.querySelectorAll('[data-plan-action]').forEach(btn => {
             btn.disabled = true;
@@ -4963,6 +5041,23 @@
                     }
                 } catch (_) {}
             });
+            es.addEventListener('stop_requested', (evt) => {
+                try {
+                    const data = JSON.parse(evt.data);
+                    liveResponse.state.textContent = 'Stopping';
+                    liveResponse.activity.textContent = data.message || 'Saving your current checkpoint…';
+                    if (liveResponse.stopButton) {
+                        liveResponse.stopButton.disabled = true;
+                        liveResponse.stopButton.textContent = 'Stopping…';
+                    }
+                } catch (_) {}
+            });
+            es.addEventListener('stopped', (evt) => {
+                liveResponse.state.textContent = 'Stopped';
+                liveResponse.activity.textContent = 'Checkpoint saved. Say Continue to resume this request.';
+                if (liveResponse.stopButton) { liveResponse.stopButton.disabled = true; liveResponse.stopButton.textContent = 'Stopped'; }
+                finishStream(true);
+            });
             es.addEventListener('complete', async (evt) => {
                 try {
                     const wrapper = JSON.parse(evt.data);
@@ -5027,6 +5122,7 @@
             return false;
         } finally {
             try { es?.close(); } catch (_) {}
+            if (liveResponse.stopButton) { liveResponse.stopButton.disabled = true; }
             if (liveResponse.row?.isConnected) {
                 setTimeout(() => removeLiveResponse(liveResponse), 700);
             }
@@ -5039,6 +5135,28 @@
             updateComposerState();
         }
     };
+
+    chatThread.addEventListener('click', async (event) => {
+        const button = event.target.closest('[data-stop-run]');
+        if (!button || !chatThread.contains(button) || button.disabled) return;
+        event.preventDefault();
+        event.stopPropagation();
+        const row = button.closest('.live-response');
+        const threadId = button.dataset.threadId || row?.dataset.threadId;
+        const live = row ? { row, state: row.querySelector('.live-state'), activity: row.querySelector('.live-activity-text'), stopButton: button } : null;
+        if (!threadId) {
+            // The asynchronous start call has not returned its durable thread id
+            // yet. Queue the user's Stop intent instead of disabling the only
+            // visible control. It will be delivered immediately after /start.
+            button.dataset.stopPending = 'true';
+            button.disabled = true;
+            button.textContent = 'Stop queued…';
+            if (live?.state) live.state.textContent = 'Stopping';
+            if (live?.activity) live.activity.textContent = 'Stop requested; waiting for the run id…';
+            return;
+        }
+        await requestStopForLive(live, threadId);
+    });
 
     // Decision actions are delegated from the chat thread so they keep working
     // after assistant cards are replaced/re-rendered. The button carries the

@@ -57,6 +57,7 @@ public class PlannerAgentService {
                             + "\nStyle: " + state.travelStyle()
                             + "\nHistory (background only): " + state.historyContext());
         } catch (Exception exception) {
+            if (exception instanceof com.example.travel.exception.GraphStopRequestedException stop) throw stop;
             log.warn("Planner LLM extraction failed, using request fields and regex", exception);
             content = "";
         }

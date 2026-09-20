@@ -10,6 +10,8 @@ import org.springframework.ai.ollama.api.OllamaChatOptions;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import com.example.travel.exception.GraphStopRequestedException;
+
 import java.util.Arrays;
 import java.util.stream.Collectors;
 
@@ -102,10 +104,36 @@ public class RoutedLlm {
             return result;
         } catch (Exception ex) {
             long durationMs = System.currentTimeMillis() - started;
+            // Cancellation is an explicit user control action. It must never be
+            // reported as an LLM/provider failure and must not trigger recovery.
+            if (ex instanceof GraphStopRequestedException
+                    || Thread.currentThread().isInterrupted()
+                    || isInterruptedCause(ex)) {
+                Thread.interrupted();
+                log.info("[RoutedLLM] phase={} decision=STOPPED_BY_USER model={} durationMs={}",
+                        role, model, durationMs);
+                if (ex instanceof GraphStopRequestedException stopRequested) {
+                    throw stopRequested;
+                }
+                throw new GraphStopRequestedException(ex);
+            }
             log.warn("[RoutedLLM] phase={} decision=LLM_FAILED model={} durationMs={} errorType={} message={}",
                     role, model, durationMs, ex.getClass().getSimpleName(), sanitizeLogMessage(ex.getMessage()));
-            throw ex;
+            if (ex instanceof RuntimeException runtimeException) {
+                throw runtimeException;
+            }
+            throw new RuntimeException(ex);
         }
+    }
+
+    private static boolean isInterruptedCause(Throwable error) {
+        Throwable current = error;
+        int depth = 0;
+        while (current != null && depth++ < 8) {
+            if (current instanceof InterruptedException) return true;
+            current = current.getCause();
+        }
+        return false;
     }
 
     /**

@@ -190,3 +190,18 @@ MAILPIT_MAX_MESSAGES=0
 
 `MAILPIT_MAX_MESSAGES=0` disables count-based pruning. The SQLite database file is local development state and is ignored by Git.
 
+
+## Stop / Resume hardening (v2)
+
+This build hardens user Stop as a control-flow operation rather than a provider/LLM failure:
+
+- Stop is clickable immediately when a live run card is created.
+- If the user clicks Stop before `/api/plan/start` returns the durable thread id, the UI queues the Stop intent and sends it as soon as the thread id is available.
+- User Stop requests are persisted as `STOP_REQUESTED`; the active future is interrupted, and the graph resumes from the latest persisted LangGraph checkpoint when the user says `Continue`.
+- Interrupted Ollama/HTTP calls are classified as `STOPPED_BY_USER`, not `LLM_FAILED`.
+- Planner/specialist fallback catches propagate `GraphStopRequestedException` instead of swallowing it and continuing work.
+- The graph wrapper emits `node_complete=STOPPED` and does not classify the node as a provider/application failure.
+- The application logs explicitly record the stop request, whether an active future was interrupted, and checkpoint preservation.
+- SSE exposes `stop_requested` followed by `stopped` so the UI transitions cleanly from Working → Stopping → Stopped.
+
+Full Maven compilation was not run in this environment because Maven is not installed. The embedded JavaScript was syntax-checked with Node.js and the distribution ZIP was integrity-checked with `unzip -t`.

@@ -144,7 +144,7 @@ public class ReplanStrategyExecutor {
                         String current = TravelState.firstNonBlank(
                                 state.destination());
 
-                        if (!TravelState.isBlank(current)
+            if (!TravelState.isBlank(current)
                                 && !current
                                         .toLowerCase()
                                         .contains(
