@@ -83,7 +83,7 @@ public class IntentAgentService {
 
         String request = state.userRequest();
         emitActivity(state, "Reading your request and identifying the goal");
-        IntentPlan primary = runSemanticIntentPass(request, false);
+        IntentPlan primary = runSemanticIntentPass(request, false, state.historyContext());
         emitActivity(state, "Validating the requested capabilities");
         primary = sanitizeSemanticPlan(primary);
 
@@ -102,7 +102,7 @@ public class IntentAgentService {
                     && !primary.isNeedsHotels() && !primary.isNeedsResearch()
                     && !primary.isNeedsWeather() && !primary.isNeedsBudget();
         MemoryIntentDecision memoryIntent = memoryCheckNeeded
-                ? runMemoryIntentPass(request)
+                ? runMemoryIntentPass(request, state.historyContext())
                 : new MemoryIntentDecision(false, false, 0.0);
         log.info("Intent memory semantic result request={} history={} historyOnly={} selection={} confidence={}",
                 request, memoryIntent.isNeedsHistory(), memoryIntent.isHistoryOnly(), memoryIntent.getSelection(), memoryIntent.getConfidence());
@@ -150,7 +150,7 @@ public class IntentAgentService {
         // ask a second semantic pass to independently reconsider the same text.
         // This is still meaning-based and works for new wording, typos and
         // natural language that was never anticipated by Java code.
-        IntentPlan adjudicated = runSemanticIntentPass(request, true);
+        IntentPlan adjudicated = runSemanticIntentPass(request, true, state.historyContext());
         adjudicated = sanitizeSemanticPlan(adjudicated);
 
         log.info("Intent secondary semantic result request={} type={} confidence={} capabilities={}",
@@ -173,7 +173,7 @@ public class IntentAgentService {
         return finalizeSemanticPlan(request, emptyPlan());
     }
 
-    private IntentPlan runSemanticIntentPass(String request, boolean adjudication) {
+    private IntentPlan runSemanticIntentPass(String request, boolean adjudication, String historyContext) {
         String system = adjudication ? """
                 You are the independent semantic adjudicator for a production travel-agent.
 
@@ -257,6 +257,17 @@ public class IntentAgentService {
                 Do not activate capabilities merely because they might be useful.
                 Do not copy capabilities from previous state.
 
+                IMPORTANT CONVERSATIONAL FOLLOW-UP RULE:
+                The CURRENT USER REQUEST may be a short continuation such as a request to
+                continue, proceed, show it, open it, retry it, or otherwise act on the
+                immediately preceding unresolved request. When that happens, use the supplied
+                conversation context to resolve what the user is referring to. The context is
+                not a new objective: it only resolves the referent of the current turn. If the
+                immediately preceding meaningful user request was a saved-trip/history request
+                and the current turn is a continuation, preserve that history objective instead
+                of starting a new travel-planning task. Ignore assistant error messages as
+                objectives; they describe execution outcome, not what the user wanted.
+
                 Capability meanings:
                 - flights: airline/airfare/flight search, options, availability or details
                 - hotels: accommodation/lodging/rooms/stay options
@@ -331,7 +342,7 @@ public class IntentAgentService {
             String content = routedLlm.complete(
                     AgentRole.EXTRACT,
                     system,
-                    "USER REQUEST:\n" + request + "\n\nReturn the semantic capability plan now.");
+                    "USER REQUEST:\n" + request + "\n\nCONVERSATION CONTEXT (use only to resolve conversational follow-ups; do not invent new objectives):\n" + boundedHistoryContext(historyContext) + "\n\nReturn the semantic capability plan now.");
             return jsonSupport.read(content, IntentPlan.class).orElseGet(this::emptyPlan);
         } catch (Exception ex) {
             log.warn("Semantic intent pass failed adjudication={}", adjudication, ex);
@@ -347,7 +358,7 @@ public class IntentAgentService {
      * asking to recall a saved itinerary can otherwise be misclassified as a
      * brand-new itinerary request by a small local model.
      */
-    private MemoryIntentDecision runMemoryIntentPass(String request) {
+    private MemoryIntentDecision runMemoryIntentPass(String request, String historyContext) {
         if (TravelState.isBlank(request)) {
             return new MemoryIntentDecision(false, false, 0.0);
         }
@@ -361,6 +372,14 @@ public class IntentAgentService {
                 Understand meaning, not literal words. The user may use any
                 wording, abbreviations, typos, or conversational phrasing.
                 Never use a keyword trigger.
+
+                IMPORTANT CONVERSATIONAL FOLLOW-UP RULE:
+                The current request can be a short continuation of the immediately preceding
+                meaningful user request. Use the supplied conversation context to resolve the
+                referent. For example, if the prior meaningful request asked for a saved trip
+                and the current request asks to continue/proceed, classify the continuation as
+                the same history retrieval objective. Do not treat the assistant's prior failure
+                message as a new user objective.
 
                 Set needsHistory=true when the user wants to recall, reopen,
                 inspect, summarize, compare, or otherwise obtain a previously
@@ -413,7 +432,7 @@ public class IntentAgentService {
             String content = routedLlm.complete(
                     AgentRole.EXTRACT,
                     system,
-                    "CURRENT USER REQUEST:\n" + request + "\n\nReturn the semantic memory decision now.");
+                    "CURRENT USER REQUEST:\n" + request + "\n\nRECENT CONVERSATION CONTEXT:\n" + boundedHistoryContext(historyContext) + "\n\nReturn the semantic memory decision now.");
             java.util.Optional<MemoryIntentDecision> parsed = jsonSupport.read(content, MemoryIntentDecision.class);
             MemoryIntentDecision decision = parsed.orElse(new MemoryIntentDecision(false, false, 0.0));
             if (decision.getConfidence() < 0) decision.setConfidence(0);
@@ -424,6 +443,12 @@ public class IntentAgentService {
             log.warn("Semantic memory intent pass failed", ex);
             return new MemoryIntentDecision(false, false, 0.0);
         }
+    }
+
+    private String boundedHistoryContext(String historyContext) {
+        if (historyContext == null || historyContext.isBlank()) return "(none)";
+        int max = 7000;
+        return historyContext.length() <= max ? historyContext : historyContext.substring(Math.max(0, historyContext.length() - max));
     }
 
     private String normalizeHistorySelection(String selection) {
