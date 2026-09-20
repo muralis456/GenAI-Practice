@@ -121,3 +121,61 @@ See `P0-PRODUCTION-SECURITY.md` for the authentication, authorization, Flyway, b
 
 ### Security configuration
 The application uses the modern Spring Security request-matcher DSL and does not depend on `AntPathRequestMatcher`. See `P0-PRODUCTION-SECURITY.md` for the authentication and production-hardening details.
+
+
+## Local password reset email (Mailpit)
+
+No real email provider is required for development. This project uses the **native Windows Mailpit executable**, so Docker Desktop, WSL, and hardware virtualization are not required.
+
+Mailpit endpoints:
+- SMTP: `localhost:1025`
+- Web inbox: http://localhost:8025
+
+### Native Mailpit setup
+
+Download the Windows AMD64 Mailpit release and extract `mailpit.exe`. The default development configuration expects:
+
+```text
+C:\softwares\mailpit-windows-amd64\mailpit.exe
+```
+
+If Mailpit is installed somewhere else, set the environment variable `MAILPIT_EXE` to the full path of `mailpit.exe`.
+
+When the application runs with the `dev` profile, `NativeMailpitManager` automatically starts Mailpit if SMTP port `1025` is not already in use. If Mailpit is already running, it is reused.
+
+You can also start it manually with:
+
+```text
+scripts\start-mailpit.bat
+```
+
+Then open the inbox at `http://localhost:8025`.
+
+The Spring Boot dev profile sends password-reset emails to Mailpit using SMTP on port `1025`; no real email provider is required.
+
+Then use **Forgot password** on the login page. The reset email appears in the Mailpit inbox. The reset token is never returned by the forgot-password API and only the hashed token is stored in PostgreSQL.
+
+Production should replace Mailpit with a real transactional SMTP/email provider through environment variables.
+
+### Spring Boot Dashboard
+
+The application defaults to the `dev` Spring profile when no profile is explicitly selected. Running `agentic-trip-ai-mcp-production` from Spring Boot Dashboard therefore enables native Mailpit auto-start without Docker.
+
+- Application: `http://localhost:8081`
+- Mailpit inbox: `http://localhost:8025`
+- Mailpit SMTP: `localhost:1025`
+
+If Mailpit is already running, the application reuses it. If it is not running and `mailpit.exe` exists at the configured path, the application starts it automatically.
+
+To disable auto-start for a local run, set:
+
+```text
+TRAVEL_MAILPIT_ENABLED=false
+```
+
+To change the executable location, set:
+
+```text
+MAILPIT_EXE=C:\path\to\mailpit.exe
+```
+

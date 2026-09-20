@@ -20,6 +20,7 @@ public class SecurityConfig {
     @Bean
     SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
+                .csrf(csrf -> csrf.ignoringRequestMatchers("/api/auth/forgot-password", "/api/auth/reset-password"))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
                                 "/",
@@ -27,9 +28,15 @@ public class SecurityConfig {
                                 "/register",
                                 "/favicon.ico",
                                 "/favicon.svg",
-                                "/error"
+                                "/error",
+                                "/forgot-password",
+                                "/reset-password"
                         ).permitAll()
-                        .requestMatchers("/api/auth/register").permitAll()
+                        .requestMatchers(
+                                "/api/auth/register",
+                                "/api/auth/forgot-password",
+                                "/api/auth/reset-password"
+                        ).permitAll()
                         .requestMatchers("/api/**").authenticated()
                         .anyRequest().authenticated())
                 .exceptionHandling(ex -> ex

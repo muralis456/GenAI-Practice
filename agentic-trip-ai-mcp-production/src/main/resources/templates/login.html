@@ -21,7 +21,7 @@
         <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
         <label class="label" for="username">Username</label>
         <input class="input" id="username" name="username" autocomplete="username" required autofocus>
-        <label class="label" for="password">Password</label>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:16px"><label class="label" for="password" style="margin:0">Password</label><a href="/forgot-password" style="color:#79b1ff;font-size:12px;text-decoration:none">Forgot password?</a></div>
         <input class="input" id="password" type="password" name="password" autocomplete="current-password" required>
         <button type="submit">Sign in</button>
     </form>

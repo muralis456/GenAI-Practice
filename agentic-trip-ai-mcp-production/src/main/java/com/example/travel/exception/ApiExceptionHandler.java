@@ -6,6 +6,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
@@ -70,9 +71,23 @@ public class ApiExceptionHandler {
     }
 
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<Map<String, String>> handleGeneralException(Exception ex) {
-        log.error("Unhandled exception", ex);
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(Map.of("error", "Something went wrong while processing the request."));
+    public Object handleGeneralException(Exception ex, WebRequest request) {
+        log.error("Unhandled exception while processing {}", request.getDescription(false), ex);
+
+        String description = request.getDescription(false);
+        boolean apiRequest = description.contains("uri=/api/");
+        if (apiRequest) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Something went wrong while processing the request."));
+        }
+
+        // Browser/page requests must not be converted into JSON merely because
+        // a view-rendering or controller exception occurred. Return a dedicated
+        // HTML error view so the browser receives the correct representation.
+        org.springframework.web.servlet.ModelAndView modelAndView =
+                new org.springframework.web.servlet.ModelAndView("error");
+        modelAndView.setStatus(HttpStatus.INTERNAL_SERVER_ERROR);
+        modelAndView.addObject("message", "We couldn't load this page. Please try again.");
+        return modelAndView;
     }
 }
