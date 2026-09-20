@@ -63,20 +63,27 @@ public class IgnavClient {
 
         String origin = request.origin().trim().toUpperCase(Locale.ROOT);
         String destination = request.destination().trim().toUpperCase(Locale.ROOT);
-        if (!validDate(request.departureDate())) {
-            return SearchFlightsResponse.failure(
-                    "IGNAV_MISSING_DEPARTURE_DATE",
-                    "Ignav fallback requires a valid departure date in yyyy-MM-dd format.");
+
+        // Ignav requires a departure date even when the user intentionally left
+        // the travel dates flexible. Use today only as the provider query date.
+        // The upstream travel state remains date-flexible, so this fallback must
+        // never be presented as the user's requested travel date. This allows
+        // Ignav to act as a real fallback when AviationStack is rate-limited.
+        String effectiveDepartureDate = request.departureDate();
+        if (!validDate(effectiveDepartureDate)) {
+            effectiveDepartureDate = LocalDate.now().toString();
+            log.info("MCP search_flights provider=Ignav using providerFallbackDepartureDate={} because request departureDate is missing/invalid origin={} destination={}",
+                    effectiveDepartureDate, origin, destination);
         }
         boolean roundTrip = validDate(request.returnDate());
         String endpoint = roundTrip ? "/fares/round-trip" : "/fares/one-way";
         long started = System.nanoTime();
 
         try {
-            String payload = buildPayload(request, origin, destination, roundTrip);
+            String payload = buildPayload(request, effectiveDepartureDate, origin, destination, roundTrip);
             log.info("MCP search_flights provider=Ignav mode={} origin={} destination={} departureDate={} returnDate={} passengers={} market={}",
                     roundTrip ? "round-trip" : "one-way", origin, destination,
-                    request.departureDate(), request.returnDate(), request.normalizedPassengers(), market);
+                    effectiveDepartureDate, request.returnDate(), request.normalizedPassengers(), market);
 
             String body = executeWithTransientRetry(endpoint, payload, origin, destination);
 
@@ -144,11 +151,11 @@ public class IgnavClient {
         }
     }
 
-    private String buildPayload(SearchFlightsRequest request, String origin, String destination, boolean roundTrip) {
+    private String buildPayload(SearchFlightsRequest request, String departureDate, String origin, String destination, boolean roundTrip) {
         StringBuilder json = new StringBuilder("{");
         appendString(json, "origin", origin);
         appendString(json, "destination", destination);
-        appendString(json, "departure_date", request.departureDate().trim());
+        appendString(json, "departure_date", departureDate.trim());
         appendNumber(json, "adults", request.normalizedPassengers());
         appendString(json, "market", market);
         if (roundTrip) {

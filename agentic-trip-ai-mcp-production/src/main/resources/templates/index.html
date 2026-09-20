@@ -1462,6 +1462,8 @@
         .live-phase.active .live-phase-dot { background:#69a9ff; box-shadow:0 0 9px rgba(105,169,255,.65); }
         .live-phase.done { color:#8ebba5; border-color:rgba(63,201,130,.14); background:rgba(45,202,123,.035); }
         .live-phase.done .live-phase-dot { background:#45d38b; }
+        .live-phase.preserved { color:#9aabc1; border-color:rgba(140,164,195,.16); background:rgba(140,164,195,.035); }
+        .live-phase.preserved .live-phase-dot { background:#8ea4c1; }
         .live-phase.failed { color:#f0a2a2; border-color:rgba(255,90,90,.2); background:rgba(255,90,90,.045); }
         .live-phase.failed .live-phase-dot { background:#ff7777; }
         .live-activity { display:flex; align-items:center; gap:9px; margin-top:11px; padding:9px 11px; border:1px solid rgba(76,145,255,.16); border-radius:11px; background:rgba(59,139,255,.055); color:#d9e9ff; min-height:34px; }
@@ -1598,7 +1600,7 @@
 .recovery-issues{margin:8px 0 0;padding-left:18px;color:#d2ddec;font-size:11px;line-height:1.55}
 .recovery-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
 .recovery-actions button{border:0;border-radius:10px;padding:10px 14px;background:linear-gradient(135deg,#c87520,#e69b3e);color:#fff;font-weight:850;cursor:pointer}
-.recovery-actions button:disabled{opacity:.6;cursor:wait}
+.recovery-actions button:disabled{opacity:.6;cursor:wait}.recovery-retry{min-width:210px;box-shadow:0 8px 20px rgba(37,99,235,.22)!important}.recovery-failed{margin-top:9px;color:#dbe9f8;font-size:12px;font-weight:700}.recovery-failed span{color:#ffcf8c}.recovery-retry{min-width:210px;box-shadow:0 8px 20px rgba(37,99,235,.22)!important}.recovery-failed{margin-top:9px;color:#dbe9f8;font-size:12px;font-weight:700}.recovery-failed span{color:#ffcf8c}
 .plan-header-status.partial-status{color:#ffd39b;background:rgba(221,143,44,.12);border-color:rgba(221,143,44,.25)}
 
         .specialist-request{max-width:520px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.specialist-dynamic-header .plan-header-facts{margin-top:2px}
@@ -4268,8 +4270,21 @@
             + '</div>'
             + (requirements.length ? '<div class="plan-requirements">' + requirements.map(r => '<span>✓ ' + escapeHtml(r) + '</span>').join('') + '</div>' : '')
             + '</header>'
-            + ((goalStatus === 'PARTIAL' || goalStatus === 'FAILED') ? '<div class="recovery-action"><div class="recovery-title">⚠ Your complete trip goal is not achieved yet</div><p class="recovery-copy">The successful parts are preserved. Retry only the failed capability below. We will rebuild dependent details only after that capability succeeds.</p>' + ((unmetCriteria.length || blockingIssues.length) ? '<ul class="recovery-issues">' + [...unmetCriteria, ...blockingIssues].slice(0,6).map(x => '<li>' + escapeHtml(String(x)) + '</li>').join('') + '</ul>' : '') + '</div>' : '');
-            + (responseStatus === 'NEEDS_USER_INPUT' && String(data.clarificationRequired || '').trim() ? '<div class="agent-clarification-banner"><strong>✦ Action needed</strong><span>' + escapeHtml(String(data.clarificationRequired)) + '</span></div>' : '');
+            ;
+        if (goalStatus === 'PARTIAL' || goalStatus === 'FAILED') {
+            const failedLabels = retryableTasks.map(task => humanTaskLabel(task));
+            const failedSummary = failedLabels.length ? failedLabels.join(', ') : 'failed capabilities';
+            const topRetry = (awaitingApproval && data.threadId && retryableTasks.length)
+                ? '<div class="recovery-actions"><button type="button" class="recovery-retry" data-plan-action="retry" data-retry-task="ALL_FAILED" data-thread-id="' + escapeHtml(data.threadId) + '">↻ Retry Failed Tasks</button></div>'
+                : '';
+            html += '<div class="recovery-action"><div class="recovery-title">⚠ Your complete trip goal is not achieved yet</div><p class="recovery-copy">The successful parts are preserved. Retry the failed capability below. Dependent details will be rebuilt automatically after recovery succeeds.</p>'
+                + (failedLabels.length ? '<div class="recovery-failed"><span>Failed:</span> ' + escapeHtml(failedSummary) + '</div>' : '')
+                + ((unmetCriteria.length || blockingIssues.length) ? '<ul class="recovery-issues">' + [...unmetCriteria, ...blockingIssues].slice(0,6).map(x => '<li>' + escapeHtml(String(x)) + '</li>').join('') + '</ul>' : '')
+                + topRetry + '</div>';
+        }
+        if (responseStatus === 'NEEDS_USER_INPUT' && String(data.clarificationRequired || '').trim()) {
+            html += '<div class="agent-clarification-banner"><strong>✦ Action needed</strong><span>' + escapeHtml(String(data.clarificationRequired)) + '</span></div>';
+        }
 
         const nav = [];
         if (hasFlights) nav.push(['flights','✈ Flights']);
@@ -4585,12 +4600,22 @@
         if (!live || !id || id === 'final') return;
         const el = live.phases.querySelector('[data-phase="' + id + '"]');
         if (!el) return;
-        el.classList.remove('active','done','failed');
+        el.classList.remove('active','done','failed','preserved');
         if (status === 'RUNNING') el.classList.add('active');
         if (status === 'SUCCEEDED') el.classList.add('done');
         if (status === 'FAILED') el.classList.add('failed');
+        if (status === 'PRESERVED') el.classList.add('preserved');
         const d = el.querySelector('.live-phase-detail');
-        if (d) d.textContent = detail || (status === 'RUNNING' ? 'In progress' : status === 'SUCCEEDED' ? 'Complete' : 'Failed');
+        if (d) d.textContent = detail || (status === 'RUNNING' ? 'In progress' : status === 'SUCCEEDED' ? 'Complete' : status === 'PRESERVED' ? 'Preserved' : 'Failed');
+    };
+
+    const initializeRetryProgress = (live) => {
+        if (!live) return;
+        // Recovery resumes from the persisted checkpoint. Understand and Plan
+        // are intentionally not re-executed, so showing "Waiting" is misleading.
+        setLivePhase(live, 'intent', 'PRESERVED', 'Preserved');
+        setLivePhase(live, 'plan', 'PRESERVED', 'Preserved');
+        setLivePhase(live, 'execute', 'RUNNING', 'In progress');
     };
 
     const setLiveTask = (live, id, status, message) => {
@@ -4856,6 +4881,7 @@
             sourceRow.parentNode.insertBefore(liveResponse.row, sourceRow.nextSibling);
         }
         liveResponse.state.textContent = 'Retrying';
+        initializeRetryProgress(liveResponse);
         liveResponse.activity.textContent = task === 'ALL_FAILED'
             ? 'Retrying failed tasks…'
             : 'Retrying ' + humanTaskLabel(task) + '…';

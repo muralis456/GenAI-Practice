@@ -87,7 +87,18 @@ public class FlightAgentService {
         flights = normalizeResults(flights, "outbound", outboundDate, state.datesFlexible(), originIata, destinationIata);
 
         if (state.roundTrip()) {
-            java.time.LocalDate returnDate = state.datesFlexible() ? null : state.returnDate();
+            // A flexible-date round trip still needs a concrete provider probe date
+            // for the reverse leg. TravelState already carries a deterministic
+            // fallback return date (departure + 5 days). Do not send null here:
+            // Ignav requires departure_date for every one-way search, and using
+            // today's date again for NRT -> BLR can produce a provider-specific
+            // HTTP 400 even though the outbound leg succeeded. This date is only
+            // a provider probe; the user-facing trip remains date-flexible.
+            java.time.LocalDate returnDate = state.returnDate();
+            if (state.datesFlexible()) {
+                log.info("flight.flexible-date return provider probe date={} route={} -> {}",
+                        returnDate, destinationIata, originIata);
+            }
             if (returnDate != null
                     && outboundDate != null
                     && returnDate.isBefore(outboundDate)

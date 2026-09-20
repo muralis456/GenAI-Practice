@@ -171,6 +171,8 @@ public class TravelController {
         if (request.getNotes() == null || request.getNotes().isBlank()) {
             throw new IllegalArgumentException("Retry task is required");
         }
+        log.info("Retry request received userId={} threadId={} task={}",
+                userId, request.getThreadId(), request.getNotes());
         TravelPlanResponse response = travelPlannerAgentService.retryTask(userId, request.getThreadId(), request.getNotes());
         conversationMemoryService.saveUiMessage(userId, request.getThreadId(), "assistant",
                 responseMessage(response, "Retry completed"), response);

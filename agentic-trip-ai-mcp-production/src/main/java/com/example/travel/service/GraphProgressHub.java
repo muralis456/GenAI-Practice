@@ -67,6 +67,15 @@ public class GraphProgressHub {
         long[] lastId = {initialLastId};
 
         try {
+            // Force the HTTP/SSE response to commit immediately. The retry UI
+            // subscribes before POST /api/plan/retry and waits for EventSource
+            // onopen before starting the backend action. Without an initial SSE
+            // frame, some servlet/proxy combinations can keep the connection
+            // pending indefinitely because no event has been emitted yet.
+            emitter.send(SseEmitter.event()
+                    .name("ready")
+                    .data("{\"threadId\":\"" + threadId.replace("\"", "") + "\"}"));
+
             if (liveOnly) {
                 // Do not replay historical events. The poller will deliver only
                 // events emitted after this subscription was established.
