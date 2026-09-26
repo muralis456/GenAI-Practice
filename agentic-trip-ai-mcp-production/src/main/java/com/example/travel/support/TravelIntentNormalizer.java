@@ -36,7 +36,11 @@ public final class TravelIntentNormalizer {
         // trip. Only an explicit request to plan/organize the trip becomes the
         // full TRIP_PLANNING contract.
         boolean planning = PLAN_TRIP.matcher(text).find()
-                || lower.contains("trip plan");
+                || lower.contains("trip plan")
+                // A complete travel contract can omit the word "plan".
+                // Route + duration + a trip-wide budget is a high-confidence
+                // request to organize a trip, not a flight-only lookup.
+                || (hasRouteHint(text) && hasDurationHint(text) && budgetHint(lower));
 
         boolean flights = explicitFlight(lower);
         boolean hotels = explicitHotel(lower);
@@ -100,6 +104,20 @@ public final class TravelIntentNormalizer {
         }
 
         return plan;
+    }
+
+    private static boolean hasRouteHint(String text) {
+        return FROM_TO.matcher(text == null ? "" : text).find()
+                || TO_FROM.matcher(text == null ? "" : text).find();
+    }
+
+    private static boolean hasDurationHint(String text) {
+        return DURATION.matcher(text == null ? "" : text).find();
+    }
+
+    private static boolean budgetHint(String lower) {
+        if (lower == null) return false;
+        return lower.matches(".*(?:under|below|within|budget|₹|rs\\.?|inr|usd|\\$|\\u20ac|\\u00a3)\\s*.*");
     }
 
     public static String deterministicOrigin(String request) {

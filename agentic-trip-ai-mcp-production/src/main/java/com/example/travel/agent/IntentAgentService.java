@@ -566,9 +566,16 @@ public class IntentAgentService {
         boolean duration = com.example.travel.support.TripSlotHeuristics.hasDurationHint(request);
         if (!route || !duration) return false;
 
-        // Require a meaningful trip-planning capability in addition to route +
-        // duration. This prevents ordinary round-trip flight/date requests from
-        // being promoted into a full itinerary.
+        // Route + duration + a trip-wide budget is a complete travel contract
+        // even when the user never says "plan". Do not let a flight-only model
+        // interpretation collapse such a request into FLIGHT_SEARCH.
+        String lower = request.toLowerCase(java.util.Locale.ROOT);
+        boolean budgetConstraint = lower.matches(".*(?:under|below|within|budget|\u20b9|rs\\.?|inr|usd|\\$|\\u20ac|\\u00a3)\\s*.*");
+        if (budgetConstraint) return true;
+
+        // Otherwise require another meaningful trip-planning capability. This
+        // prevents ordinary round-trip flight/date requests from becoming full
+        // itinerary workflows.
         return plan.isNeedsHotels()
                 || plan.isNeedsResearch()
                 || plan.isNeedsBudget()

@@ -52,6 +52,16 @@ public class GraphProgressHub {
         return subscribe(threadId, false);
     }
 
+    public long latestEventId(String threadId) {
+        return repository.findTop1ByThreadIdOrderByIdDesc(threadId)
+                .map(GraphProgressEvent::getId)
+                .orElse(0L);
+    }
+
+    public SseEmitter subscribe(String threadId, long afterId) {
+        return subscribe(threadId, false, afterId);
+    }
+
     /**
      * Subscribe to progress. When liveOnly is true, ignore all events that
      * existed before the subscription. This is required for retries on an
@@ -59,11 +69,15 @@ public class GraphProgressHub {
      * from the previous run, which must not immediately close the new SSE.
      */
     public SseEmitter subscribe(String threadId, boolean liveOnly) {
+        return subscribe(threadId, liveOnly, -1L);
+    }
+
+    private SseEmitter subscribe(String threadId, boolean liveOnly, long afterId) {
         SseEmitter emitter = new SseEmitter(SSE_TIMEOUT_MS);
         AtomicBoolean closed = new AtomicBoolean(false);
-        long initialLastId = liveOnly
+        long initialLastId = afterId >= 0 ? afterId : (liveOnly
                 ? repository.findTop1ByThreadIdOrderByIdDesc(threadId).map(GraphProgressEvent::getId).orElse(0L)
-                : 0L;
+                : 0L);
         long[] lastId = {initialLastId};
 
         try {

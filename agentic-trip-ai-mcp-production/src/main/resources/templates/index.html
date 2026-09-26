@@ -4677,6 +4677,12 @@
             const res = await apiFetch('/api/plan/' + encodeURIComponent(threadId) + '/stop', { method: 'POST' });
             const payload = await res.json().catch(() => ({}));
             if (!res.ok) throw new Error(payload.error || safeUiErrorMessage());
+            if (payload.status === 'NOT_RUNNING') {
+                if (live.state) live.state.textContent = 'Already stopped';
+                if (live.activity) live.activity.textContent = payload.message || 'This run is no longer active.';
+                if (button) { button.disabled = true; button.textContent = 'Stopped'; }
+                return false;
+            }
             if (live.state) live.state.textContent = 'Stopping';
             if (live.activity) live.activity.textContent = payload.message || 'Saving your current checkpoint…';
             return true;
@@ -4755,12 +4761,52 @@
             }
             if (started.status === 'RESUMED') {
                 liveResponse.state.textContent = 'Continuing';
-                liveResponse.activity.textContent = 'Resuming your saved request…';
+                liveResponse.activity.textContent = 'Resuming from your saved checkpoint…';
+                // Render the persisted checkpoint immediately. Do not reset the
+                // card to Understand/Waiting while the resumed graph is being
+                // subscribed to. The checkpoint is the source of truth for what
+                // was already completed before Stop.
+                const rs = started.resumeState || {};
+                const next = String(rs.nextNode || '').toLowerCase();
+                const phaseRank = { intent: 0, plan: 1, execute: 2, evaluate: 3, replan: 4 };
+                const nextRank = phaseRank[next] != null ? phaseRank[next] : 2;
+                ['intent','plan','execute','evaluate','replan'].forEach((id, idx) => {
+                    if (idx < nextRank) setLivePhase(liveResponse, id, 'SUCCEEDED', 'Complete');
+                    else if (idx === nextRank) setLivePhase(liveResponse, id, 'RUNNING', 'Resuming');
+                });
+                const statuses = rs.taskStatuses || {};
+                Object.entries(statuses).forEach(([task, status]) => {
+                    const normalized = String(status || '').toUpperCase();
+                    if (normalized === 'SUCCEEDED') setLiveTask(liveResponse, task, 'SUCCEEDED', humanTaskLabel(task) + ' complete');
+                    else if (normalized === 'RUNNING') setLiveTask(liveResponse, task, 'RUNNING', humanTaskLabel(task));
+                    else if (normalized === 'FAILED') setLiveTask(liveResponse, task, 'FAILED', humanTaskLabel(task));
+                });
             }
             const statusSpan = loadingState.querySelectorAll('span')[1];
             await new Promise((resolve, reject) => {
                 let finished = false;
-                const es = new EventSource('/api/plan/' + encodeURIComponent(threadId) + '/events');
+                const isResumedRun = started.status === 'RESUMED';
+                const resumeCursor = isResumedRun && Number.isFinite(Number(started.resumeSinceEventId))
+                    ? Number(started.resumeSinceEventId) : -1;
+                const eventsUrl = resumeCursor >= 0
+                    ? '/api/plan/' + encodeURIComponent(threadId) + '/events?afterId=' + encodeURIComponent(resumeCursor)
+                    : '/api/plan/' + encodeURIComponent(threadId) + '/events';
+                const es = new EventSource(eventsUrl);
+                // A resumed thread contains the previous run's STOPPED event.
+                // The durable cursor filters it in the normal case, but the UI
+                // must also defend against an SSE replay/reconnect delivering an
+                // older terminal event before the current RESUME marker.
+                let resumeRunStarted = !isResumedRun;
+                const isCurrentResumeEvent = (data) => {
+                    if (!isResumedRun) return true;
+                    const node = String(data?.node || '').toUpperCase();
+                    const message = String(data?.message || '').toLowerCase();
+                    if (node === 'RESUME' || message.includes('continuing your saved request')) {
+                        resumeRunStarted = true;
+                        return true;
+                    }
+                    return resumeRunStarted;
+                };
                 // If the user clicked Stop while /start was still allocating the
                 // thread id, deliver that intent now that the target exists.
                 if (stopWasQueued) {
@@ -4778,6 +4824,7 @@
                     // the first real node_start event arrives.
                     try {
                         const data = JSON.parse(evt.data);
+                        if (!isCurrentResumeEvent(data)) return;
                         if (!data.node || String(data.node).toUpperCase() === 'START') {
                             liveResponse.state.textContent = 'Working';
                             if (liveResponse.activity) liveResponse.activity.textContent = 'Starting…';
@@ -4787,6 +4834,7 @@
                 es.addEventListener('activity', (evt) => {
                     try {
                         const data = JSON.parse(evt.data);
+                        if (!isCurrentResumeEvent(data)) return;
                         const msg = data.message || '';
                         if (!msg) return;
                         if (liveResponse.activity) liveResponse.activity.textContent = msg + '…';
@@ -4797,6 +4845,7 @@
                 es.addEventListener('node_start', (evt) => {
                     try {
                         const data = JSON.parse(evt.data);
+                        if (!isCurrentResumeEvent(data)) return;
                         if (data.node) {
                             const msg = data.message || ('Running ' + data.node);
                             if (statusSpan) statusSpan.textContent = msg + '…';
@@ -4807,6 +4856,7 @@
                 es.addEventListener('node_complete', (evt) => {
                     try {
                         const data = JSON.parse(evt.data);
+                        if (!isCurrentResumeEvent(data)) return;
                         if (data.node) {
                             const msg = data.message || data.node;
                             if (statusSpan) statusSpan.textContent = msg;
@@ -4817,6 +4867,7 @@
                 es.addEventListener('task_start', (evt) => {
                     try {
                         const data = JSON.parse(evt.data);
+                        if (!isCurrentResumeEvent(data)) return;
                         if (data.task) {
                             const msg = data.message || data.task;
                             if (statusSpan) statusSpan.textContent = msg + '…';
@@ -4827,6 +4878,7 @@
                 es.addEventListener('task_complete', (evt) => {
                     try {
                         const data = JSON.parse(evt.data);
+                        if (!isCurrentResumeEvent(data)) return;
                         if (data.task) {
                             const msg = data.message || data.task;
                             const failed = data.status === 'FAILED';
@@ -4841,6 +4893,7 @@
                 es.addEventListener('stop_requested', (evt) => {
                     try {
                         const data = JSON.parse(evt.data);
+                        if (!isCurrentResumeEvent(data)) return;
                         liveResponse.state.textContent = 'Stopping';
                         liveResponse.activity.textContent = data.message || 'Saving your current checkpoint…';
                         if (liveResponse.stopButton) {
@@ -4850,6 +4903,12 @@
                     } catch (ignored) {}
                 });
                 es.addEventListener('stopped', (evt) => {
+                    try {
+                        const data = JSON.parse(evt.data);
+                        if (!isCurrentResumeEvent(data)) return;
+                    } catch (_) {
+                        if (isResumedRun && !resumeRunStarted) return;
+                    }
                     finished = true;
                     es.close();
                     liveResponse.state.textContent = 'Stopped';
@@ -4864,6 +4923,7 @@
                     resolve();
                 });
                 es.addEventListener('complete', async (evt) => {
+                    if (isResumedRun && !resumeRunStarted) return;
                     finished = true;
                     es.close();
                     liveResponse.state.textContent = 'Plan ready';
@@ -4902,6 +4962,7 @@
                     }
                 });
                 es.addEventListener('failed', (evt) => {
+                    if (isResumedRun && !resumeRunStarted) return;
                     finished = true;
                     es.close();
                     liveResponse.state.textContent = 'Plan failed';

@@ -85,7 +85,7 @@ public class TravelController {
     }
 
     @PostMapping("/plan/start")
-    public ResponseEntity<Map<String, String>> startPlan(Authentication authentication,
+    public ResponseEntity<Map<String, Object>> startPlan(Authentication authentication,
                                                          @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
                                                          @Valid @RequestBody TravelRequest request) {
         String userId = currentUser(authentication);
@@ -124,15 +124,20 @@ public class TravelController {
         // creating a new thread and asking the intent/planner agents to guess
         // what the user meant. The original requirement remains in the
         // checkpoint's USER_REQUEST.
-        java.util.Optional<String> resumedThread = travelPlannerAgentService
+        java.util.Optional<Map<String, Object>> resumed = travelPlannerAgentService
                 .tryResumeLatestStopped(userId, conversationId, rawPrompt);
-        if (resumedThread.isPresent()) {
-            String threadId = resumedThread.get();
+        if (resumed.isPresent()) {
+            Map<String, Object> resumeInfo = new java.util.LinkedHashMap<>(resumed.get());
+            String threadId = String.valueOf(resumeInfo.get("threadId"));
+            // Capture the durable cursor before the resumed worker can emit new
+            // events. The UI subscribes with this cursor so it cannot miss fast
+            // resume events between the POST response and EventSource creation.
+            long resumeSinceEventId = graphProgressHub.latestEventId(threadId);
             conversationMemoryService.saveMessage(userId, threadId, conversationId, "user", rawPrompt);
-            log.info("Continuing stopped graph threadId={} conversationId={} prompt={}",
-                    threadId, conversationId, rawPrompt);
-            return ResponseEntity.status(HttpStatus.ACCEPTED)
-                    .body(Map.of("threadId", threadId, "status", "RESUMED"));
+            resumeInfo.put("resumeSinceEventId", resumeSinceEventId);
+            log.info("Continuing stopped graph threadId={} conversationId={} prompt={} resumeSinceEventId={} resumeState={}",
+                    threadId, conversationId, rawPrompt, resumeSinceEventId, resumeInfo.get("resumeState"));
+            return ResponseEntity.status(HttpStatus.ACCEPTED).body(resumeInfo);
         }
 
         if (request.getDepartureDate() != null && !request.getDepartureDate().isBlank()
@@ -156,7 +161,7 @@ public class TravelController {
 
         String historyContext = conversationMemoryService.buildConversationHistoryContext(userId, conversationId);
         String threadId = travelPlannerAgentService.startTravelPlan(request, historyContext);
-        Map<String, String> started = Map.of("threadId", threadId, "status", "STARTED");
+        Map<String, Object> started = Map.of("threadId", threadId, "status", "STARTED");
         if (idempotencyKey != null) {
             try { idempotencyService.complete(userId, idempotencyKey, requestHash, objectMapper.writeValueAsString(started)); }
             catch (Exception ex) { log.warn("Unable to persist idempotency response", ex); }
@@ -166,9 +171,13 @@ public class TravelController {
 
     @GetMapping(value = "/plan/{threadId}/events", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter planEvents(Authentication authentication, @PathVariable String threadId,
-                                 @RequestParam(defaultValue = "false") boolean liveOnly) {
+                                 @RequestParam(defaultValue = "false") boolean liveOnly,
+                                 @RequestParam(defaultValue = "-1") long afterId) {
         String userId = currentUser(authentication);
         travelPlannerAgentService.assertOwnedThread(userId, threadId);
+        if (afterId >= 0) {
+            return graphProgressHub.subscribe(threadId, afterId);
+        }
         return graphProgressHub.subscribe(threadId, liveOnly);
     }
 

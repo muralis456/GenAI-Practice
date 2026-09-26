@@ -6,10 +6,14 @@ import com.example.travel.dto.TripPlanResult;
 import com.example.travel.dto.TravelPlanResponse;
 import com.example.travel.dto.TravelRequest;
 import com.example.travel.entity.UserPreference;
+import com.example.travel.entity.AgentRunControl;
 import com.example.travel.graph.GraphExecutionLogger;
 import com.example.travel.graph.TravelGraphNodes;
 import com.example.travel.graph.TravelState;
 import com.example.travel.model.ModificationRequest;
+import com.example.travel.model.AgentPlan;
+import com.example.travel.model.AgentTask;
+import com.example.travel.model.IntentPlan;
 import com.example.travel.service.AgentExecutionBudget;
 import com.example.travel.service.ConversationMemoryService;
 import com.example.travel.service.GraphProgressHub;
@@ -44,6 +48,8 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.RejectedExecutionException;
 
 /**
@@ -431,11 +437,11 @@ public class TravelPlannerAgentService {
         return requested;
     }
 
-    public java.util.Optional<String> tryResumeLatestStopped(String userId, String conversationId, String prompt) {
+    public java.util.Optional<Map<String, Object>> tryResumeLatestStopped(String userId, String conversationId, String prompt) {
         if (!isContinuationPrompt(prompt)) return java.util.Optional.empty();
         if (conversationId == null || conversationId.isBlank()) return java.util.Optional.empty();
         if (runControlService.latestStopped(userId, conversationId).isEmpty()) return java.util.Optional.empty();
-        return java.util.Optional.of(resumeLatestStopped(userId, conversationId));
+        return java.util.Optional.of(resumeLatestStoppedInfo(userId, conversationId));
     }
 
     private boolean isContinuationPrompt(String prompt) {
@@ -457,6 +463,16 @@ public class TravelPlannerAgentService {
      * never becomes a new planning requirement.
      */
     public String resumeLatestStopped(String userId, String conversationId) {
+        return String.valueOf(resumeLatestStoppedInfo(userId, conversationId).get("threadId"));
+    }
+
+    /**
+     * Starts Continue from the persisted checkpoint and returns a small snapshot
+     * of that checkpoint to the UI. The UI must render this snapshot first; it
+     * must not reset the live card to Understand/Waiting just because a new SSE
+     * subscription is being created.
+     */
+    public Map<String, Object> resumeLatestStoppedInfo(String userId, String conversationId) {
         var stopped = runControlService.latestStopped(userId, conversationId)
                 .orElseThrow(() -> new IllegalStateException("There is no stopped request to continue."));
         String threadId = stopped.getThreadId();
@@ -466,12 +482,30 @@ public class TravelPlannerAgentService {
         boolean handedOff = false;
         try {
             String policy = previousPolicy(threadId);
+            TravelState checkpoint = requireCheckpointState(threadId);
+            String nextNode = travelGraph.getState(configFor(threadId)).next();
+            Map<String, String> taskStatuses = new LinkedHashMap<>();
+            if (checkpoint.agentPlan() != null) {
+                for (AgentTask task : checkpoint.agentPlan().getTasks()) {
+                    taskStatuses.put(task.getId(), task.getStatus().name());
+                }
+            }
+            Map<String, Object> resumeState = new LinkedHashMap<>();
+            resumeState.put("nextNode", nextNode);
+            resumeState.put("pipeline", checkpoint.pipeline());
+            resumeState.put("requestType", checkpoint.requestType());
+            resumeState.put("taskStatuses", taskStatuses);
+
             runControlService.start(userId, conversationId, threadId, stopped.getOriginalRequest(), policy);
             graphProgressHub.open(threadId);
             Future<?> future = travelPlanExecutor.submit(() -> runResumedStreaming(threadId, userId, conversationId, policy));
             runControlService.registerFuture(threadId, future);
             handedOff = true;
-            return threadId;
+            Map<String, Object> info = new LinkedHashMap<>();
+            info.put("threadId", threadId);
+            info.put("status", "RESUMED");
+            info.put("resumeState", resumeState);
+            return info;
         } catch (RejectedExecutionException ex) {
             throw new TooManyRequestsException("Travel planning is busy right now. Please try again shortly.");
         } finally {
@@ -486,8 +520,12 @@ public class TravelPlannerAgentService {
         graphRunContext.open(threadId, executionBudget.capture(), policy);
         long runStarted = System.currentTimeMillis();
         try {
+            TravelState checkpoint = requireCheckpointState(threadId);
+            Map<String, Object> resumeInput = buildResumeInput(checkpoint,
+                    runControlService.find(threadId).map(AgentRunControl::getOriginalRequest).orElse(checkpoint.userRequest()));
+
             graphProgressHub.emit(threadId, "started", Map.of("threadId", threadId, "node", "RESUME", "message", "Continuing your saved request…"));
-            for (NodeOutput<TravelState> output : travelGraph.stream(GraphInput.resume(Map.of()), config)) {
+            for (NodeOutput<TravelState> output : travelGraph.stream(GraphInput.resume(resumeInput), config)) {
                 if (runControlService.isStopRequested(threadId)) {
                     throw new java.util.concurrent.CancellationException("User requested stop");
                 }
@@ -523,6 +561,83 @@ public class TravelPlannerAgentService {
             ModelRoutingContext.clear();
             runAdmissionService.release(userId);
         }
+    }
+
+    /**
+     * Rehydrates a stopped checkpoint with the original trip contract.
+     *
+     * A stop can occur immediately after a specialist wave. If an older
+     * checkpoint was created with a narrowed FLIGHT_SEARCH plan, blindly
+     * resuming that checkpoint would finish after flights and incorrectly
+     * treat "Continue" as a flight-only request. For a high-confidence
+     * full-trip request (route + duration + trip-wide budget), restore the
+     * canonical trip plan while preserving already successful task state.
+     */
+    private Map<String, Object> buildResumeInput(TravelState checkpoint, String originalRequest) {
+        Map<String, Object> resume = new LinkedHashMap<>();
+        resume.put(TravelState.USER_REQUEST, TravelState.firstNonBlank(originalRequest, checkpoint.userRequest()));
+
+        if (!isHighConfidenceFullTripRequest(originalRequest)) {
+            return resume;
+        }
+
+        IntentPlan intent = new IntentPlan();
+        intent.setRequestType(IntentPlan.TRIP_PLANNING);
+        intent.setNeedsFlights(true);
+        intent.setNeedsHotels(true);
+        intent.setNeedsResearch(true);
+        intent.setNeedsWeather(true);
+        intent.setNeedsBudget(true);
+        intent.setNeedsItinerary(true);
+        intent.setNeedsKnowledge(true);
+        intent.setBudgetScope("TRIP");
+        intent.setStrategy("trip_planning");
+        intent.setPriority("balanced");
+        intent.setConfidence(0.95d);
+
+        AgentPlan rebuilt = AgentPlan.fromIntent(intent);
+        AgentPlan previous = checkpoint.agentPlan();
+        if (previous != null) {
+            for (AgentTask oldTask : previous.getTasks()) {
+                AgentTask newTask = rebuilt.task(oldTask.getId());
+                if (newTask == null) continue;
+                newTask.setAttempts(oldTask.getAttempts());
+                newTask.setFailureReason(oldTask.getFailureReason());
+                if (oldTask.getStatus() == AgentTask.Status.SUCCEEDED) {
+                    newTask.setStatus(AgentTask.Status.SUCCEEDED);
+                }
+            }
+        }
+
+        resume.put(TravelState.REQUEST_TYPE, IntentPlan.TRIP_PLANNING);
+        resume.put(TravelState.AGENT_PLAN, rebuilt);
+        resume.put(TravelState.NEEDS_FLIGHTS, true);
+        resume.put(TravelState.NEEDS_HOTELS, true);
+        resume.put(TravelState.NEEDS_RESEARCH, true);
+        resume.put(TravelState.NEEDS_WEATHER, true);
+        resume.put(TravelState.NEEDS_BUDGET, true);
+        resume.put(TravelState.NEEDS_ITINERARY, true);
+        resume.put(TravelState.NEEDS_KNOWLEDGE, true);
+        resume.put(TravelState.RUN_FLIGHTS, true);
+        resume.put(TravelState.RUN_HOTELS, true);
+        resume.put(TravelState.RUN_RESEARCH, true);
+        resume.put(TravelState.RUN_WEATHER, true);
+        resume.put(TravelState.RUN_BUDGET, true);
+        resume.put(TravelState.RUN_ITINERARY, true);
+        resume.put(TravelState.PLAN_STRATEGY, "trip_planning");
+        resume.put(TravelState.PLAN_PRIORITY, "balanced");
+
+        log.info("Resume contract restored as TRIP_PLANNING threadId={} originalRequest={} previousTasks={} resumedTasks={}",
+                checkpoint.graphThreadId(), originalRequest, previous == null ? 0 : previous.getTasks().size(), rebuilt.getTasks().size());
+        return resume;
+    }
+
+    private boolean isHighConfidenceFullTripRequest(String request) {
+        if (request == null || request.isBlank()) return false;
+        String text = request.toLowerCase(java.util.Locale.ROOT);
+        return com.example.travel.support.TripSlotHeuristics.hasRouteHint(request)
+                && com.example.travel.support.TripSlotHeuristics.hasDurationHint(request)
+                && text.matches(".*(?:under|below|within|budget|₹|rs\\.?|inr|usd|\\$|\\u20ac|\\u00a3)\\s*.*");
     }
 
     /**
@@ -865,8 +980,6 @@ public class TravelPlannerAgentService {
                 || "all".equals(requested)) {
             recoveryTasks = failedTasks;
         } else {
-            // Backward compatibility: an explicit task can still be retried, but
-            // the normal UI path never uses this branch.
             com.example.travel.model.AgentTask target = current.agentPlan().task(requested);
             if (target == null || !target.isRequired()
                     || target.getStatus() != com.example.travel.model.AgentTask.Status.FAILED) {
@@ -885,27 +998,119 @@ public class TravelPlannerAgentService {
         decision.put(TravelState.AWAITING_APPROVAL, Boolean.FALSE);
         decision.put(TravelState.RETRY_TASK, String.join(",", recoveryTasks));
         decision.put(TravelState.REPLAN_NOTES, "Manual recovery requested for failed tasks: " + recoveryTasks);
-        ModelRoutingContext.set(previousPolicy(key));
+
+        String policy = previousPolicy(key);
+        AgentRunControl existing = runControlService.find(key)
+                .orElseThrow(() -> new IllegalStateException("No durable run control exists for thread " + key));
+
+        // A retry is a real long-running execution. Put it back into RUNNING
+        // state and execute it on the same cancellable plan executor used by
+        // initial runs. Previously retryTask() called travelGraph.invoke()
+        // directly on the HTTP request thread, so Stop had no Future to cancel.
+        runControlService.start(
+                userId,
+                existing.getConversationId(),
+                key,
+                TravelState.firstNonBlank(existing.getOriginalRequest(), current.userRequest()),
+                policy);
+
+        ModelRoutingContext.set(policy);
         executionBudget.begin();
-        graphRunContext.open(key, executionBudget.capture(), previousPolicy(key));
+        graphRunContext.open(key, executionBudget.capture(), policy);
         graphProgressHub.emit(key, "started", Map.of(
                 "threadId", key,
                 "node", "RETRY",
                 "message", "Retrying failed tasks"));
+
+        boolean handedOff = false;
         try {
-            travelGraph.invoke(GraphInput.resume(decision), config);
-            TravelState state = requireCheckpointState(key);
-            boolean pending = isAwaitingHitl(key);
-            TravelPlanResponse response = toResponse(state, key, pending);
-            tripHistoryService.saveOrUpdate(userId, response);
-            graphProgressHub.emit(key, "complete", Map.of("plan", response));
-            return response;
-        } catch (RuntimeException ex) {
-            log.warn("Retry failed threadId={} tasks={}", key, recoveryTasks, ex);
-            graphProgressHub.emit(key, "failed", Map.of(
-                    "error", "Retry could not complete. Please try again."));
-            throw ex;
+            Future<TravelPlanResponse> future = travelPlanExecutor.submit(() -> {
+                try {
+                    if (runControlService.isStopRequested(key)) {
+                        throw new com.example.travel.exception.GraphStopRequestedException();
+                    }
+
+                    travelGraph.invoke(GraphInput.resume(decision), config);
+
+                    if (runControlService.isStopRequested(key) || Thread.currentThread().isInterrupted()) {
+                        throw new com.example.travel.exception.GraphStopRequestedException();
+                    }
+
+                    TravelState state = requireCheckpointState(key);
+                    boolean pending = isAwaitingHitl(key);
+                    TravelPlanResponse response = toResponse(state, key, pending);
+                    tripHistoryService.saveOrUpdate(userId, response);
+                    graphProgressHub.emit(key, "complete", Map.of("plan", response));
+                    runControlService.markCompleted(key);
+                    return response;
+                } catch (Exception ex) {
+                    if (runControlService.isStopRequested(key)
+                            || ex instanceof com.example.travel.exception.GraphStopRequestedException
+                            || Thread.currentThread().isInterrupted()) {
+                        try {
+                            runControlService.markStopped(key);
+                        } finally {
+                            graphProgressHub.emit(key, "stopped", Map.of(
+                                    "threadId", key,
+                                    "message", "Stopped. Your current checkpoint is saved. Say Continue to resume this request."));
+                        }
+                        throw ex instanceof RuntimeException re
+                                ? re
+                                : new RuntimeException(ex);
+                    }
+                    runControlService.markFailed(key);
+                    graphProgressHub.emit(key, "failed", Map.of(
+                            "error", "Retry could not complete. Please try again."));
+                    throw ex instanceof RuntimeException re ? re : new RuntimeException(ex);
+                }
+            });
+            runControlService.registerFuture(key, future);
+            handedOff = true;
+
+            try {
+                return future.get();
+            } catch (CancellationException ex) {
+                // Future.cancel(true) is expected when the user presses Stop.
+                // The worker owns the durable STOPPED transition; return the
+                // latest checkpoint as a safe HTTP response rather than exposing
+                // CancellationException to the browser.
+                if (runControlService.isStopRequested(key)) {
+                    TravelState checkpoint = requireCheckpointState(key);
+                    TravelPlanResponse response = toResponse(checkpoint, key, isAwaitingHitl(key));
+                    response.setStatus("STOPPED");
+                    return response;
+                }
+                throw ex;
+            } catch (InterruptedException ex) {
+                // The HTTP/request thread itself may be interrupted while waiting
+                // for the worker. Preserve the interrupt flag and treat it as a
+                // user stop only when the durable run-control state confirms it.
+                Thread.currentThread().interrupt();
+                if (runControlService.isStopRequested(key)) {
+                    TravelState checkpoint = requireCheckpointState(key);
+                    TravelPlanResponse response = toResponse(checkpoint, key, isAwaitingHitl(key));
+                    response.setStatus("STOPPED");
+                    return response;
+                }
+                throw new RuntimeException("Retry execution was interrupted", ex);
+            } catch (ExecutionException ex) {
+                Throwable cause = ex.getCause();
+                if (runControlService.isStopRequested(key)) {
+                    TravelState checkpoint = requireCheckpointState(key);
+                    TravelPlanResponse response = toResponse(checkpoint, key, isAwaitingHitl(key));
+                    response.setStatus("STOPPED");
+                    return response;
+                }
+                if (cause instanceof RuntimeException re) throw re;
+                throw new RuntimeException(cause);
+            }
+        } catch (RejectedExecutionException ex) {
+            runControlService.markFailed(key);
+            throw new TooManyRequestsException("Travel planning is busy right now. Please try again shortly.");
         } finally {
+            if (!handedOff) {
+                runControlService.markFailed(key);
+            }
             graphRunContext.close(key);
             executionBudget.end();
             ModelRoutingContext.clear();
