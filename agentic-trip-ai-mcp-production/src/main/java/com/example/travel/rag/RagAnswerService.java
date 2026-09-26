@@ -2,6 +2,7 @@ package com.example.travel.rag;
 
 import com.example.travel.config.TravelModelsProperties.AgentRole;
 import com.example.travel.graph.TravelState;
+import com.example.travel.exception.GraphStopRequestedException;
 import com.example.travel.service.RoutedLlm;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -86,7 +87,12 @@ public class RagAnswerService {
                 return answer.trim();
             }
             log.warn("RAG answer rejected by knowledge-card contract; using grounded fallback");
+        } catch (GraphStopRequestedException stopped) {
+            throw stopped;
         } catch (Exception ex) {
+            if (Thread.currentThread().isInterrupted()) {
+                throw new GraphStopRequestedException(ex);
+            }
             log.warn("RAG answer generation failed; using grounded fallback", ex);
         }
 

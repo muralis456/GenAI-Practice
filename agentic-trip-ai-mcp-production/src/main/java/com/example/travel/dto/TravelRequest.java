@@ -8,6 +8,8 @@ public class TravelRequest {
     private String userId;
     /** Stable browser/application conversation id. Unlike threadId, this survives follow-up turns. */
     private String conversationId;
+    /** Last graph thread attached to the active browser conversation, when available. */
+    private String continuationThreadId;
     private String destination;
     private String departureCity;
     private String departureDate;
@@ -30,6 +32,14 @@ public class TravelRequest {
 
     public void setConversationId(String conversationId) {
         this.conversationId = conversationId;
+    }
+
+    public String getContinuationThreadId() {
+        return continuationThreadId;
+    }
+
+    public void setContinuationThreadId(String continuationThreadId) {
+        this.continuationThreadId = continuationThreadId;
     }
 
     public String getUserId() {

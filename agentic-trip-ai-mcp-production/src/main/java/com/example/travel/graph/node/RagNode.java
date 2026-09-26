@@ -4,6 +4,7 @@ import com.example.travel.graph.GraphExecutionLogger;
 import com.example.travel.graph.NodeFailureSupport;
 import com.example.travel.graph.TravelGraphNodes;
 import com.example.travel.graph.TravelState;
+import com.example.travel.exception.GraphStopRequestedException;
 import com.example.travel.rag.AgenticRagService;
 import com.example.travel.rag.RagAnswerService;
 import org.bsc.langgraph4j.action.NodeAction;
@@ -56,6 +57,8 @@ public class RagNode implements NodeAction<TravelState> {
             GraphExecutionLogger.specialistResult(TravelGraphNodes.RAG, state, "ok",
                     "decision=" + result.decision() + " method=" + result.retrievalMethod() + " candidates=" + result.candidateCount() + " reranked=" + result.rerankedCount() + " iterations=" + result.iterations() + " sources=" + result.sources().size());
             return updates;
+        } catch (GraphStopRequestedException stopped) {
+            throw stopped;
         } catch (Exception ex) {
             return NodeFailureSupport.record(TravelGraphNodes.RAG, state, ex, true,
                     state.nodeFailure().getNodeRetryCount());

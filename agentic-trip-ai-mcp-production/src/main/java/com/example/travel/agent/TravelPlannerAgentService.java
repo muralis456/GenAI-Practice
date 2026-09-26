@@ -11,6 +11,7 @@ import com.example.travel.graph.GraphExecutionLogger;
 import com.example.travel.graph.TravelGraphNodes;
 import com.example.travel.graph.TravelState;
 import com.example.travel.model.ModificationRequest;
+import com.example.travel.model.StoppedRunActionDecision;
 import com.example.travel.model.AgentPlan;
 import com.example.travel.model.AgentTask;
 import com.example.travel.model.IntentPlan;
@@ -25,6 +26,7 @@ import com.example.travel.service.AgentRunAdmissionService;
 import com.example.travel.service.AgentRunControlService;
 import com.example.travel.service.ApiRateLimitService;
 import com.example.travel.exception.TooManyRequestsException;
+import com.example.travel.exception.GraphStopRequestedException;
 import com.example.travel.exception.ResourceNotFoundException;
 import tools.jackson.databind.ObjectMapper;
 
@@ -70,6 +72,7 @@ public class TravelPlannerAgentService {
     private final UserPreferenceService userPreferenceService;
     private final TravelModelsProperties travelModels;
     private final ModificationAgentService modificationAgentService;
+    private final StoppedRunActionResolver stoppedRunActionResolver;
     private final AgentExecutionBudget executionBudget;
     private final GraphProgressHub graphProgressHub;
     private final GraphRunContext graphRunContext;
@@ -91,6 +94,7 @@ public class TravelPlannerAgentService {
             UserPreferenceService userPreferenceService,
             TravelModelsProperties travelModels,
             ModificationAgentService modificationAgentService,
+            StoppedRunActionResolver stoppedRunActionResolver,
             AgentExecutionBudget executionBudget,
             GraphProgressHub graphProgressHub,
             GraphRunContext graphRunContext,
@@ -111,6 +115,7 @@ public class TravelPlannerAgentService {
         this.userPreferenceService = userPreferenceService;
         this.travelModels = travelModels;
         this.modificationAgentService = modificationAgentService;
+        this.stoppedRunActionResolver = stoppedRunActionResolver;
         this.executionBudget = executionBudget;
         this.graphProgressHub = graphProgressHub;
         this.graphRunContext = graphRunContext;
@@ -332,6 +337,9 @@ public class TravelPlannerAgentService {
                         payload);
             }
 
+            if (runControlService.isStopRequested(threadId)) {
+                throw new GraphStopRequestedException();
+            }
             TravelState state = requireCheckpointState(threadId);
 
             userPreferenceService.remember(
@@ -437,24 +445,75 @@ public class TravelPlannerAgentService {
         return requested;
     }
 
-    public java.util.Optional<Map<String, Object>> tryResumeLatestStopped(String userId, String conversationId, String prompt) {
-        if (!isContinuationPrompt(prompt)) return java.util.Optional.empty();
-        if (conversationId == null || conversationId.isBlank()) return java.util.Optional.empty();
-        if (runControlService.latestStopped(userId, conversationId).isEmpty()) return java.util.Optional.empty();
-        return java.util.Optional.of(resumeLatestStoppedInfo(userId, conversationId));
+    /**
+     * Resolve arbitrary user input against the latest stopped checkpoint. A stopped
+     * run is an existing execution context, not a fresh intent-classification turn.
+     */
+    public java.util.Optional<Map<String, Object>> tryHandleStoppedRunInput(
+            String userId, String conversationId, String prompt, String historyContext) {
+        return tryHandleStoppedRunInput(userId, conversationId, prompt, historyContext, "");
     }
 
-    private boolean isContinuationPrompt(String prompt) {
+    public java.util.Optional<Map<String, Object>> tryHandleStoppedRunInput(
+            String userId, String conversationId, String prompt, String historyContext, String continuationThreadId) {
+        var stopped = runControlService.findStoppedForConversation(userId, conversationId, continuationThreadId);
+        if (stopped.isEmpty()) {
+            var active = runControlService.findActiveForConversation(userId, conversationId, continuationThreadId);
+            if (active.isPresent() && isContinueCommand(prompt)) {
+                return java.util.Optional.of(attachToActiveRunInfo(active.get()));
+            }
+            return java.util.Optional.empty();
+        }
+
+        AgentRunControl run = stopped.get();
+        String threadId = run.getThreadId();
+        TravelState checkpoint = requireCheckpointState(threadId);
+        StoppedRunActionDecision action = stoppedRunActionResolver.resolve(checkpoint, prompt);
+        log.info("Stopped-run routing action={} confidence={} threadId={} prompt={}",
+                action.getAction(), action.getConfidence(), threadId, prompt);
+
+        return switch (action.getAction()) {
+            case "RESUME" -> java.util.Optional.of(
+                resumeLatestStoppedInfo(userId, conversationId, threadId));
+            case "MODIFY" -> java.util.Optional.of(
+                    startNaturalLanguageModification(userId, conversationId, threadId, prompt, action.getEffectiveRequest(), historyContext));
+            default -> java.util.Optional.empty();
+        };
+    }
+
+    private Map<String, Object> attachToActiveRunInfo(AgentRunControl run) {
+        String threadId = run.getThreadId();
+        TravelState checkpoint = requireCheckpointState(threadId);
+        Map<String, String> taskStatuses = new LinkedHashMap<>();
+        if (checkpoint.agentPlan() != null) {
+            for (AgentTask task : checkpoint.agentPlan().getTasks()) {
+                taskStatuses.put(task.getId(), task.getStatus().name());
+            }
+        }
+        Map<String, Object> resumeState = new LinkedHashMap<>();
+        resumeState.put("nextNode", travelGraph.getState(configFor(threadId)).next());
+        resumeState.put("pipeline", checkpoint.pipeline());
+        resumeState.put("requestType", checkpoint.requestType());
+        resumeState.put("taskStatuses", taskStatuses);
+
+        Map<String, Object> info = new LinkedHashMap<>();
+        info.put("threadId", threadId);
+        info.put("status", "ATTACHED");
+        info.put("message", "This request is already running. Reconnecting to its progress…");
+        info.put("resumeState", resumeState);
+        info.put("resumeSinceEventId", graphProgressHub.latestEventId(threadId));
+        return info;
+    }
+
+    private boolean isContinueCommand(String prompt) {
         if (prompt == null) return false;
-        String normalized = prompt.trim().toLowerCase(java.util.Locale.ROOT)
-                .replaceAll("[.!?]+$", "")
-                .replaceAll("\\s+", " ");
-        return java.util.Set.of(
-                "continue", "continue please", "proceed", "proceed please",
-                "go ahead", "go ahead please", "resume", "resume please",
-                "continue where you stopped", "continue from where you stopped",
-                "continue from where we stopped", "keep going", "carry on")
-                .contains(normalized);
+        return prompt.trim().toLowerCase(java.util.Locale.ROOT)
+                .matches("(?:please\\s+)?(?:continue|resume|go ahead|proceed|keep going|do it|yes|okay|ok)(?:\\s+please)?[.!?]*");
+    }
+
+    /** Backward-compatible explicit continuation entry point. */
+    public java.util.Optional<Map<String, Object>> tryResumeLatestStopped(String userId, String conversationId, String prompt) {
+        return tryHandleStoppedRunInput(userId, conversationId, prompt, "");
     }
 
     /**
@@ -473,9 +532,14 @@ public class TravelPlannerAgentService {
      * subscription is being created.
      */
     public Map<String, Object> resumeLatestStoppedInfo(String userId, String conversationId) {
-        var stopped = runControlService.latestStopped(userId, conversationId)
+        return resumeLatestStoppedInfo(userId, conversationId, "");
+    }
+
+    private Map<String, Object> resumeLatestStoppedInfo(String userId, String conversationId, String preferredThreadId) {
+        var stopped = runControlService.findStoppedForConversation(userId, conversationId, preferredThreadId);
+        AgentRunControl stoppedRun = stopped
                 .orElseThrow(() -> new IllegalStateException("There is no stopped request to continue."));
-        String threadId = stopped.getThreadId();
+        String threadId = stoppedRun.getThreadId();
         if (!runAdmissionService.tryAcquire(userId)) {
             throw new TooManyRequestsException("Your travel planning capacity is currently busy. Please wait for the active run to finish.");
         }
@@ -496,8 +560,28 @@ public class TravelPlannerAgentService {
             resumeState.put("requestType", checkpoint.requestType());
             resumeState.put("taskStatuses", taskStatuses);
 
-            runControlService.start(userId, conversationId, threadId, stopped.getOriginalRequest(), policy);
+            runControlService.start(userId, conversationId, threadId, stoppedRun.getOriginalRequest(), policy);
             graphProgressHub.open(threadId);
+
+            // Capture the SSE cursor BEFORE submitting the resumed worker.
+            // The worker can emit the RESUME/started event almost immediately;
+            // capturing the cursor after submit creates a race where the cursor
+            // points past the RESUME marker and the UI waits forever for the
+            // current-run marker, eventually reporting a generic error.
+            long resumeSinceEventId = graphProgressHub.latestEventId(threadId);
+
+            // Publish the persisted checkpoint snapshot BEFORE starting the worker.
+            // The browser can therefore hydrate the resumed card even if the worker
+            // reaches the first graph node before the HTTP response/SSE connection
+            // is fully established. The event is intentionally emitted after the
+            // cursor is captured so it is guaranteed to be replayed by afterId.
+            Map<String, Object> resumeEvent = new LinkedHashMap<>();
+            resumeEvent.put("threadId", threadId);
+            resumeEvent.put("node", "RESUME_STATE");
+            resumeEvent.put("message", "Resuming from your saved checkpoint…");
+            resumeEvent.putAll(resumeState);
+            graphProgressHub.emit(threadId, "resume_state", resumeEvent);
+
             Future<?> future = travelPlanExecutor.submit(() -> runResumedStreaming(threadId, userId, conversationId, policy));
             runControlService.registerFuture(threadId, future);
             handedOff = true;
@@ -505,6 +589,7 @@ public class TravelPlannerAgentService {
             info.put("threadId", threadId);
             info.put("status", "RESUMED");
             info.put("resumeState", resumeState);
+            info.put("resumeSinceEventId", resumeSinceEventId);
             return info;
         } catch (RejectedExecutionException ex) {
             throw new TooManyRequestsException("Travel planning is busy right now. Please try again shortly.");
@@ -534,6 +619,9 @@ public class TravelPlannerAgentService {
                 payload.put("end", output.isEND());
                 if (output.state() != null) payload.put("pipeline", output.state().pipeline());
                 graphProgressHub.emit(threadId, "node", payload);
+            }
+            if (runControlService.isStopRequested(threadId)) {
+                throw new GraphStopRequestedException();
             }
             TravelState state = requireCheckpointState(threadId);
             boolean pending = isAwaitingHitl(threadId);
@@ -575,60 +663,39 @@ public class TravelPlannerAgentService {
      */
     private Map<String, Object> buildResumeInput(TravelState checkpoint, String originalRequest) {
         Map<String, Object> resume = new LinkedHashMap<>();
-        resume.put(TravelState.USER_REQUEST, TravelState.firstNonBlank(originalRequest, checkpoint.userRequest()));
+        String effective = TravelState.firstNonBlank(originalRequest, checkpoint.userRequest());
+        resume.put(TravelState.USER_REQUEST, effective);
 
-        if (!isHighConfidenceFullTripRequest(originalRequest)) {
-            return resume;
+        // A durable checkpoint is the source of truth for execution progress.
+        // Do not reconstruct the plan from the original prompt and do not reset
+        // RUN_*/NEEDS_* flags: doing so can make already-completed specialists
+        // execute again after Continue. LangGraph will resume at the persisted
+        // next node and ProductionExecutionNode will execute only non-terminal
+        // tasks in the checkpoint AgentPlan.
+        if (checkpoint.agentPlan() != null) {
+            resume.put(TravelState.AGENT_PLAN, checkpoint.agentPlan());
         }
+        resume.put(TravelState.REQUEST_TYPE, checkpoint.requestType());
+        resume.put(TravelState.NEEDS_FLIGHTS, checkpoint.needsFlights());
+        resume.put(TravelState.NEEDS_HOTELS, checkpoint.needsHotels());
+        resume.put(TravelState.NEEDS_RESEARCH, checkpoint.needsResearch());
+        resume.put(TravelState.NEEDS_WEATHER, checkpoint.needsWeather());
+        resume.put(TravelState.NEEDS_BUDGET, checkpoint.needsBudget());
+        resume.put(TravelState.NEEDS_ITINERARY, checkpoint.needsItinerary());
+        resume.put(TravelState.NEEDS_KNOWLEDGE, checkpoint.needsKnowledge());
+        resume.put(TravelState.RUN_FLIGHTS, checkpoint.runFlights());
+        resume.put(TravelState.RUN_HOTELS, checkpoint.runHotels());
+        resume.put(TravelState.RUN_RESEARCH, checkpoint.runResearch());
+        resume.put(TravelState.RUN_WEATHER, checkpoint.runWeather());
+        resume.put(TravelState.RUN_BUDGET, checkpoint.runBudget());
+        resume.put(TravelState.RUN_ITINERARY, checkpoint.runItinerary());
+        resume.put(TravelState.PLAN_STRATEGY, checkpoint.planStrategy());
+        resume.put(TravelState.PLAN_PRIORITY, checkpoint.planPriority());
 
-        IntentPlan intent = new IntentPlan();
-        intent.setRequestType(IntentPlan.TRIP_PLANNING);
-        intent.setNeedsFlights(true);
-        intent.setNeedsHotels(true);
-        intent.setNeedsResearch(true);
-        intent.setNeedsWeather(true);
-        intent.setNeedsBudget(true);
-        intent.setNeedsItinerary(true);
-        intent.setNeedsKnowledge(true);
-        intent.setBudgetScope("TRIP");
-        intent.setStrategy("trip_planning");
-        intent.setPriority("balanced");
-        intent.setConfidence(0.95d);
-
-        AgentPlan rebuilt = AgentPlan.fromIntent(intent);
-        AgentPlan previous = checkpoint.agentPlan();
-        if (previous != null) {
-            for (AgentTask oldTask : previous.getTasks()) {
-                AgentTask newTask = rebuilt.task(oldTask.getId());
-                if (newTask == null) continue;
-                newTask.setAttempts(oldTask.getAttempts());
-                newTask.setFailureReason(oldTask.getFailureReason());
-                if (oldTask.getStatus() == AgentTask.Status.SUCCEEDED) {
-                    newTask.setStatus(AgentTask.Status.SUCCEEDED);
-                }
-            }
-        }
-
-        resume.put(TravelState.REQUEST_TYPE, IntentPlan.TRIP_PLANNING);
-        resume.put(TravelState.AGENT_PLAN, rebuilt);
-        resume.put(TravelState.NEEDS_FLIGHTS, true);
-        resume.put(TravelState.NEEDS_HOTELS, true);
-        resume.put(TravelState.NEEDS_RESEARCH, true);
-        resume.put(TravelState.NEEDS_WEATHER, true);
-        resume.put(TravelState.NEEDS_BUDGET, true);
-        resume.put(TravelState.NEEDS_ITINERARY, true);
-        resume.put(TravelState.NEEDS_KNOWLEDGE, true);
-        resume.put(TravelState.RUN_FLIGHTS, true);
-        resume.put(TravelState.RUN_HOTELS, true);
-        resume.put(TravelState.RUN_RESEARCH, true);
-        resume.put(TravelState.RUN_WEATHER, true);
-        resume.put(TravelState.RUN_BUDGET, true);
-        resume.put(TravelState.RUN_ITINERARY, true);
-        resume.put(TravelState.PLAN_STRATEGY, "trip_planning");
-        resume.put(TravelState.PLAN_PRIORITY, "balanced");
-
-        log.info("Resume contract restored as TRIP_PLANNING threadId={} originalRequest={} previousTasks={} resumedTasks={}",
-                checkpoint.graphThreadId(), originalRequest, previous == null ? 0 : previous.getTasks().size(), rebuilt.getTasks().size());
+        log.info("Resume preserves checkpoint threadId={} next work request={} tasks={}",
+                checkpoint.graphThreadId(), effective,
+                checkpoint.agentPlan() == null ? 0 : checkpoint.agentPlan().getTasks().stream()
+                        .filter(t -> !t.terminal()).count());
         return resume;
     }
 
@@ -738,6 +805,92 @@ public class TravelPlannerAgentService {
     }
 
     /**
+     * Applies a natural-language change to the stopped checkpoint asynchronously.
+     * The same LangGraph thread and checkpoint are preserved.
+     */
+    private Map<String, Object> startNaturalLanguageModification(
+            String userId, String conversationId, String threadId, String notes, String reframedRequest, String historyContext) {
+        if (!runAdmissionService.tryAcquire(userId)) {
+            throw new TooManyRequestsException("Your travel planning capacity is currently busy. Please wait for the active run to finish.");
+        }
+        boolean handedOff = false;
+        try {
+            TravelState checkpoint = requireCheckpointState(threadId);
+            String policy = previousPolicy(threadId);
+            runControlService.start(userId, conversationId, threadId,
+                    TravelState.firstNonBlank(reframedRequest, checkpoint.userRequest(), notes), policy);
+            graphProgressHub.open(threadId);
+            long since = graphProgressHub.latestEventId(threadId);
+
+            Map<String, String> statuses = new LinkedHashMap<>();
+            if (checkpoint.agentPlan() != null) {
+                for (AgentTask task : checkpoint.agentPlan().getTasks()) {
+                    statuses.put(task.getId(), task.getStatus().name());
+                }
+            }
+            Map<String, Object> resumeState = new LinkedHashMap<>();
+            resumeState.put("nextNode", travelGraph.getState(configFor(threadId)).next());
+            resumeState.put("pipeline", checkpoint.pipeline());
+            resumeState.put("requestType", checkpoint.requestType());
+            resumeState.put("taskStatuses", statuses);
+            resumeState.put("action", "MODIFY");
+
+            Map<String, Object> event = new LinkedHashMap<>(resumeState);
+            event.put("threadId", threadId);
+            event.put("node", "RESUME_STATE");
+            event.put("message", "Applying your change to the saved request…");
+            graphProgressHub.emit(threadId, "resume_state", event);
+
+            Future<?> future = travelPlanExecutor.submit(() -> {
+                try {
+                    graphProgressHub.emit(threadId, "started", Map.of(
+                            "threadId", threadId, "node", "MODIFY",
+                            "message", "Understanding your change and updating the saved request…"));
+                    modify(userId, threadId, notes, reframedRequest, historyContext);
+                    if (runControlService.isStopRequested(threadId) || Thread.currentThread().isInterrupted()) {
+                        throw new GraphStopRequestedException();
+                    }
+                    TravelState after = requireCheckpointState(threadId);
+                    TravelPlanResponse response = toResponse(after, threadId, isAwaitingHitl(threadId));
+                    graphProgressHub.emit(threadId, "complete", Map.of("plan", response));
+                    runControlService.markCompleted(threadId);
+                } catch (Exception ex) {
+                    if (runControlService.isStopRequested(threadId)
+                            || ex instanceof GraphStopRequestedException
+                            || Thread.currentThread().isInterrupted()) {
+                        runControlService.markStopped(threadId);
+                        graphProgressHub.emit(threadId, "stopped", Map.of(
+                                "threadId", threadId,
+                                "message", "Stopped. Your updated checkpoint is saved and ready to continue."));
+                        return;
+                    }
+                    log.error("Stopped-run modification failed userId={} threadId={}", userId, threadId, ex);
+                    runControlService.markFailed(threadId);
+                    graphProgressHub.emit(threadId, "failed", Map.of(
+                            "error", "We couldn't apply that change. Please try again."));
+                } finally {
+                    runAdmissionService.release(userId);
+                }
+            });
+            runControlService.registerFuture(threadId, future);
+            handedOff = true;
+
+            Map<String, Object> result = new LinkedHashMap<>();
+            result.put("threadId", threadId);
+            result.put("status", "MODIFYING");
+            result.put("action", "MODIFY");
+            result.put("resumeState", resumeState);
+            result.put("resumeSinceEventId", since);
+            result.put("userRequest", notes);
+            return result;
+        } catch (RejectedExecutionException ex) {
+            throw new TooManyRequestsException("Travel planning is busy right now. Please try again shortly.");
+        } finally {
+            if (!handedOff) runAdmissionService.release(userId);
+        }
+    }
+
+    /**
      * Resume an existing graph checkpoint with a user modification.
      *
      * IMPORTANT:
@@ -749,6 +902,21 @@ public class TravelPlannerAgentService {
             String userId,
             String threadId,
             String notes,
+            String historyContext) {
+        return modify(userId, threadId, notes, "", historyContext);
+    }
+
+    /**
+     * Applies a conversational turn to an existing checkpoint. The semantic turn
+     * resolver supplies reframedRequest so the planner receives the complete
+     * requirement (previous request + current change), while `notes` remains the
+     * user's actual delta for ModificationAgentService.
+     */
+    public TravelPlanResponse modify(
+            String userId,
+            String threadId,
+            String notes,
+            String reframedRequest,
             String historyContext) {
 
         String key = requireOwnedThread(
@@ -768,7 +936,11 @@ public class TravelPlannerAgentService {
                 notes);
 
         String latestUserRequest;
-        if (previous.userInputRequired()) {
+        if (!TravelState.isBlank(reframedRequest)) {
+            // The turn re-framer already merged the previous requirement with the
+            // current user turn. Keep that complete contract for Planner/Replanner.
+            latestUserRequest = reframedRequest;
+        } else if (previous.userInputRequired()) {
             // A clarification answer such as "Bengaluru" is not a standalone
             // intent. Preserve the original goal and attach the user's missing
             // detail so the next planning pass can resolve the slot correctly.

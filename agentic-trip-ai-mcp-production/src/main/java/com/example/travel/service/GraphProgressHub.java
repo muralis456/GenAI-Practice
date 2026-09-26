@@ -97,6 +97,7 @@ public class GraphProgressHub {
             List<GraphProgressEvent> replay = new ArrayList<>(repository.findTop200ByThreadIdOrderByIdDesc(threadId));
             replay.sort(java.util.Comparator.comparing(GraphProgressEvent::getId));
             for (GraphProgressEvent event : replay) {
+                if (event.getId() <= lastId[0]) continue;
                 send(emitter, event);
                 lastId[0] = event.getId();
                 if (isTerminal(event.getEventType())) {

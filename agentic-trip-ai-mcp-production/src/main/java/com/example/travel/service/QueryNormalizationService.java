@@ -7,7 +7,6 @@ import com.example.travel.support.JsonSupport;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -46,7 +45,6 @@ public class QueryNormalizationService {
      * returned normalized prompt for graph processing and retain the raw text
      * for conversation history/UI.
      */
-    @Transactional(readOnly = true)
     public NormalizationResult normalize(TravelRequest request) {
         if (request == null) {
             return NormalizationResult.empty("");
@@ -188,7 +186,6 @@ public class QueryNormalizationService {
     }
 
     /** Apply the normalized request without changing the raw conversation text. */
-    @Transactional(readOnly = true)
     public void applyToRequest(TravelRequest request) {
         if (request == null) return;
         if (request.getOriginalPrompt() == null || request.getOriginalPrompt().isBlank()) {

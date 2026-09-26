@@ -1,10 +1,12 @@
 package com.example.travel.graph;
 
 import com.example.travel.agent.*;
+import com.example.travel.exception.GraphStopRequestedException;
 import com.example.travel.model.*;
 import com.example.travel.tool.AirportLookupTool;
 import com.example.travel.graph.node.RagNode;
 import com.example.travel.graph.node.HistoryNode;
+import com.example.travel.service.AgentRunControlService;
 import com.example.travel.service.GraphProgressHub;
 import org.bsc.langgraph4j.action.NodeAction;
 import org.springframework.stereotype.Component;
@@ -12,8 +14,11 @@ import org.springframework.stereotype.Component;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Executes the current AgentPlan. It is deliberately not a router: dependencies
@@ -30,18 +35,20 @@ public class ProductionExecutionNode implements NodeAction<TravelState> {
     private final RagNode ragNode;
     private final HistoryNode historyNode;
     private final AirportLookupTool airportLookupTool;
-    private final Executor executor;
+    private final ExecutorService executor;
     private final GraphProgressHub progressHub;
+    private final AgentRunControlService runControlService;
 
     public ProductionExecutionNode(FlightAgentService flight, HotelAgentService hotel,
             TravelResearchAgentService research, WeatherAgentService weather,
             BudgetAgentService budget, ItineraryAgentService itinerary,
             RagNode ragNode, HistoryNode historyNode, AirportLookupTool airportLookupTool,
-            @org.springframework.beans.factory.annotation.Qualifier("travelParallelExecutor") Executor executor,
-            GraphProgressHub progressHub) {
+            @org.springframework.beans.factory.annotation.Qualifier("travelParallelExecutor") ExecutorService executor,
+            GraphProgressHub progressHub, AgentRunControlService runControlService) {
         this.flight = flight; this.hotel = hotel; this.research = research; this.weather = weather;
         this.budget = budget; this.itinerary = itinerary; this.ragNode = ragNode; this.historyNode = historyNode;
         this.airportLookupTool = airportLookupTool; this.executor = executor; this.progressHub = progressHub;
+        this.runControlService = runControlService;
     }
 
     @Override public Map<String,Object> apply(TravelState state) {
@@ -75,22 +82,45 @@ public class ProductionExecutionNode implements NodeAction<TravelState> {
                 .filter(t -> !List.of("flights","hotels","research","weather","knowledge","history").contains(t.getId()))
                 .toList();
 
-        List<CompletableFuture<TaskResult>> futures = parallel.stream()
-                .map(t -> CompletableFuture.supplyAsync(() -> execute(t.getId(), state), executor)
-                        .whenComplete((r, ex) -> emitTaskComplete(state, t, ex == null && r != null && r.success(),
-                                ex == null && r != null ? r.error() : "execution failed")))
+        List<Future<TaskResult>> futures = parallel.stream()
+                .map(task -> executor.submit(() -> execute(task.getId(), state)))
                 .toList();
 
-        for (int i = 0; i < futures.size(); i++) {
-            TaskResult r = futures.get(i).join();
-            merge(updates, r.updates());
-            mark(plan, parallel.get(i), r.success(), r.error());
+        try {
+            for (int i = 0; i < futures.size(); i++) {
+                TaskResult result;
+                while (true) {
+                    if (isStopRequested(state)) {
+                        futures.forEach(future -> future.cancel(true));
+                        throw new GraphStopRequestedException();
+                    }
+                    try {
+                        result = futures.get(i).get(100, TimeUnit.MILLISECONDS);
+                        break;
+                    } catch (TimeoutException ignored) {
+                        // Poll durable run control while specialist calls are in flight.
+                    }
+                }
+                emitTaskComplete(state, parallel.get(i), result.success(), result.error());
+                merge(updates, result.updates());
+                mark(plan, parallel.get(i), result.success(), result.error());
+            }
+        } catch (InterruptedException ex) {
+            futures.forEach(future -> future.cancel(true));
+            Thread.currentThread().interrupt();
+            throw new GraphStopRequestedException(ex);
+        } catch (ExecutionException ex) {
+            futures.forEach(future -> future.cancel(true));
+            Throwable cause = ex.getCause();
+            if (cause instanceof GraphStopRequestedException stopped) throw stopped;
+            throw new RuntimeException("A parallel travel task failed unexpectedly", cause == null ? ex : cause);
         }
 
         // Non-parallel tasks are executed only when their dependencies were
         // already satisfied at the beginning of this wave. In the next graph
         // iteration they will observe persisted outputs from this wave.
         for (AgentTask task : sequential) {
+            if (isStopRequested(state)) throw new GraphStopRequestedException();
             TaskResult r = execute(task.getId(), state);
             merge(updates, r.updates());
             mark(plan, task, r.success(), r.error());
@@ -151,6 +181,10 @@ public class ProductionExecutionNode implements NodeAction<TravelState> {
             }
             return new TaskResult(true,u,"");
         } catch (Exception e) {
+            if (e instanceof GraphStopRequestedException stopped) throw stopped;
+            if (Thread.currentThread().isInterrupted() || isInterrupted(e)) {
+                throw new GraphStopRequestedException(e);
+            }
             Map<String,Object> failureUpdates = new LinkedHashMap<>();
             boolean retryable = e instanceof com.example.travel.service.McpFlightSearchClient.FlightProviderException providerException
                     ? providerException.retryable()
@@ -160,6 +194,19 @@ public class ProductionExecutionNode implements NodeAction<TravelState> {
             return new TaskResult(false, failureUpdates,
                     e.getMessage() == null ? "execution failed" : e.getMessage());
         }
+    }
+
+    private boolean isInterrupted(Throwable error) {
+        for (Throwable cause = error; cause != null; cause = cause.getCause()) {
+            if (cause instanceof InterruptedException) return true;
+        }
+        return false;
+    }
+
+    private boolean isStopRequested(TravelState state) {
+        String threadId = state.graphThreadId();
+        return threadId != null && !threadId.isBlank()
+                && runControlService.isStopRequested(threadId);
     }
 
 

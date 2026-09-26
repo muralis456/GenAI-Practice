@@ -11,4 +11,7 @@ public interface AgentRunControlRepository extends JpaRepository<AgentRunControl
     Optional<AgentRunControl> findByThreadId(String threadId);
     List<AgentRunControl> findByUserIdAndConversationIdAndStatusOrderByUpdatedAtDesc(
             String userId, String conversationId, String status, Pageable pageable);
+
+    List<AgentRunControl> findByUserIdAndStatusOrderByUpdatedAtDesc(
+            String userId, String status, Pageable pageable);
 }

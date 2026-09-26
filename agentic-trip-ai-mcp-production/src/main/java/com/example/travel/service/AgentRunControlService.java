@@ -86,11 +86,27 @@ public class AgentRunControlService {
     }
 
     public void markCompleted(String threadId) {
+        Optional<AgentRunControl> current = repository.findByThreadId(threadId);
+        if (current.isPresent() && (STOP_REQUESTED.equals(current.get().getStatus())
+                || STOPPED.equals(current.get().getStatus()))) {
+            log.info("Ignoring completion for stopped run threadId={} status={}",
+                    threadId, current.get().getStatus());
+            markStopped(threadId);
+            return;
+        }
         update(threadId, COMPLETED);
         cleanup(threadId);
     }
 
     public void markFailed(String threadId) {
+        Optional<AgentRunControl> current = repository.findByThreadId(threadId);
+        if (current.isPresent() && (STOP_REQUESTED.equals(current.get().getStatus())
+                || STOPPED.equals(current.get().getStatus()))) {
+            log.info("Ignoring failure for stopped run threadId={} status={}",
+                    threadId, current.get().getStatus());
+            markStopped(threadId);
+            return;
+        }
         update(threadId, FAILED);
         cleanup(threadId);
     }
@@ -98,6 +114,50 @@ public class AgentRunControlService {
     public Optional<AgentRunControl> latestStopped(String userId, String conversationId) {
         return repository.findByUserIdAndConversationIdAndStatusOrderByUpdatedAtDesc(
                         userId, conversationId, STOPPED, PageRequest.of(0, 1))
+                .stream().findFirst();
+    }
+
+    public Optional<AgentRunControl> findStoppedForConversation(
+            String userId, String conversationId, String preferredThreadId) {
+        if (preferredThreadId != null && !preferredThreadId.isBlank()) {
+            Optional<AgentRunControl> preferred = repository.findByThreadId(preferredThreadId)
+                .filter(run -> userId.equals(run.getUserId()));
+            if (preferred.isPresent()) {
+            return STOPPED.equals(preferred.get().getStatus())
+                ? preferred
+                : Optional.empty();
+            }
+        }
+        if (conversationId == null || conversationId.isBlank()) return Optional.empty();
+        return latestStopped(userId, conversationId);
+    }
+
+        public Optional<AgentRunControl> findActiveForConversation(
+            String userId, String conversationId, String preferredThreadId) {
+        if (preferredThreadId != null && !preferredThreadId.isBlank()) {
+            Optional<AgentRunControl> preferred = repository.findByThreadId(preferredThreadId)
+                .filter(run -> userId.equals(run.getUserId()));
+            if (preferred.isPresent()) {
+            String status = preferred.get().getStatus();
+            return RUNNING.equals(status) || STOP_REQUESTED.equals(status)
+                ? preferred
+                : Optional.empty();
+            }
+        }
+        if (conversationId == null || conversationId.isBlank()) return Optional.empty();
+        Optional<AgentRunControl> running = repository
+            .findByUserIdAndConversationIdAndStatusOrderByUpdatedAtDesc(
+                userId, conversationId, RUNNING, PageRequest.of(0, 1))
+            .stream().findFirst();
+        return running.isPresent() ? running : repository
+            .findByUserIdAndConversationIdAndStatusOrderByUpdatedAtDesc(
+                userId, conversationId, STOP_REQUESTED, PageRequest.of(0, 1))
+            .stream().findFirst();
+        }
+
+    public Optional<AgentRunControl> latestStoppedForUser(String userId) {
+        return repository.findByUserIdAndStatusOrderByUpdatedAtDesc(
+                        userId, STOPPED, PageRequest.of(0, 1))
                 .stream().findFirst();
     }
 

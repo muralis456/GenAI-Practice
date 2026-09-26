@@ -7,6 +7,7 @@ import org.springframework.ai.tool.ToolCallbackProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
+import com.example.travel.exception.GraphStopRequestedException;
 import com.example.travel.security.PromptInjectionGuard;
 import com.example.travel.tool.ToolGovernanceService;
 import tools.jackson.databind.JsonNode;
@@ -101,6 +102,9 @@ public class McpToolClient {
             String toolName = callback.getToolDefinition().name();
             return invoke(toolName, callback, arguments);
         } catch (Exception exception) {
+            if (isCancellation(exception)) {
+                throw stopException(exception);
+            }
             log.error("mcp.client.error phase=selection agentPurpose='{}' userInput='{}' errorType={} errorMessage={}",
                     abbreviate(agentPurpose), abbreviate(userInput),
                     exception.getClass().getName(), safeExceptionMessage(exception), exception);
@@ -207,6 +211,12 @@ public class McpToolClient {
                 log.info("mcp.client.complete tool={} attempt={} durationMs={}", toolName, attempt, elapsedMs(started));
                 return result;
             } catch (Exception exception) {
+                if (isCancellation(exception)) {
+                    Thread.currentThread().interrupt();
+                    log.info("mcp.client.cancelled tool={} attempt={} durationMs={}",
+                            callback.getToolDefinition().name(), attempt, elapsedMs(started));
+                    throw stopException(exception);
+                }
                 last = exception;
                 toolGovernance.recordFailure(toolName);
                 boolean retryable = isRetryable(exception);
@@ -256,6 +266,24 @@ public class McpToolClient {
         }
 
         return !(exception instanceof IllegalArgumentException || exception instanceof IllegalStateException);
+    }
+
+    private static boolean isCancellation(Throwable error) {
+        if (Thread.currentThread().isInterrupted()) return true;
+        for (Throwable current = error; current != null; current = current.getCause()) {
+            if (current instanceof GraphStopRequestedException
+                    || current instanceof InterruptedException
+                    || current instanceof java.util.concurrent.CancellationException) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static GraphStopRequestedException stopException(Throwable error) {
+        return error instanceof GraphStopRequestedException stop
+                ? stop
+                : new GraphStopRequestedException(error);
     }
 
     private boolean isRetryableProviderResponse(String errorCode, String message) {
@@ -308,6 +336,10 @@ public class McpToolClient {
             } catch (java.util.concurrent.TimeoutException timeout) {
                 future.cancel(true);
                 throw new java.util.concurrent.TimeoutException("MCP tool timed out after " + timeoutMs + "ms");
+            } catch (InterruptedException interrupted) {
+                future.cancel(true);
+                Thread.currentThread().interrupt();
+                throw interrupted;
             }
         } finally {
             executor.shutdownNow();
