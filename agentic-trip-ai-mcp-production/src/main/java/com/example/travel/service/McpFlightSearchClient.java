@@ -46,10 +46,21 @@ public class McpFlightSearchClient {
             departureDate = correctedDate;
         }
         try {
-                Map<String, Object> input = Map.of(
+            // Ignav requires a concrete departure_date even when the user did not
+            // specify an exact travel date. Keep the user intent date-flexible, but
+            // use a provider-only probe date at the MCP boundary. This date is never
+            // written back into TravelState or presented as the user's requested date.
+            LocalDate providerDepartureDate = departureDate != null
+                    ? departureDate
+                    : LocalDate.now().plusDays(1);
+            if (departureDate == null) {
+                log.info("mcp.client.date.guard using provider probe date={} for flexible search origin={} destination={}",
+                        providerDepartureDate, origin, destination);
+            }
+            Map<String, Object> input = Map.of(
                     "origin", origin,
                     "destination", destination,
-                    "departureDate", departureDate == null ? "" : departureDate.toString(),
+                    "departureDate", providerDepartureDate.toString(),
                     "returnDate", "",
                     "passengers", Math.max(1, passengers));
                 return parse(mcpToolClient.invokePreferred("search_flights", "Live flight schedule search", userInput, input));

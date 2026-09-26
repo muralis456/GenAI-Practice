@@ -8,6 +8,12 @@ import com.example.travel.service.ConversationMemoryService;
 import com.example.travel.service.GraphProgressHub;
 import com.example.travel.service.QueryNormalizationService;
 import com.example.travel.service.TripHistoryService;
+import com.example.travel.idempotency.IdempotencyService;
+import com.example.travel.idempotency.IdempotencyService.DuplicateRequestException;
+import com.example.travel.idempotency.IdempotencyService.KeyReuseException;
+import tools.jackson.databind.ObjectMapper;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -31,17 +37,23 @@ public class TravelController {
     private final GraphProgressHub graphProgressHub;
     private final TripHistoryService tripHistoryService;
     private final QueryNormalizationService queryNormalizationService;
+    private final IdempotencyService idempotencyService;
+    private final ObjectMapper objectMapper;
 
     public TravelController(TravelPlannerAgentService travelPlannerAgentService,
                             ConversationMemoryService conversationMemoryService,
                             GraphProgressHub graphProgressHub,
                             TripHistoryService tripHistoryService,
-                            QueryNormalizationService queryNormalizationService) {
+                            QueryNormalizationService queryNormalizationService,
+                            IdempotencyService idempotencyService,
+                            ObjectMapper objectMapper) {
         this.travelPlannerAgentService = travelPlannerAgentService;
         this.conversationMemoryService = conversationMemoryService;
         this.graphProgressHub = graphProgressHub;
         this.tripHistoryService = tripHistoryService;
         this.queryNormalizationService = queryNormalizationService;
+        this.idempotencyService = idempotencyService;
+        this.objectMapper = objectMapper;
     }
 
     @PostMapping("/plan")
@@ -74,9 +86,27 @@ public class TravelController {
 
     @PostMapping("/plan/start")
     public ResponseEntity<Map<String, String>> startPlan(Authentication authentication,
+                                                         @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
                                                          @Valid @RequestBody TravelRequest request) {
         String userId = currentUser(authentication);
         request.setUserId(userId);
+        String requestHash = requestHash(request);
+        if (idempotencyKey != null) {
+            try {
+                var existing = idempotencyService.find(userId, idempotencyKey, requestHash);
+                if (existing.isPresent()) {
+                    return ResponseEntity.status(HttpStatus.ACCEPTED).body(objectMapper.readValue(existing.get(), Map.class));
+                }
+                idempotencyService.claim(userId, idempotencyKey, requestHash);
+            } catch (DuplicateRequestException duplicate) {
+                return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("status", "IN_PROGRESS", "message", duplicate.getMessage()));
+            } catch (KeyReuseException conflict) {
+                return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("status", "KEY_REUSED", "message", conflict.getMessage()));
+            } catch (Exception ex) {
+                log.error("Idempotency persistence failed userId={} key={} hash={}", userId, idempotencyKey, requestHash, ex);
+                throw new IllegalStateException("Unable to process Idempotency-Key. Verify Flyway migration V8__phase1_idempotency.sql is applied.", ex);
+            }
+        }
         String conversationId = request.getConversationId();
         if (conversationId == null || conversationId.isBlank()) {
             conversationId = userId + "-conversation";
@@ -126,7 +156,12 @@ public class TravelController {
 
         String historyContext = conversationMemoryService.buildConversationHistoryContext(userId, conversationId);
         String threadId = travelPlannerAgentService.startTravelPlan(request, historyContext);
-        return ResponseEntity.status(HttpStatus.ACCEPTED).body(Map.of("threadId", threadId, "status", "STARTED"));
+        Map<String, String> started = Map.of("threadId", threadId, "status", "STARTED");
+        if (idempotencyKey != null) {
+            try { idempotencyService.complete(userId, idempotencyKey, requestHash, objectMapper.writeValueAsString(started)); }
+            catch (Exception ex) { log.warn("Unable to persist idempotency response", ex); }
+        }
+        return ResponseEntity.status(HttpStatus.ACCEPTED).body(started);
     }
 
     @GetMapping(value = "/plan/{threadId}/events", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
@@ -218,6 +253,15 @@ public class TravelController {
         conversationMemoryService.saveUiMessage(userId, request.getThreadId(), "assistant", responseMessage(response, "Plan rejected"), response);
         tripHistoryService.saveOrUpdate(userId, response);
         return ResponseEntity.ok(response);
+    }
+
+    private String requestHash(TravelRequest request) {
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256").digest(objectMapper.writeValueAsBytes(request));
+            StringBuilder hex = new StringBuilder();
+            for (byte b : digest) hex.append(String.format("%02x", b));
+            return hex.toString();
+        } catch (Exception ex) { throw new IllegalStateException("Unable to hash travel request", ex); }
     }
 
     private String responseMessage(TravelPlanResponse response, String fallback) {

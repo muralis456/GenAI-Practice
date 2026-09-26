@@ -4,6 +4,7 @@ import com.example.travel.config.TravelModelsProperties.AgentRole;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import com.example.travel.security.PromptInjectionGuard;
 import org.springframework.ai.tool.ToolCallback;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -25,10 +26,12 @@ public class McpToolSelector {
     private final RoutedLlm routedLlm;
     private final ObjectMapper objectMapper;
     private final ConcurrentHashMap<String, String> selectionCache = new ConcurrentHashMap<>();
+    private final PromptInjectionGuard promptInjectionGuard;
 
-    public McpToolSelector(RoutedLlm routedLlm, ObjectMapper objectMapper) {
+    public McpToolSelector(RoutedLlm routedLlm, ObjectMapper objectMapper, PromptInjectionGuard promptInjectionGuard) {
         this.routedLlm = routedLlm;
         this.objectMapper = objectMapper;
+        this.promptInjectionGuard = promptInjectionGuard;
     }
 
     public ToolCallback select(String agentPurpose, String userInput, List<ToolCallback> candidates) throws Exception {
@@ -38,7 +41,7 @@ public class McpToolSelector {
 
         String tools = candidates.stream()
                 .map(callback -> "- name: " + callback.getToolDefinition().name()
-                        + "\n  description: " + safe(callback.getToolDefinition().description()))
+                        + "\n  description: " + promptInjectionGuard.wrapUntrusted("MCP_TOOL_DESCRIPTION", callback.getToolDefinition().description()))
                 .collect(Collectors.joining("\n"));
 
         // MCP tool selection is infrastructure, not the application's semantic

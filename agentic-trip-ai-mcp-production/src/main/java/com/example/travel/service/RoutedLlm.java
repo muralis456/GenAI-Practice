@@ -60,6 +60,11 @@ public class RoutedLlm {
         String policy = ModelRoutingContext.get();
         ModelRoutingContext.Complexity complexity = ModelRoutingContext.getComplexity();
         String model = models.resolve(role, policy);
+        java.util.List<String> modelCandidates = new java.util.ArrayList<>();
+        modelCandidates.add(model);
+        if (models.getFallbackModels() != null) {
+            models.getFallbackModels().stream().filter(m -> m != null && !m.isBlank() && !m.trim().equals(model)).forEach(modelCandidates::add);
+        }
         String toolNames = tools == null || tools.length == 0 ? ""
                 : Arrays.stream(tools).map(tool -> tool.getClass().getSimpleName()).collect(Collectors.joining(","));
         log.info("[RoutedLLM] phase={} decision=MODEL_SELECTION model={} policy={} complexity={} tools={} purpose={} reason={}",
@@ -75,55 +80,54 @@ public class RoutedLlm {
         if (tools != null && tools.length > 0) {
             prompt = prompt.tools(tools);
         }
-        String content;
-        try {
-            var call = prompt.call();
-            content = call.content();
-
-            long durationMs = System.currentTimeMillis() - started;
-            log.info("[RoutedLLM] phase={} decision=LLM_COMPLETED model={} durationMs={} responseStatus={} outputChars={}",
-                    role, model, durationMs,
-                    content == null || content.isBlank() ? "EMPTY" : "SUCCESS",
-                    content == null ? 0 : content.length());
-
-            int inputTokens = 0;
-            int outputTokens = 0;
+        Exception lastFailure = null;
+        for (int candidateIndex = 0; candidateIndex < modelCandidates.size(); candidateIndex++) {
+            String candidateModel = modelCandidates.get(candidateIndex);
             try {
-                var response = call.chatResponse();
-                if (response != null && response.getMetadata() != null && response.getMetadata().getUsage() != null) {
-                    var usage = response.getMetadata().getUsage();
-                    inputTokens = safeTokens(usage.getPromptTokens());
-                    outputTokens = safeTokens(usage.getCompletionTokens());
+                if (candidateIndex > 0) {
+                    log.warn("[RoutedLLM] phase={} decision=MODEL_FALLBACK from={} to={}", role, model, candidateModel);
                 }
-            } catch (Exception ignored) {
-                // Some Ollama responses omit usage.
-            }
-            LlmExecutionResult result = new LlmExecutionResult(content, model, toolNames,
-                    durationMs, inputTokens, outputTokens);
-            LlmCallContext.record(result);
-            return result;
-        } catch (Exception ex) {
-            long durationMs = System.currentTimeMillis() - started;
-            // Cancellation is an explicit user control action. It must never be
-            // reported as an LLM/provider failure and must not trigger recovery.
-            if (ex instanceof GraphStopRequestedException
-                    || Thread.currentThread().isInterrupted()
-                    || isInterruptedCause(ex)) {
-                Thread.interrupted();
-                log.info("[RoutedLLM] phase={} decision=STOPPED_BY_USER model={} durationMs={}",
-                        role, model, durationMs);
-                if (ex instanceof GraphStopRequestedException stopRequested) {
-                    throw stopRequested;
+                var candidatePrompt = chatClient.prompt()
+                    .options(OllamaChatOptions.builder()
+                        .model(candidateModel)
+                        .temperature(models.temperature(role))
+                        .numPredict(maxTokens(role)))
+                    .system(system)
+                    .user(user);
+                if (tools != null && tools.length > 0) candidatePrompt = candidatePrompt.tools(tools);
+                long candidateStarted = System.currentTimeMillis();
+                var call = candidatePrompt.call();
+                String content = call.content();
+                long durationMs = System.currentTimeMillis() - candidateStarted;
+                log.info("[RoutedLLM] phase={} decision=LLM_COMPLETED model={} durationMs={} responseStatus={} outputChars={}",
+                        role, candidateModel, durationMs, content == null || content.isBlank() ? "EMPTY" : "SUCCESS", content == null ? 0 : content.length());
+                int inputTokens = 0;
+                int outputTokens = 0;
+                try {
+                    var response = call.chatResponse();
+                    if (response != null && response.getMetadata() != null && response.getMetadata().getUsage() != null) {
+                        var usage = response.getMetadata().getUsage();
+                        inputTokens = safeTokens(usage.getPromptTokens());
+                        outputTokens = safeTokens(usage.getCompletionTokens());
+                    }
+                } catch (Exception ignored) { }
+                LlmExecutionResult result = new LlmExecutionResult(content, candidateModel, toolNames, durationMs, inputTokens, outputTokens);
+                LlmCallContext.record(result);
+                return result;
+            } catch (Exception ex) {
+                long durationMs = System.currentTimeMillis() - started;
+                if (ex instanceof GraphStopRequestedException || Thread.currentThread().isInterrupted() || isInterruptedCause(ex)) {
+                    Thread.interrupted();
+                    log.info("[RoutedLLM] phase={} decision=STOPPED_BY_USER model={} durationMs={}", role, candidateModel, durationMs);
+                    if (ex instanceof GraphStopRequestedException stopRequested) throw stopRequested;
+                    throw new GraphStopRequestedException(ex);
                 }
-                throw new GraphStopRequestedException(ex);
+                lastFailure = ex;
+                log.warn("[RoutedLLM] phase={} decision=LLM_FAILED model={} durationMs={} errorType={} message={}", role, candidateModel, durationMs, ex.getClass().getSimpleName(), sanitizeLogMessage(ex.getMessage()));
             }
-            log.warn("[RoutedLLM] phase={} decision=LLM_FAILED model={} durationMs={} errorType={} message={}",
-                    role, model, durationMs, ex.getClass().getSimpleName(), sanitizeLogMessage(ex.getMessage()));
-            if (ex instanceof RuntimeException runtimeException) {
-                throw runtimeException;
-            }
-            throw new RuntimeException(ex);
         }
+        if (lastFailure instanceof RuntimeException runtimeException) throw runtimeException;
+        throw new RuntimeException(lastFailure);
     }
 
     private static boolean isInterruptedCause(Throwable error) {

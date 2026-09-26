@@ -89,6 +89,12 @@ travel:
     client:
       enabled: ${TRAVEL_MCP_CLIENT_ENABLED:true}
       max-attempts: ${TRAVEL_MCP_CLIENT_MAX_ATTEMPTS:2}
+      timeout-ms: ${TRAVEL_MCP_CLIENT_TIMEOUT_MS:15000}
+    governance:
+      enabled: ${TRAVEL_MCP_GOVERNANCE_ENABLED:true}
+      max-argument-bytes: ${TRAVEL_MCP_MAX_ARGUMENT_BYTES:16384}
+      circuit-failure-threshold: ${TRAVEL_MCP_CIRCUIT_FAILURE_THRESHOLD:3}
+      circuit-open-ms: ${TRAVEL_MCP_CIRCUIT_OPEN_MS:30000}
   itinerary:
     provider: ${TRAVEL_ITINERARY_PROVIDER:fast}
   rag:
@@ -133,6 +139,9 @@ travel:
     fast: ${TRAVEL_MODEL_FAST:llama3.2:3b}
     balanced: ${TRAVEL_MODEL_BALANCED:llama3.2:3b}
     reasoning: ${TRAVEL_MODEL_REASONING:llama3.2:3b}
+    fallback-models:
+      - ${TRAVEL_MODEL_FALLBACK_1:}
+      - ${TRAVEL_MODEL_FALLBACK_2:}
     max-tokens:
       extraction: ${TRAVEL_MODEL_MAX_TOKENS_EXTRACTION:384}
       planner: ${TRAVEL_MODEL_MAX_TOKENS_PLANNER:512}

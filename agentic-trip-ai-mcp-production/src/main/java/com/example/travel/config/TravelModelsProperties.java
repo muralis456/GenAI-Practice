@@ -16,6 +16,7 @@ public class TravelModelsProperties {
     private String fast;
     private String balanced;
     private String reasoning;
+    private java.util.List<String> fallbackModels = new java.util.ArrayList<>();
 
     private double extractionTemperature = 0.1;
     private double plannerTemperature = 0.2;
@@ -69,6 +70,10 @@ public class TravelModelsProperties {
     public void setBalanced(String balanced) {
         this.balanced = balanced;
     }
+
+    public java.util.List<String> getFallbackModels() { return fallbackModels; }
+
+    public void setFallbackModels(java.util.List<String> fallbackModels) { this.fallbackModels = fallbackModels == null ? new java.util.ArrayList<>() : fallbackModels; }
 
     public String getReasoning() {
         return reasoning;

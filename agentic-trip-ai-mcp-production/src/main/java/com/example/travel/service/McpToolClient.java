@@ -7,6 +7,8 @@ import org.springframework.ai.tool.ToolCallbackProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
+import com.example.travel.security.PromptInjectionGuard;
+import com.example.travel.tool.ToolGovernanceService;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
@@ -34,12 +36,18 @@ public class McpToolClient {
     private final McpToolSelector toolSelector;
     private final java.util.Set<String> allowedTools;
     private final int maxAttempts;
+    private final long timeoutMs;
+    private final PromptInjectionGuard promptInjectionGuard;
+    private final ToolGovernanceService toolGovernance;
 
     public McpToolClient(ToolCallbackProvider toolCallbackProvider,
                          ObjectMapper objectMapper,
                          McpToolSelector toolSelector,
                          @Value("${TRAVEL_MCP_CLIENT_ALLOWED_TOOLS:}") String allowedTools,
-                         @Value("${travel.mcp.client.max-attempts:2}") int maxAttempts) {
+                         @Value("${travel.mcp.client.max-attempts:2}") int maxAttempts,
+                         @Value("${travel.mcp.client.timeout-ms:15000}") long timeoutMs,
+                         PromptInjectionGuard promptInjectionGuard,
+                         ToolGovernanceService toolGovernance) {
         this.toolCallbackProvider = toolCallbackProvider;
         this.objectMapper = objectMapper;
         this.toolSelector = toolSelector;
@@ -50,6 +58,9 @@ public class McpToolClient {
                 .filter(tool -> !tool.isEmpty())
                 .collect(Collectors.toUnmodifiableSet());
         this.maxAttempts = Math.max(1, maxAttempts);
+        this.timeoutMs = Math.max(1000, timeoutMs);
+        this.promptInjectionGuard = promptInjectionGuard;
+        this.toolGovernance = toolGovernance;
     }
 
     /**
@@ -156,13 +167,16 @@ public class McpToolClient {
     }
 
     private JsonNode invoke(String toolName, ToolCallback callback, Map<String, Object> arguments) throws Exception {
+        String purpose = "MCP invocation";
+        String argumentJson = objectMapper.writeValueAsString(arguments == null ? Map.of() : arguments);
+        toolGovernance.authorize(toolName, purpose, argumentJson);
         Exception last = null;
         long started = System.nanoTime();
         for (int attempt = 1; attempt <= maxAttempts; attempt++) {
             try {
                 log.info("mcp.client.invocation-start tool={} attempt={}",
                         callback.getToolDefinition().name(), attempt);
-                String response = callback.call(objectMapper.writeValueAsString(arguments));
+                String response = callWithTimeout(callback, argumentJson);
                 JsonNode result = responseTree(response);
                 if (result.has("success")) {
                     boolean success = result.path("success").asBoolean();
@@ -172,6 +186,7 @@ public class McpToolClient {
                         message = result.path("summary").asString("");
                     }
                     if (success) {
+                        toolGovernance.recordSuccess(toolName);
                         log.info("mcp.client.response tool={} success=true errorCode={} message={}",
                                 toolName, errorCode, message);
                     } else {
@@ -183,6 +198,7 @@ public class McpToolClient {
                         // into another invocation. This is especially important for
                         // quota/rate-limit errors, where another call only consumes more quota.
                         if (!responseRetryable) {
+                            toolGovernance.recordFailure(toolName);
                             log.warn("mcp.client.no-retry tool={} reason=provider-non-retryable errorCode={} message={}",
                                     toolName, errorCode, message);
                         }
@@ -192,6 +208,7 @@ public class McpToolClient {
                 return result;
             } catch (Exception exception) {
                 last = exception;
+                toolGovernance.recordFailure(toolName);
                 boolean retryable = isRetryable(exception);
                 log.error("mcp.client.error phase=invocation tool={} attempt={} retryable={} errorType={} errorMessage={} durationMs={}",
                         toolName, attempt, retryable, exception.getClass().getName(),
@@ -280,6 +297,21 @@ public class McpToolClient {
             current = current.getCause();
         }
         return value.toString();
+    }
+
+    private String callWithTimeout(ToolCallback callback, String argumentJson) throws Exception {
+        java.util.concurrent.ExecutorService executor = java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor();
+        try {
+            java.util.concurrent.Future<String> future = executor.submit(() -> callback.call(argumentJson));
+            try {
+                return future.get(timeoutMs, java.util.concurrent.TimeUnit.MILLISECONDS);
+            } catch (java.util.concurrent.TimeoutException timeout) {
+                future.cancel(true);
+                throw new java.util.concurrent.TimeoutException("MCP tool timed out after " + timeoutMs + "ms");
+            }
+        } finally {
+            executor.shutdownNow();
+        }
     }
 
     private JsonNode responseTree(String response) throws Exception {
