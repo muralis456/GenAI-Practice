@@ -218,8 +218,12 @@ public class McpToolClient {
                     throw stopException(exception);
                 }
                 last = exception;
-                toolGovernance.recordFailure(toolName);
-                boolean retryable = isRetryable(exception);
+                boolean policyFailure = exception instanceof SecurityException
+                        || exception instanceof com.example.travel.exception.ToolApprovalRequiredException;
+                if (!policyFailure) {
+                    toolGovernance.recordFailure(toolName);
+                }
+                boolean retryable = !policyFailure && isRetryable(exception);
                 log.error("mcp.client.error phase=invocation tool={} attempt={} retryable={} errorType={} errorMessage={} durationMs={}",
                         toolName, attempt, retryable, exception.getClass().getName(),
                         safeExceptionMessage(exception), elapsedMs(started), exception);
@@ -265,7 +269,10 @@ public class McpToolClient {
             return false;
         }
 
-        return !(exception instanceof IllegalArgumentException || exception instanceof IllegalStateException);
+        return !(exception instanceof IllegalArgumentException
+                || exception instanceof IllegalStateException
+                || exception instanceof SecurityException
+                || exception instanceof com.example.travel.exception.ToolApprovalRequiredException);
     }
 
     private static boolean isCancellation(Throwable error) {
