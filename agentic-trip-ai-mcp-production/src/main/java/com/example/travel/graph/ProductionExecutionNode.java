@@ -136,8 +136,13 @@ public class ProductionExecutionNode implements NodeAction<TravelState> {
     private boolean readyNow(AgentPlan p, AgentTask t) { return t.getDependsOn().stream().allMatch(d -> { AgentTask x=p.task(d); return x==null || x.getStatus()==AgentTask.Status.SUCCEEDED; }); }
 
     private TaskResult execute(String id, TravelState s) {
-        try {
-            Map<String,Object> u = new LinkedHashMap<>();
+        // The execution pool is shared by parallel specialist tasks, so identity
+        // must be installed per task and removed in finally. The policy engine
+        // reads this context immediately before every MCP invocation.
+        try (com.example.travel.tool.ToolInvocationContext.Scope ignored =
+                     com.example.travel.tool.ToolInvocationContext.open(s.userId(), "USER")) {
+            try {
+                Map<String,Object> u = new LinkedHashMap<>();
             switch(id) {
                 case "flights" -> { var r=flight.search(s); u.put(TravelState.FLIGHTS,r.flights()); u.put(TravelState.ORIGIN_IATA,r.originIata()); u.put(TravelState.DESTINATION_IATA,r.destinationIata()); if(r.flights().isEmpty()) return new TaskResult(false,u,"No usable flight options found"); }
                 case "hotels" -> { var r=hotel.search(s); u.put(TravelState.HOTELS,r.hotels()); u.put(TravelState.HOTEL_FALLBACK_EXHAUSTED,r.fallbackExhausted()); if(r.hotels().isEmpty()) return new TaskResult(false,u,"No usable hotel options found"); }
@@ -179,8 +184,8 @@ public class ProductionExecutionNode implements NodeAction<TravelState> {
                 }
                 default -> { return new TaskResult(false,u,"Unsupported task: "+id); }
             }
-            return new TaskResult(true,u,"");
-        } catch (Exception e) {
+                return new TaskResult(true,u,"");
+            } catch (Exception e) {
             if (e instanceof GraphStopRequestedException stopped) throw stopped;
             if (Thread.currentThread().isInterrupted() || isInterrupted(e)) {
                 throw new GraphStopRequestedException(e);
@@ -191,8 +196,9 @@ public class ProductionExecutionNode implements NodeAction<TravelState> {
                     : com.example.travel.support.ToolFailureClassifier.fromException(e).isRetryable();
             failureUpdates.putAll(NodeFailureSupport.record(id, s, e, retryable,
                     s.nodeFailure().getNodeRetryCount()));
-            return new TaskResult(false, failureUpdates,
-                    e.getMessage() == null ? "execution failed" : e.getMessage());
+                return new TaskResult(false, failureUpdates,
+                        e.getMessage() == null ? "execution failed" : e.getMessage());
+            }
         }
     }
 
